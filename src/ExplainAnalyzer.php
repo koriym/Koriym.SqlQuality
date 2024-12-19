@@ -4,15 +4,24 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use function preg_match;
+use function array_filter;
+use function array_unique;
+use function implode;
 use function preg_match_all;
 use function sprintf;
 use function str_contains;
+use function usort;
 
 class ExplainAnalyzer
 {
     private array $issues = [];
     private string $sqlFile = '';
+
+    /**
+     * 問題の重要度レベル
+     */
+    private const PRIORITY_ROOT = 'root';      // 根本的な問題
+    private const PRIORITY_DERIVED = 'derived'; // 派生的な問題
 
     public function setSqlFile(string $sqlFile): void
     {
@@ -28,17 +37,14 @@ class ExplainAnalyzer
         $this->issues = [];
         $queryBlock = $explainResult['query_block'];
 
-        // 基本的なテーブルアクセスの分析
         if (isset($queryBlock['table'])) {
             $this->analyzeTable($queryBlock['table']);
         }
 
-        // ソート操作の分析
         if (isset($queryBlock['ordering_operation'])) {
             $this->analyzeOrdering($queryBlock['ordering_operation']);
         }
 
-        // GROUP BY操作の分析
         if (isset($queryBlock['grouping_operation'])) {
             $this->analyzeGrouping($queryBlock['grouping_operation']);
         }
@@ -47,6 +53,11 @@ class ExplainAnalyzer
             $issue['sql_file'] = $this->sqlFile;
         }
 
+        // 優先度順にソート
+        usort($this->issues, static function ($a, $b) {
+            return $a['priority'] <=> $b['priority'];
+        });
+
         return $this->issues;
     }
 
@@ -54,91 +65,85 @@ class ExplainAnalyzer
     {
         $tableName = $table['table_name'] ?? 'unknown';
 
-        // フルテーブルスキャンの検出
-        if (isset($table['access_type']) && $table['access_type'] === 'ALL') {
-            $this->issues[] = [
-                'type' => 'full_table_scan',
-                'table' => $tableName,
-                'description' => 'Full table scan detected. Consider adding an index.',
-            ];
-        }
-
-        // インデックスが使えるのに使っていない場合
+        // 根本的な問題: インデックスが使えるのに使っていない
         if (isset($table['possible_keys']) && (! isset($table['key']) || empty($table['key']))) {
             $this->issues[] = [
                 'type' => 'unused_available_index',
                 'table' => $tableName,
-                'description' => 'Index available but not used.',
+                'description' => 'Available indexes are not being used. This is causing unnecessary table scans.',
+                'priority' => self::PRIORITY_ROOT,
             ];
         }
-
-        // フィルタ率の分析
-        if (isset($table['filtered'])) {
-            $filtered = (float) $table['filtered'];
-            if ($filtered > 90) {
-                $this->issues[] = [
-                    'type' => 'high_filter_ratio',
-                    'table' => $tableName,
-                    'description' => sprintf(
-                        'Filter ratio is very high (%.2f%%). Conditions might not be selective enough.',
-                        $filtered,
-                    ),
-                ];
-            }
-        }
-
-        // スキャン行数の分析
-        if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
+        // その他のフルテーブルスキャンはインデックスがない場合
+        elseif (isset($table['access_type']) && $table['access_type'] === 'ALL') {
             $this->issues[] = [
-                'type' => 'high_scan_rows',
+                'type' => 'full_table_scan',
                 'table' => $tableName,
-                'description' => sprintf(
-                    'Large number of rows examined per scan: %d. Consider more selective conditions.',
-                    $table['rows_examined_per_scan'],
-                ),
+                'description' => 'Full table scan detected. Consider adding an appropriate index.',
+                'priority' => self::PRIORITY_ROOT,
             ];
         }
 
-        // JOIN バッファの使用検出
+        // 根本的な問題: JOINの問題
         if (isset($table['using_join_buffer'])) {
             $this->issues[] = [
-                'type' => 'using_join_buffer',
+                'type' => 'inefficient_join',
                 'table' => $tableName,
                 'description' => sprintf(
-                    'Using join buffer (%s). Consider adding proper indexes for JOIN conditions.',
+                    'Inefficient JOIN operation using %s. Add an index for JOIN conditions.',
                     $table['using_join_buffer'],
                 ),
+                'priority' => self::PRIORITY_ROOT,
             ];
         }
 
-        // 条件句の分析
+        // 根本的な問題: インデックスを使えない条件
         if (isset($table['attached_condition'])) {
             $condition = $table['attached_condition'];
 
-            // 関数使用の検出
+            // 関数使用
             if (str_contains($condition, 'DATE(') || str_contains($condition, 'cast(')) {
                 $this->issues[] = [
-                    'type' => 'function_on_indexed_column',
+                    'type' => 'function_on_column',
                     'table' => $tableName,
-                    'description' => 'Function used on column prevents index usage',
+                    'description' => 'Function call in WHERE clause prevents index usage. Rewrite the condition.',
+                    'priority' => self::PRIORITY_ROOT,
                 ];
             }
 
-            // LIKEパターンの検出（複数のLIKE条件も個別に検出）
+            // LIKE with wildcards
             $matches = [];
-            preg_match_all("/`[^`]+` like '%[^']*%'/i", $condition, $matches);
-            foreach ($matches[0] as $match) {
-                preg_match('/`([^`]+)`/', $match, $columnMatch);
-                $columnName = $columnMatch[1] ?? 'unknown';
+            preg_match_all("/`([^`]+)` like '%[^']*%'/i", $condition, $matches);
+            if (! empty($matches[1])) {
+                $columns = implode(', ', array_unique($matches[1]));
                 $this->issues[] = [
-                    'type' => 'leading_wildcard_like',
+                    'type' => 'inefficient_like',
                     'table' => $tableName,
                     'description' => sprintf(
-                        'Leading wildcard in LIKE on column %s prevents index usage',
-                        $columnName,
+                        'Leading wildcard in LIKE on column(s) %s prevents index usage. Consider using full-text search.',
+                        $columns,
                     ),
+                    'priority' => self::PRIORITY_ROOT,
                 ];
             }
+        }
+
+        // 派生的な問題: 高いフィルタ率（他の問題の結果として）
+        if (
+            isset($table['filtered'])
+            && (float) $table['filtered'] > 90
+            && isset($table['rows_examined_per_scan'])
+            && $table['rows_examined_per_scan'] > 100
+        ) {
+            $this->issues[] = [
+                'type' => 'low_selectivity',
+                'table' => $tableName,
+                'description' => sprintf(
+                    'Query examines %.1f%% of scanned rows. Conditions are not selective enough.',
+                    (float) $table['filtered'],
+                ),
+                'priority' => self::PRIORITY_DERIVED,
+            ];
         }
     }
 
@@ -147,9 +152,10 @@ class ExplainAnalyzer
         if (isset($ordering['using_filesort']) && $ordering['using_filesort'] === true) {
             $tableName = $ordering['table']['table_name'] ?? 'unknown';
             $this->issues[] = [
-                'type' => 'filesort',
+                'type' => 'filesort_required',
                 'table' => $tableName,
-                'description' => 'Filesort detected in ORDER BY. Consider adding an index for sorting columns.',
+                'description' => 'Extra sorting required for ORDER BY. Add an index that matches the ordering.',
+                'priority' => self::PRIORITY_ROOT,
             ];
         }
 
@@ -163,9 +169,10 @@ class ExplainAnalyzer
         if (isset($grouping['using_temporary_table']) && $grouping['using_temporary_table'] === true) {
             $tableName = $grouping['nested_loop'][0]['table']['table_name'] ?? 'unknown';
             $this->issues[] = [
-                'type' => 'temporary_table',
+                'type' => 'temp_table_required',
                 'table' => $tableName,
-                'description' => 'Temporary table used for grouping. Consider adding an index for GROUP BY clause',
+                'description' => 'Temporary table required for GROUP BY. Add an index that matches the grouping.',
+                'priority' => self::PRIORITY_ROOT,
             ];
         }
 
@@ -178,7 +185,6 @@ class ExplainAnalyzer
         }
     }
 
-    /** @param array<int, array<string, string>> $issues */
     public function getFormattedIssues(array $issues): string
     {
         if (empty($issues)) {
@@ -186,13 +192,31 @@ class ExplainAnalyzer
         }
 
         $output = sprintf("Issues found in SQL file: %s\n", $this->sqlFile);
-        foreach ($issues as $issue) {
-            $output .= sprintf(
-                "- %s: %s%s\n",
-                $issue['type'],
-                $issue['description'],
-                isset($issue['table']) ? sprintf(' (Table: %s)', $issue['table']) : '',
-            );
+
+        // 根本的な問題を先に表示
+        if ($rootIssues = array_filter($issues, static fn ($i) => $i['priority'] === self::PRIORITY_ROOT)) {
+            $output .= "\nPrimary issues:\n";
+            foreach ($rootIssues as $issue) {
+                $output .= sprintf(
+                    "- %s: %s%s\n",
+                    $issue['type'],
+                    $issue['description'],
+                    isset($issue['table']) ? sprintf(' (Table: %s)', $issue['table']) : '',
+                );
+            }
+        }
+
+        // 派生的な問題は後で表示
+        if ($derivedIssues = array_filter($issues, static fn ($i) => $i['priority'] === self::PRIORITY_DERIVED)) {
+            $output .= "\nSecondary issues:\n";
+            foreach ($derivedIssues as $issue) {
+                $output .= sprintf(
+                    "- %s: %s%s\n",
+                    $issue['type'],
+                    $issue['description'],
+                    isset($issue['table']) ? sprintf(' (Table: %s)', $issue['table']) : '',
+                );
+            }
         }
 
         return $output;
