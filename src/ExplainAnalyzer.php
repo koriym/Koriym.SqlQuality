@@ -4,11 +4,10 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function preg_match;
 use function preg_match_all;
-use function preg_replace;
 use function sprintf;
 use function str_contains;
-use function var_dump;
 
 class ExplainAnalyzer
 {
@@ -22,7 +21,6 @@ class ExplainAnalyzer
 
     public function analyze(array $explainResult): array
     {
-        // var_dump($explainResult);
         if (! isset($explainResult['query_block'])) {
             return [];
         }
@@ -43,15 +41,6 @@ class ExplainAnalyzer
         // GROUP BY操作の分析
         if (isset($queryBlock['grouping_operation'])) {
             $this->analyzeGrouping($queryBlock['grouping_operation']);
-        }
-
-        // JOINの分析
-        if (isset($queryBlock['nested_loop'])) {
-            foreach ($queryBlock['nested_loop'] as $join) {
-                if (isset($join['table'])) {
-                    $this->analyzeTable($join['table']);
-                }
-            }
         }
 
         foreach ($this->issues as &$issue) {
@@ -83,6 +72,45 @@ class ExplainAnalyzer
             ];
         }
 
+        // フィルタ率の分析
+        if (isset($table['filtered'])) {
+            $filtered = (float) $table['filtered'];
+            if ($filtered > 90) {
+                $this->issues[] = [
+                    'type' => 'high_filter_ratio',
+                    'table' => $tableName,
+                    'description' => sprintf(
+                        'Filter ratio is very high (%.2f%%). Conditions might not be selective enough.',
+                        $filtered,
+                    ),
+                ];
+            }
+        }
+
+        // スキャン行数の分析
+        if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
+            $this->issues[] = [
+                'type' => 'high_scan_rows',
+                'table' => $tableName,
+                'description' => sprintf(
+                    'Large number of rows examined per scan: %d. Consider more selective conditions.',
+                    $table['rows_examined_per_scan'],
+                ),
+            ];
+        }
+
+        // JOIN バッファの使用検出
+        if (isset($table['using_join_buffer'])) {
+            $this->issues[] = [
+                'type' => 'using_join_buffer',
+                'table' => $tableName,
+                'description' => sprintf(
+                    'Using join buffer (%s). Consider adding proper indexes for JOIN conditions.',
+                    $table['using_join_buffer'],
+                ),
+            ];
+        }
+
         // 条件句の分析
         if (isset($table['attached_condition'])) {
             $condition = $table['attached_condition'];
@@ -100,12 +128,14 @@ class ExplainAnalyzer
             $matches = [];
             preg_match_all("/`[^`]+` like '%[^']*%'/i", $condition, $matches);
             foreach ($matches[0] as $match) {
+                preg_match('/`([^`]+)`/', $match, $columnMatch);
+                $columnName = $columnMatch[1] ?? 'unknown';
                 $this->issues[] = [
                     'type' => 'leading_wildcard_like',
                     'table' => $tableName,
                     'description' => sprintf(
-                        'Leading wildcard in LIKE on %s prevents index usage',
-                        preg_replace('/`([^`]+)`.*$/', '$1', $match),
+                        'Leading wildcard in LIKE on column %s prevents index usage',
+                        $columnName,
                     ),
                 ];
             }
