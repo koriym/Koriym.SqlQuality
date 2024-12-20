@@ -18,7 +18,7 @@
     },
     "autoload": {
         "psr-4": {
-            "Koriym\\SqlQaulity\\": "src/"
+            "Koriym\\SqlQuality\\": "src/"
         }
     },
     "autoload-dev": {
