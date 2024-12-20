@@ -11,11 +11,12 @@ $pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
 ]);
 
 $sqlParams = require __DIR__ . '/tests/params/sql_params.php';
+
 $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
     __DIR__ . '/tests/sql',
-    new AIQueryAdvisor()
+    new AIQueryAdvisor('以上の分析を日本語で記述してください')
 );
 $results = $analyzer->analyzeSQLFiles($sqlParams);
 echo $analyzer->getFormattedResults($results);

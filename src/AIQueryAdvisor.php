@@ -5,15 +5,23 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use PDO;
+use PDOException;
+use RuntimeException;
 
 use function array_unique;
 use function json_encode;
+use function preg_match;
 use function preg_match_all;
 
 use const JSON_PRETTY_PRINT;
 
 class AIQueryAdvisor
 {
+    public function __construct(
+        private readonly string $instruction = 'Please provide your analysis in English.',
+    ) {
+    }
+
     public function generatePrompt(
         string $sql,
         array $explainResult,
@@ -39,6 +47,8 @@ Please provide:
 4. Expected benefits and potential trade-offs of each suggestion
 
 Focus on practical, implementable solutions that would have the highest impact on performance.
+
+{$this->instruction}
 PROMPT;
     }
 
@@ -50,40 +60,38 @@ PROMPT;
     ): string {
         $context = "Original SQL:\n{$sql}\n\n";
 
-        // Add schema information if available
         if ($schemaInfo !== null) {
             $context .= "Schema Information:\n";
             $context .= json_encode($schemaInfo, JSON_PRETTY_PRINT) . "\n\n";
         }
 
-        // Add EXPLAIN results
         $context .= "EXPLAIN Results:\n";
         $context .= json_encode($explainResult, JSON_PRETTY_PRINT) . "\n\n";
 
-        // Add identified issues
         $context .= "Identified Issues:\n";
         $context .= json_encode($issues, JSON_PRETTY_PRINT) . "\n";
 
         return $context;
     }
 
+    /** @throws RuntimeException */
     public function extractSchemaInfo(PDO $pdo, string $tableName): array
     {
-        $tableInfo = [];
+        if (! $this->isValidTableName($tableName)) {
+            throw new RuntimeException('Invalid table name');
+        }
 
-        // Get column information
-        $columns = $pdo->query("SHOW COLUMNS FROM {$tableName}")->fetchAll(PDO::FETCH_ASSOC);
-        $tableInfo['columns'] = $columns;
+        try {
+            $quotedTable = $pdo->quote($tableName);
 
-        // Get existing indexes
-        $indexes = $pdo->query("SHOW INDEXES FROM {$tableName}")->fetchAll(PDO::FETCH_ASSOC);
-        $tableInfo['indexes'] = $indexes;
-
-        // Get table status (size, rows, etc.)
-        $status = $pdo->query("SHOW TABLE STATUS LIKE '{$tableName}'")->fetch(PDO::FETCH_ASSOC);
-        $tableInfo['status'] = $status;
-
-        return $tableInfo;
+            return [
+                'columns' => $this->getColumnInfo($pdo, $quotedTable),
+                'indexes' => $this->getIndexInfo($pdo, $quotedTable),
+                'status' => $this->getTableStatus($pdo, $quotedTable),
+            ];
+        } catch (PDOException $e) {
+            throw new RuntimeException('Failed to extract schema info: ' . $e->getMessage());
+        }
     }
 
     public function extractTableNames(string $sql): array
@@ -91,5 +99,66 @@ PROMPT;
         preg_match_all('/(?:FROM|JOIN)\s+`?(\w+)`?/i', $sql, $matches);
 
         return array_unique($matches[1] ?? []);
+    }
+
+    private function isValidTableName(string $tableName): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
+    }
+
+    private function getColumnInfo(PDO $pdo, string $quotedTable): array
+    {
+        $sql = "
+            SELECT 
+                column_name,
+                data_type,
+                column_type,
+                is_nullable,
+                column_key,
+                column_default,
+                extra
+            FROM information_schema.columns
+            WHERE table_schema = DATABASE()
+            AND table_name = {$quotedTable}
+            ORDER BY ordinal_position
+        ";
+
+        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function getIndexInfo(PDO $pdo, string $quotedTable): array
+    {
+        $sql = "
+            SELECT 
+                index_name,
+                column_name,
+                non_unique,
+                seq_in_index,
+                cardinality
+            FROM information_schema.statistics
+            WHERE table_schema = DATABASE()
+            AND table_name = {$quotedTable}
+            ORDER BY index_name, seq_in_index
+        ";
+
+        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    private function getTableStatus(PDO $pdo, string $quotedTable): array
+    {
+        $sql = "
+            SELECT 
+                table_rows,
+                data_length,
+                index_length,
+                auto_increment,
+                create_time,
+                update_time
+            FROM information_schema.tables 
+            WHERE table_schema = DATABASE()
+            AND table_name = {$quotedTable}
+        ";
+
+        return $pdo->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
     }
 }
