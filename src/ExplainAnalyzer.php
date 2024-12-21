@@ -4,10 +4,6 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use function is_array;
-use function sprintf;
-use function str_contains;
-
 /**
  * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
  * @psalm-type WarningMessages = array{
@@ -27,16 +23,17 @@ use function str_contains;
  *   message: string,
  *   pattern: WarningPattern
  * }
- * @psalm-type Warnings = array<WarningType, Warning>
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,
  *   message: string,
  *   documentation: string
  * }
+ * @psalm-import-type ExplainResult from SqlFileAnalyzer
+ * @psalm-import-type ShowWarnings from SqlFileAnalyzer
  */
 final class ExplainAnalyzer
 {
-    private const DOC_BASE_URL = 'https://example.com/issues/';
+    private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
         'FullTableScan' => 'Full table scan detected.',
@@ -45,68 +42,81 @@ final class ExplainAnalyzer
         'IneffectiveLikePattern' => 'Ineffective LIKE pattern detected.',
         'ImplicitTypeConversion' => 'Implicit type conversion detected.',
         'IneffectiveSort' => 'Ineffective sort operation detected.',
-        'TemporaryTableGrouping' => 'Temporary table required for grouping.',
+        'TemporaryTableGrouping' => 'Temporary table required for grouping.'
     ];
 
-    /** @var Warnings */
+    /** @var array<WarningType, Warning> */
     private array $warnings;
 
-    /** @param WarningMessages $messages */
+    /**
+     * @param WarningMessages $messages
+     */
     public function __construct(array $messages = self::DEFAULT_MESSAGES)
     {
         $this->warnings = [
             'FullTableScan' => [
                 'message' => $messages['FullTableScan'],
                 'pattern' => [
-                    'explain' => ['access_type' => 'ALL'],
-                ],
+                    'explain' => [
+                        'access_type' => 'ALL'
+                    ]
+                ]
             ],
             'IneffectiveJoin' => [
                 'message' => $messages['IneffectiveJoin'],
                 'pattern' => [
-                    'explain' => ['using_join_buffer' => true],
-                ],
+                    'explain' => [
+                        'using_join_buffer' => true
+                    ]
+                ]
             ],
             'FunctionInvalidatesIndex' => [
                 'message' => $messages['FunctionInvalidatesIndex'],
                 'pattern' => [
-                    'explain' => ['attached_condition' => 'function_call'],
-                ],
+                    'explain' => [
+                        'attached_condition' => 'function_call'
+                    ]
+                ]
             ],
             'IneffectiveLikePattern' => [
                 'message' => $messages['IneffectiveLikePattern'],
                 'pattern' => [
-                    'explain' => ['attached_condition' => 'like_scan'],
-                ],
+                    'explain' => [
+                        'attached_condition' => 'like_scan'
+                    ]
+                ]
             ],
             'ImplicitTypeConversion' => [
                 'message' => $messages['ImplicitTypeConversion'],
                 'pattern' => [
                     'warnings' => [
                         'Converting column',
-                        'Implicit conversion',
-                    ],
-                ],
+                        'Implicit conversion'
+                    ]
+                ]
             ],
             'IneffectiveSort' => [
                 'message' => $messages['IneffectiveSort'],
                 'pattern' => [
-                    'explain' => ['using_filesort' => true],
-                ],
+                    'explain' => [
+                        'using_filesort' => true
+                    ]
+                ]
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
                 'pattern' => [
-                    'explain' => ['using_temporary_table' => true],
-                ],
-            ],
+                    'explain' => [
+                        'using_temporary_table' => true
+                    ]
+                ]
+            ]
         ];
     }
 
     /**
-     * @param array<string, mixed>         $explainResult
-     * @param list<array{Message: string}> $warnings
-     *
+     * @param ExplainResult $explainResult
+     * @param ShowWarnings $warnings
      * @return list<DetectedWarning>
      */
     public function analyze(array $explainResult, array $warnings = []): array
@@ -118,7 +128,7 @@ final class ExplainAnalyzer
                 $detectedWarnings[] = [
                     'type' => $warningType,
                     'message' => $warning['message'],
-                    'documentation' => $this->getDocumentationUrl($warningType),
+                    'documentation' => $this->getDocumentationUrl($warningType)
                 ];
             }
         }
@@ -127,15 +137,15 @@ final class ExplainAnalyzer
     }
 
     /**
-     * @param array<string, mixed>         $explainResult
-     * @param list<array{Message: string}> $warnings
-     * @param WarningPattern               $pattern
+     * @param ExplainResult $explainResult
+     * @param ShowWarnings $warnings
+     * @param WarningPattern $pattern
      */
     private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
     {
         if (isset($pattern['explain'])) {
             foreach ($pattern['explain'] as $key => $value) {
-                if (! $this->matchExplainPattern($explainResult, $key, $value)) {
+                if (!$this->matchExplainPattern($explainResult, $key, $value)) {
                     return false;
                 }
             }
@@ -143,7 +153,7 @@ final class ExplainAnalyzer
 
         if (isset($pattern['warnings'])) {
             foreach ($pattern['warnings'] as $warningPattern) {
-                if (! $this->matchWarningPattern($warnings, $warningPattern)) {
+                if (!$this->matchWarningPattern($warnings, $warningPattern)) {
                     return false;
                 }
             }
@@ -152,7 +162,10 @@ final class ExplainAnalyzer
         return true;
     }
 
-    /** @param array<string, mixed> $explainResult */
+    /**
+     * @param ExplainResult $explainResult
+     * @param mixed $value
+     */
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
         if (isset($explainResult['query_block'])) {
@@ -164,7 +177,9 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param list<array{Message: string}> $warnings */
+    /**
+     * @param ShowWarnings $warnings
+     */
     private function matchWarningPattern(array $warnings, string $pattern): bool
     {
         foreach ($warnings as $warning) {
@@ -176,7 +191,10 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param array<string, mixed> $array */
+    /**
+     * @param array<string, mixed> $array
+     * @param mixed $value
+     */
     private function findInArray(array $array, string $key, mixed $value): bool
     {
         foreach ($array as $k => $v) {
@@ -194,13 +212,17 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param WarningType $warningType */
+    /**
+     * @param WarningType $warningType
+     */
     private function getDocumentationUrl(string $warningType): string
     {
         return self::DOC_BASE_URL . $warningType . '.md';
     }
 
-    /** @param list<DetectedWarning> $warnings */
+    /**
+     * @param list<DetectedWarning> $warnings
+     */
     public function formatResults(array $warnings): string
     {
         $output = '';
@@ -208,7 +230,7 @@ final class ExplainAnalyzer
             $output .= sprintf(
                 "%s\n詳細な説明とベストプラクティス: %s\n\n",
                 $warning['message'],
-                $warning['documentation'],
+                $warning['documentation']
             );
         }
 
