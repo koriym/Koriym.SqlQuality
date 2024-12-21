@@ -217,7 +217,7 @@ final class ExplainAnalyzer
      */
     private function getDocumentationUrl(string $warningType): string
     {
-        return self::DOC_BASE_URL . $warningType . '.md';
+        return self::DOC_BASE_URL . $warningType;
     }
 
     /**
@@ -228,7 +228,7 @@ final class ExplainAnalyzer
         $output = '';
         foreach ($warnings as $warning) {
             $output .= sprintf(
-                "%s\n詳細な説明とベストプラクティス: %s\n\n",
+                "%s\nSee %s\n\n",
                 $warning['message'],
                 $warning['documentation']
             );
