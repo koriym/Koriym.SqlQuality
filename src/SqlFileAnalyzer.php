@@ -7,10 +7,22 @@ namespace Koriym\SqlQuality;
 use PDO;
 use RuntimeException;
 
+use function array_keys;
+use function array_map;
+use function array_values;
+use function file_exists;
+use function file_get_contents;
+use function is_array;
+use function is_bool;
+use function is_null;
+use function is_string;
+use function json_decode;
+use function preg_replace;
+use function str_repeat;
+
 /**
  * @psalm-import-type DetectedWarning from ExplainAnalyzer
  * @psalm-import-type SchemaInfo from AIQueryAdvisor
- *
  * @psalm-type SqlParams = array<string, array<string, mixed>>
  * @psalm-type ExplainResult = array{
  *   query_block: array{
@@ -58,7 +70,9 @@ final class SqlFileAnalyzer
 
     /**
      * @param SqlParams $sqlParams
+     *
      * @return AnalysisResults
+     *
      * @throws RuntimeException
      */
     public function analyzeSQLFiles(array $sqlParams): array
@@ -78,8 +92,8 @@ final class SqlFileAnalyzer
                     $sql,
                     $explainResult,
                     $issues,
-                    $schemaInfo
-                )
+                    $schemaInfo,
+                ),
             ];
         }
 
@@ -89,7 +103,7 @@ final class SqlFileAnalyzer
     private function readSqlFile(string $filename): string
     {
         $path = $this->sqlDir . '/' . $filename;
-        if (!file_exists($path)) {
+        if (! file_exists($path)) {
             throw new RuntimeException("SQL file not found: {$path}");
         }
 
@@ -103,7 +117,9 @@ final class SqlFileAnalyzer
 
     /**
      * @param array<string, mixed> $params
+     *
      * @return ExplainResult
+     *
      * @throws RuntimeException
      */
     private function executeExplain(string $sql, array $params): array
@@ -115,7 +131,7 @@ final class SqlFileAnalyzer
         }
 
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$result) {
+        if (! $result) {
             throw new RuntimeException('Failed to get EXPLAIN result');
         }
 
@@ -125,7 +141,7 @@ final class SqlFileAnalyzer
         }
 
         $explainData = json_decode($explainJson, true);
-        if (!is_array($explainData)) {
+        if (! is_array($explainData)) {
             throw new RuntimeException('Failed to decode EXPLAIN result');
         }
 
@@ -135,6 +151,7 @@ final class SqlFileAnalyzer
 
     /**
      * @return ShowWarnings
+     *
      * @throws RuntimeException
      */
     private function getWarnings(): array
@@ -148,14 +165,12 @@ final class SqlFileAnalyzer
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
-    /**
-     * @param array<string, mixed> $params
-     */
+    /** @param array<string, mixed> $params */
     private function interpolateQuery(string $sql, array $params): string
     {
         $keys = array_map(
             static fn (string $key): string => "/:$key/",
-            array_keys($params)
+            array_keys($params),
         );
 
         $values = array_map(
@@ -167,15 +182,13 @@ final class SqlFileAnalyzer
                     default => (string) $value
                 };
             },
-            array_values($params)
+            array_values($params),
         );
 
         return (string) preg_replace($keys, $values, $sql);
     }
 
-    /**
-     * @return array<string, SchemaInfo>
-     */
+    /** @return array<string, SchemaInfo> */
     private function getSchemaInfo(string $sql): array
     {
         $tableNames = $this->aiAdvisor->extractTableNames($sql);
@@ -187,9 +200,7 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
-    /**
-     * @param AnalysisResults $results
-     */
+    /** @param AnalysisResults $results */
     public function getFormattedResults(array $results): string
     {
         $output = '';
