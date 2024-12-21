@@ -91,9 +91,16 @@ ADD INDEX idx_covering (
 以下の場合は警告を無視できる可能性があります：
 
 1. 小規模なデータセット
-2. LIMIT句での上位N件取得
-3. バッチ処理での非定期的な処理
+   - 1000行未満のテーブル
+   - メモリ内でソート可能なサイズ（< sort_buffer_size）
 
+2. LIMIT句での上位N件取得
+   - LIMIT <= 100 の場合
+   - ソート対象が結果セットの10%未満の場合
+
+3. バッチ処理での非定期的な処理
+   - 日次バッチなど、1日1回未満の実行
+   - システムの非ピーク時に実行される場合
 ## 参考
 - [MySQL: ORDER BY Optimization](https://dev.mysql.com/doc/refman/8.0/en/order-by-optimization.html)
 - [MySQL: Sorted Index Builds](https://dev.mysql.com/doc/refman/8.0/en/sorted-index-builds.html)
