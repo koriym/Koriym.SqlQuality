@@ -21,8 +21,7 @@ recommended: true
 - GROUP BY後の結果に対する集計や演算
 
 ## EXPLAINでの検出パターン
-```sql
-EXPLAIN FORMAT=JSON で以下のパターンを検出:
+```
 {
   "query_block": {
     "grouping_operation": {

@@ -16,7 +16,7 @@ recommended: true
 ## 検出パターン
 
 ### EXPLAIN出力での特徴
-```json
+```
 {
   "query_block": {
     "nested_loop": [

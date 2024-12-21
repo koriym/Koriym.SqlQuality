@@ -20,8 +20,7 @@ recommended: true
 - ソートカラムに関数や演算が使用されている
 
 ## EXPLAINでの検出パターン
-```sql
-EXPLAIN FORMAT=JSON で以下のパターンを検出:
+```
 {
   "query_block": {
     "ordering_operation": {
