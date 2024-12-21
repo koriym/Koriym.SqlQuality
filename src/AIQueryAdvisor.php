@@ -5,28 +5,62 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use PDO;
-use PDOException;
 use RuntimeException;
 
-use function array_unique;
-use function json_encode;
-use function preg_match;
-use function preg_match_all;
-
-use const JSON_PRETTY_PRINT;
-
-class AIQueryAdvisor
+/**
+ * @psalm-import-type DetectedWarning from ExplainAnalyzer
+ * @psalm-import-type ExplainResult from SqlFileAnalyzer
+ *
+ * @psalm-type SchemaColumn = array{
+ *   column_name: string,
+ *   data_type: string,
+ *   column_type: string,
+ *   is_nullable: string,
+ *   column_key: string,
+ *   column_default: string|null,
+ *   extra: string
+ * }
+ *
+ * @psalm-type SchemaIndex = array{
+ *   index_name: string,
+ *   column_name: string,
+ *   non_unique: string,
+ *   seq_in_index: string,
+ *   cardinality: string|null
+ * }
+ *
+ * @psalm-type TableStatus = array{
+ *   table_rows: int|null,
+ *   data_length: int|null,
+ *   index_length: int|null,
+ *   auto_increment: int|null,
+ *   create_time: string|null,
+ *   update_time: string|null
+ * }
+ *
+ * @psalm-type SchemaInfo = array{
+ *   columns: list<SchemaColumn>,
+ *   indexes: list<SchemaIndex>,
+ *   status: TableStatus
+ * }
+ */
+final class AIQueryAdvisor
 {
     public function __construct(
         private readonly string $instruction = 'Please provide your analysis in English.',
     ) {
     }
 
+    /**
+     * @param ExplainResult $explainResult
+     * @param list<DetectedWarning> $issues
+     * @param array<string, SchemaInfo>|null $schemaInfo
+     */
     public function generatePrompt(
         string $sql,
         array $explainResult,
         array $issues,
-        array|null $schemaInfo = null,
+        ?array $schemaInfo = null,
     ): string {
         $context = $this->formatContext($sql, $explainResult, $issues, $schemaInfo);
 
@@ -52,32 +86,40 @@ Focus on practical, implementable solutions that would have the highest impact o
 PROMPT;
     }
 
+    /**
+     * @param ExplainResult $explainResult
+     * @param list<DetectedWarning> $issues
+     * @param array<string, SchemaInfo>|null $schemaInfo
+     */
     private function formatContext(
         string $sql,
         array $explainResult,
         array $issues,
-        array|null $schemaInfo,
+        ?array $schemaInfo,
     ): string {
         $context = "Original SQL:\n{$sql}\n\n";
 
         if ($schemaInfo !== null) {
             $context .= "Schema Information:\n";
-            $context .= json_encode($schemaInfo, JSON_PRETTY_PRINT) . "\n\n";
+            $context .= json_encode($schemaInfo, JSON_THROW_ON_ERROR) . "\n\n";
         }
 
         $context .= "EXPLAIN Results:\n";
-        $context .= json_encode($explainResult, JSON_PRETTY_PRINT) . "\n\n";
+        $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
 
         $context .= "Identified Issues:\n";
-        $context .= json_encode($issues, JSON_PRETTY_PRINT) . "\n";
+        $context .= json_encode($issues, JSON_THROW_ON_ERROR) . "\n";
 
         return $context;
     }
 
-    /** @throws RuntimeException */
+    /**
+     * @return SchemaInfo
+     * @throws RuntimeException
+     */
     public function extractSchemaInfo(PDO $pdo, string $tableName): array
     {
-        if (! $this->isValidTableName($tableName)) {
+        if (!$this->isValidTableName($tableName)) {
             throw new RuntimeException('Invalid table name');
         }
 
@@ -89,16 +131,27 @@ PROMPT;
                 'indexes' => $this->getIndexInfo($pdo, $quotedTable),
                 'status' => $this->getTableStatus($pdo, $quotedTable),
             ];
-        } catch (PDOException $e) {
-            throw new RuntimeException('Failed to extract schema info: ' . $e->getMessage());
+        } catch (RuntimeException $e) {
+            throw new RuntimeException('Failed to extract schema info: ' . $e->getMessage(), 0, $e);
         }
     }
 
+    /**
+     * @return list<string>
+     */
     public function extractTableNames(string $sql): array
     {
-        preg_match_all('/(?:FROM|JOIN)\s+`?(\w+)`?/i', $sql, $matches);
+        // SQLコメントを削除
+        $sql = preg_replace('/--.*$/m', '', $sql);
 
-        return array_unique($matches[1] ?? []);
+        // キーワードの後にあるテーブル名を抽出
+        // AS/ON/WHEREなどの後のテーブル名は除外
+        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
+            $tables = array_filter(array_merge($matches[1], $matches[2]));
+            return array_unique(array_values($tables));
+        }
+
+        return [];
     }
 
     private function isValidTableName(string $tableName): bool
@@ -106,6 +159,10 @@ PROMPT;
         return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
     }
 
+    /**
+     * @return list<SchemaColumn>
+     * @throws RuntimeException
+     */
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
     {
         $sql = "
@@ -123,9 +180,19 @@ PROMPT;
             ORDER BY ordinal_position
         ";
 
-        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $pdo->query($sql);
+        if ($stmt === false) {
+            throw new RuntimeException('Failed to get column information');
+        }
+
+        /** @var list<SchemaColumn> */
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return list<SchemaIndex>
+     * @throws RuntimeException
+     */
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
     {
         $sql = "
@@ -141,24 +208,45 @@ PROMPT;
             ORDER BY index_name, seq_in_index
         ";
 
-        return $pdo->query($sql)->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $pdo->query($sql);
+        if ($stmt === false) {
+            throw new RuntimeException('Failed to get index information');
+        }
+
+        /** @var list<SchemaIndex> */
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
+    /**
+     * @return TableStatus
+     * @throws RuntimeException
+     */
     private function getTableStatus(PDO $pdo, string $quotedTable): array
     {
         $sql = "
-            SELECT 
-                table_rows,
-                data_length,
-                index_length,
-                auto_increment,
-                create_time,
-                update_time
-            FROM information_schema.tables 
-            WHERE table_schema = DATABASE()
-            AND table_name = {$quotedTable}
-        ";
+        SELECT 
+            TABLE_ROWS as table_rows,
+            DATA_LENGTH as data_length,
+            INDEX_LENGTH as index_length,
+            AUTO_INCREMENT as auto_increment,
+            CREATE_TIME as create_time,
+            UPDATE_TIME as update_time
+        FROM information_schema.tables 
+        WHERE table_schema = DATABASE()
+        AND table_name = {$quotedTable}
+    ";
 
-        return $pdo->query($sql)->fetch(PDO::FETCH_ASSOC) ?: [];
+        $stmt = $pdo->query($sql);
+        if ($stmt === false) {
+            throw new RuntimeException('Failed to get table status');
+        }
+
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        if ($result === false) {
+            throw new RuntimeException('No table status found');
+        }
+
+        /** @var TableStatus */
+        return $result;
     }
 }
