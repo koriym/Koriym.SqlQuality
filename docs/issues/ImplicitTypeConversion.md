@@ -30,7 +30,7 @@ recommended: true
 ```
 
 ### SHOW WARNINGS出力
-```sql
+```
 SHOW WARNINGS の結果で以下のパターンを検出:
 - "Converting column 'X' from Y to Z"
 - "Implicit conversion of column 'X'"
