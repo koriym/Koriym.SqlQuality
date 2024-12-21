@@ -4,219 +4,212 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use function array_filter;
-use function array_unique;
-use function implode;
-use function preg_match_all;
+use function is_array;
 use function sprintf;
 use function str_contains;
-use function usort;
 
-class ExplainAnalyzer
+/**
+ * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
+ * @psalm-type WarningMessages = array{
+ *   FullTableScan: string,
+ *   IneffectiveJoin: string,
+ *   FunctionInvalidatesIndex: string,
+ *   IneffectiveLikePattern: string,
+ *   ImplicitTypeConversion: string,
+ *   IneffectiveSort: string,
+ *   TemporaryTableGrouping: string
+ * }
+ * @psalm-type WarningPattern = array{
+ *   explain?: array<string, mixed>,
+ *   warnings?: list<string>
+ * }
+ * @psalm-type Warning = array{
+ *   message: string,
+ *   pattern: WarningPattern
+ * }
+ * @psalm-type Warnings = array<WarningType, Warning>
+ * @psalm-type DetectedWarning = array{
+ *   type: WarningType,
+ *   message: string,
+ *   documentation: string
+ * }
+ */
+final class ExplainAnalyzer
 {
-    private array $issues = [];
-    private string $sqlFile = '';
+    private const DOC_BASE_URL = 'https://example.com/issues/';
+
+    public const DEFAULT_MESSAGES = [
+        'FullTableScan' => 'Full table scan detected.',
+        'IneffectiveJoin' => 'Ineffective join detected.',
+        'FunctionInvalidatesIndex' => 'Function invalidates index.',
+        'IneffectiveLikePattern' => 'Ineffective LIKE pattern detected.',
+        'ImplicitTypeConversion' => 'Implicit type conversion detected.',
+        'IneffectiveSort' => 'Ineffective sort operation detected.',
+        'TemporaryTableGrouping' => 'Temporary table required for grouping.',
+    ];
+
+    /** @var Warnings */
+    private array $warnings;
+
+    /** @param WarningMessages $messages */
+    public function __construct(array $messages = self::DEFAULT_MESSAGES)
+    {
+        $this->warnings = [
+            'FullTableScan' => [
+                'message' => $messages['FullTableScan'],
+                'pattern' => [
+                    'explain' => ['access_type' => 'ALL'],
+                ],
+            ],
+            'IneffectiveJoin' => [
+                'message' => $messages['IneffectiveJoin'],
+                'pattern' => [
+                    'explain' => ['using_join_buffer' => true],
+                ],
+            ],
+            'FunctionInvalidatesIndex' => [
+                'message' => $messages['FunctionInvalidatesIndex'],
+                'pattern' => [
+                    'explain' => ['attached_condition' => 'function_call'],
+                ],
+            ],
+            'IneffectiveLikePattern' => [
+                'message' => $messages['IneffectiveLikePattern'],
+                'pattern' => [
+                    'explain' => ['attached_condition' => 'like_scan'],
+                ],
+            ],
+            'ImplicitTypeConversion' => [
+                'message' => $messages['ImplicitTypeConversion'],
+                'pattern' => [
+                    'warnings' => [
+                        'Converting column',
+                        'Implicit conversion',
+                    ],
+                ],
+            ],
+            'IneffectiveSort' => [
+                'message' => $messages['IneffectiveSort'],
+                'pattern' => [
+                    'explain' => ['using_filesort' => true],
+                ],
+            ],
+            'TemporaryTableGrouping' => [
+                'message' => $messages['TemporaryTableGrouping'],
+                'pattern' => [
+                    'explain' => ['using_temporary_table' => true],
+                ],
+            ],
+        ];
+    }
 
     /**
-     * 問題の重要度レベル
+     * @param array<string, mixed>         $explainResult
+     * @param list<array{Message: string}> $warnings
+     *
+     * @return list<DetectedWarning>
      */
-    private const PRIORITY_ROOT = 'root';      // 根本的な問題
-    private const PRIORITY_DERIVED = 'derived'; // 派生的な問題
-
-    public function setSqlFile(string $sqlFile): void
+    public function analyze(array $explainResult, array $warnings = []): array
     {
-        $this->sqlFile = $sqlFile;
-    }
+        $detectedWarnings = [];
 
-    public function analyze(array $explainResult): array
-    {
-        if (! isset($explainResult['query_block'])) {
-            return [];
-        }
-
-        $this->issues = [];
-        $queryBlock = $explainResult['query_block'];
-
-        if (isset($queryBlock['table'])) {
-            $this->analyzeTable($queryBlock['table']);
-        }
-
-        if (isset($queryBlock['ordering_operation'])) {
-            $this->analyzeOrdering($queryBlock['ordering_operation']);
-        }
-
-        if (isset($queryBlock['grouping_operation'])) {
-            $this->analyzeGrouping($queryBlock['grouping_operation']);
-        }
-
-        foreach ($this->issues as &$issue) {
-            $issue['sql_file'] = $this->sqlFile;
-        }
-
-        // 優先度順にソート
-        usort($this->issues, static function ($a, $b) {
-            return $a['priority'] <=> $b['priority'];
-        });
-
-        return $this->issues;
-    }
-
-    private function analyzeTable(array $table): void
-    {
-        $tableName = $table['table_name'] ?? 'unknown';
-
-        // 根本的な問題: インデックスが使えるのに使っていない
-        if (isset($table['possible_keys']) && (! isset($table['key']) || empty($table['key']))) {
-            $this->issues[] = [
-                'type' => 'unused_available_index',
-                'table' => $tableName,
-                'description' => 'Available indexes are not being used. This is causing unnecessary table scans.',
-                'priority' => self::PRIORITY_ROOT,
-            ];
-        }
-        // その他のフルテーブルスキャンはインデックスがない場合
-        elseif (isset($table['access_type']) && $table['access_type'] === 'ALL') {
-            $this->issues[] = [
-                'type' => 'full_table_scan',
-                'table' => $tableName,
-                'description' => 'Full table scan detected. Consider adding an appropriate index.',
-                'priority' => self::PRIORITY_ROOT,
-            ];
-        }
-
-        // 根本的な問題: JOINの問題
-        if (isset($table['using_join_buffer'])) {
-            $this->issues[] = [
-                'type' => 'inefficient_join',
-                'table' => $tableName,
-                'description' => sprintf(
-                    'Inefficient JOIN operation using %s. Add an index for JOIN conditions.',
-                    $table['using_join_buffer'],
-                ),
-                'priority' => self::PRIORITY_ROOT,
-            ];
-        }
-
-        // 根本的な問題: インデックスを使えない条件
-        if (isset($table['attached_condition'])) {
-            $condition = $table['attached_condition'];
-
-            // 関数使用
-            if (str_contains($condition, 'DATE(') || str_contains($condition, 'cast(')) {
-                $this->issues[] = [
-                    'type' => 'function_on_column',
-                    'table' => $tableName,
-                    'description' => 'Function call in WHERE clause prevents index usage. Rewrite the condition.',
-                    'priority' => self::PRIORITY_ROOT,
-                ];
-            }
-
-            // LIKE with wildcards
-            $matches = [];
-            preg_match_all("/`([^`]+)` like '%[^']*%'/i", $condition, $matches);
-            if (! empty($matches[1])) {
-                $columns = implode(', ', array_unique($matches[1]));
-                $this->issues[] = [
-                    'type' => 'inefficient_like',
-                    'table' => $tableName,
-                    'description' => sprintf(
-                        'Leading wildcard in LIKE on column(s) %s prevents index usage. Consider using full-text search.',
-                        $columns,
-                    ),
-                    'priority' => self::PRIORITY_ROOT,
+        foreach ($this->warnings as $warningType => $warning) {
+            if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
+                $detectedWarnings[] = [
+                    'type' => $warningType,
+                    'message' => $warning['message'],
+                    'documentation' => $this->getDocumentationUrl($warningType),
                 ];
             }
         }
 
-        // 派生的な問題: 高いフィルタ率（他の問題の結果として）
-        if (
-            isset($table['filtered'])
-            && (float) $table['filtered'] > 90
-            && isset($table['rows_examined_per_scan'])
-            && $table['rows_examined_per_scan'] > 100
-        ) {
-            $this->issues[] = [
-                'type' => 'low_selectivity',
-                'table' => $tableName,
-                'description' => sprintf(
-                    'Query examines %.1f%% of scanned rows. Conditions are not selective enough.',
-                    (float) $table['filtered'],
-                ),
-                'priority' => self::PRIORITY_DERIVED,
-            ];
-        }
+        return $detectedWarnings;
     }
 
-    private function analyzeOrdering(array $ordering): void
+    /**
+     * @param array<string, mixed>         $explainResult
+     * @param list<array{Message: string}> $warnings
+     * @param WarningPattern               $pattern
+     */
+    private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
     {
-        if (isset($ordering['using_filesort']) && $ordering['using_filesort'] === true) {
-            $tableName = $ordering['table']['table_name'] ?? 'unknown';
-            $this->issues[] = [
-                'type' => 'filesort_required',
-                'table' => $tableName,
-                'description' => 'Extra sorting required for ORDER BY. Add an index that matches the ordering.',
-                'priority' => self::PRIORITY_ROOT,
-            ];
-        }
-
-        if (isset($ordering['table'])) {
-            $this->analyzeTable($ordering['table']);
-        }
-    }
-
-    private function analyzeGrouping(array $grouping): void
-    {
-        if (isset($grouping['using_temporary_table']) && $grouping['using_temporary_table'] === true) {
-            $tableName = $grouping['nested_loop'][0]['table']['table_name'] ?? 'unknown';
-            $this->issues[] = [
-                'type' => 'temp_table_required',
-                'table' => $tableName,
-                'description' => 'Temporary table required for GROUP BY. Add an index that matches the grouping.',
-                'priority' => self::PRIORITY_ROOT,
-            ];
-        }
-
-        if (isset($grouping['nested_loop'])) {
-            foreach ($grouping['nested_loop'] as $join) {
-                if (isset($join['table'])) {
-                    $this->analyzeTable($join['table']);
+        if (isset($pattern['explain'])) {
+            foreach ($pattern['explain'] as $key => $value) {
+                if (! $this->matchExplainPattern($explainResult, $key, $value)) {
+                    return false;
                 }
             }
         }
+
+        if (isset($pattern['warnings'])) {
+            foreach ($pattern['warnings'] as $warningPattern) {
+                if (! $this->matchWarningPattern($warnings, $warningPattern)) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
     }
 
-    public function getFormattedIssues(array $issues): string
+    /** @param array<string, mixed> $explainResult */
+    private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
-        if (empty($issues)) {
-            return sprintf("No issues found in SQL file: %s\n", $this->sqlFile);
-        }
-
-        $output = sprintf("Issues found in SQL file: %s\n", $this->sqlFile);
-
-        // 根本的な問題を先に表示
-        if ($rootIssues = array_filter($issues, static fn ($i) => $i['priority'] === self::PRIORITY_ROOT)) {
-            $output .= "\nPrimary issues:\n";
-            foreach ($rootIssues as $issue) {
-                $output .= sprintf(
-                    "- %s: %s%s\n",
-                    $issue['type'],
-                    $issue['description'],
-                    isset($issue['table']) ? sprintf(' (Table: %s)', $issue['table']) : '',
-                );
+        if (isset($explainResult['query_block'])) {
+            if ($this->findInArray($explainResult['query_block'], $key, $value)) {
+                return true;
             }
         }
 
-        // 派生的な問題は後で表示
-        if ($derivedIssues = array_filter($issues, static fn ($i) => $i['priority'] === self::PRIORITY_DERIVED)) {
-            $output .= "\nSecondary issues:\n";
-            foreach ($derivedIssues as $issue) {
-                $output .= sprintf(
-                    "- %s: %s%s\n",
-                    $issue['type'],
-                    $issue['description'],
-                    isset($issue['table']) ? sprintf(' (Table: %s)', $issue['table']) : '',
-                );
+        return false;
+    }
+
+    /** @param list<array{Message: string}> $warnings */
+    private function matchWarningPattern(array $warnings, string $pattern): bool
+    {
+        foreach ($warnings as $warning) {
+            if (str_contains($warning['Message'], $pattern)) {
+                return true;
             }
+        }
+
+        return false;
+    }
+
+    /** @param array<string, mixed> $array */
+    private function findInArray(array $array, string $key, mixed $value): bool
+    {
+        foreach ($array as $k => $v) {
+            if ($k === $key && $v === $value) {
+                return true;
+            }
+
+            if (is_array($v)) {
+                if ($this->findInArray($v, $key, $value)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    /** @param WarningType $warningType */
+    private function getDocumentationUrl(string $warningType): string
+    {
+        return self::DOC_BASE_URL . $warningType . '.md';
+    }
+
+    /** @param list<DetectedWarning> $warnings */
+    public function formatResults(array $warnings): string
+    {
+        $output = '';
+        foreach ($warnings as $warning) {
+            $output .= sprintf(
+                "%s\n詳細な説明とベストプラクティス: %s\n\n",
+                $warning['message'],
+                $warning['documentation'],
+            );
         }
 
         return $output;
