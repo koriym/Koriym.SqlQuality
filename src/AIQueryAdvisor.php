@@ -101,14 +101,14 @@ PROMPT;
 
         if ($schemaInfo !== null) {
             $context .= "Schema Information:\n";
-            $context .= json_encode($schemaInfo, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n\n";
+            $context .= json_encode($schemaInfo, JSON_THROW_ON_ERROR) . "\n\n";
         }
 
         $context .= "EXPLAIN Results:\n";
-        $context .= json_encode($explainResult, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n\n";
+        $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
 
         $context .= "Identified Issues:\n";
-        $context .= json_encode($issues, JSON_PRETTY_PRINT | JSON_THROW_ON_ERROR) . "\n";
+        $context .= json_encode($issues, JSON_THROW_ON_ERROR) . "\n";
 
         return $context;
     }
