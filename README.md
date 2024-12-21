@@ -1,126 +1,115 @@
 # Koriym.SqlQuality
 
-MySQL query analyzer that detects potential performance issues in SQL files and provides AI-powered optimization recommendations.
+A powerful MySQL query analyzer that helps detect potential performance issues in SQL files and provides AI-powered optimization recommendations. This tool combines traditional SQL analysis with advanced AI suggestions to help you write more efficient queries.
+
+## Features
+
+### Comprehensive SQL Analysis
+- Detects common performance issues including:
+   - Full table scans and missing indexes
+   - Inefficient JOIN operations
+   - Index-preventing conditions (functions in WHERE clause)
+   - Problematic LIKE patterns with leading wildcards
+   - Implicit type conversions
+   - Inefficient sorting operations
+   - Temporary table usage for grouping
+
+### AI-Powered Optimization
+- Provides detailed performance impact analysis
+- Generates specific optimization recommendations
+- Suggests exact SQL statements for implementing changes
+- Evaluates cost-benefit trade-offs for suggested optimizations
+- Offers schema optimization suggestions
+
+### Developer-Friendly Output
+- Clear, actionable warning messages
+- Links to detailed documentation for each issue
+- Formatted analysis results with examples
+- Support for multiple output languages
 
 ## Installation
+
+Install via Composer:
 
 ```bash
 composer require koriym/sql-quality
 ```
 
-## Usage
-
-### Basic Analysis
+## Basic Usage
 
 ```php
 use PDO;
 use Koriym\SqlQuality\SqlFileAnalyzer;
 use Koriym\SqlQuality\ExplainAnalyzer;
+use Koriym\SqlQuality\AIQueryAdvisor;
 
-// Setup database connection
+// Initialize database connection
 $pdo = new PDO('mysql:host=localhost;dbname=test', 'user', 'password');
 
-// Initialize analyzers
+// Create analyzers
 $analyzer = new ExplainAnalyzer();
-$sqlAnalyzer = new SqlFileAnalyzer($pdo, $analyzer, '/path/to/sql/dir');
+$aiAdvisor = new AIQueryAdvisor();  // Default English output
 
-// Analyze SQL files
+// Initialize SQL analyzer
+$sqlAnalyzer = new SqlFileAnalyzer(
+    $pdo,
+    $analyzer,
+    '/path/to/sql/dir',
+    $aiAdvisor
+);
+
+// Analyze SQL files with parameters
 $results = $sqlAnalyzer->analyzeSQLFiles([
     'query1.sql' => ['user_id' => 1],
     'query2.sql' => ['status' => 'active']
 ]);
 
-// Get formatted results
+// Output formatted results
 echo $sqlAnalyzer->getFormattedResults($results);
 ```
 
-### AI-Powered Analysis
+## Multilingual Support
+
+The AI advisor supports multiple languages for its analysis output:
 
 ```php
-use Koriym\SqlQuality\AIQueryAdvisor;
+// Japanese output
+$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください。');
 
-// Initialize with AI advisor (optional)
-$aiAdvisor = new AIQueryAdvisor('Please provide the analysis in English.');  // or any other language
-$sqlAnalyzer = new SqlFileAnalyzer($pdo, $analyzer, '/path/to/sql/dir', $aiAdvisor);
+// French output
+$aiAdvisor = new AIQueryAdvisor('Veuillez fournir cette analyse en français.');
 
-// Get AI-powered optimization suggestions
-$results = $sqlAnalyzer->analyzeSQLFiles($sqlParams);
-echo $sqlAnalyzer->getFormattedResults($results);
+// German output
+$aiAdvisor = new AIQueryAdvisor('Bitte stellen Sie diese Analyse auf Deutsch bereit.');
 ```
-
-## What it detects
-
-### Primary Issues
-
-1. Missing or unused indexes
-   - Full table scans
-   - Available but unused indexes
-   - Missing indexes for ORDER BY/GROUP BY
-
-2. Inefficient JOIN operations
-   - Hash joins requiring join buffers
-   - Missing indexes for JOIN conditions
-
-3. Index-preventing conditions
-   - Function calls in WHERE clause
-   - Leading wildcard in LIKE queries
-   - Non-sargable conditions
-
-### AI-Powered Analysis
-
-When using the AI advisor, you get additional insights:
-- Detailed performance impact analysis
-- Specific optimization recommendations
-- Example SQL for implementing changes
-- Cost-benefit analysis of suggested optimizations
-- Schema optimization suggestions
 
 ## Example Output
 
-### Standard Analysis
 ```text
-Issues found in SQL file: query1.sql
-Primary issues:
-- full_table_scan: Full table scan detected. Consider adding an appropriate index. (Table: users)
-- filesort_required: Extra sorting required for ORDER BY. Add an index that matches the ordering.
+▶ Query Analysis: query1.sql:
 
-Issues found in SQL file: query2.sql
-Primary issues:
-- inefficient_join: Inefficient JOIN operation using hash join. Add an index for JOIN conditions. (Table: posts)
-- inefficient_like: Leading wildcard in LIKE on column(s) title prevents index usage. Consider using full-text search.
+Full table scan detected.
+See https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan
+
+Ineffective JOIN operation detected.
+See https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveJoin
+
+AI Prompt:
+Based on the provided MySQL table schemas and EXPLAIN results, please provide ...
+...
 ```
 
-### With AI Analysis
-```text
-AI Analysis Suggestions:
+## CI Integration
 
-Key Performance Issues:
-1. Full table scan on 'users' table impacting query performance
-2. Inefficient sorting operation due to missing index
-
-Optimization Recommendations:
-1. Create compound index for frequently used columns:
-   CREATE INDEX idx_users_status_created ON users (status, created_at);
-
-2. Consider query restructuring:
-   - Original: SELECT * FROM users WHERE status = ? ORDER BY created_at
-   - Optimized: SELECT id, name, email FROM users FORCE INDEX (idx_users_status_created) WHERE status = ?
-
-Expected Benefits:
-- Reduced I/O operations
-- Elimination of filesort
-- Improved query response time
-```
-
-## CI Integration Example
+Integrate SQL quality checks into your CI pipeline:
 
 ```php
-// In your CI script
 $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), '/path/to/sql');
 $results = $analyzer->analyzeSQLFiles($sqlParams);
 
+// Exit with error if issues found
 $hasIssues = false;
-foreach ($results as $file => $fileResults) {
+foreach ($results as $fileResults) {
     if (!empty($fileResults['issues'])) {
         $hasIssues = true;
         break;
@@ -130,26 +119,16 @@ foreach ($results as $file => $fileResults) {
 exit($hasIssues ? 1 : 0);
 ```
 
-## Language Support
+## Documentation
 
-The AI advisor supports multiple languages. Simply specify your preferred language when initializing:
-
-```php
-// Japanese analysis
-$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください。');
-
-// French analysis
-$aiAdvisor = new AIQueryAdvisor('Veuillez fournir cette analyse en français.');
-
-// German analysis
-$aiAdvisor = new AIQueryAdvisor('Bitte stellen Sie diese Analyse auf Deutsch bereit.');
-```
+Each detected issue links to detailed documentation explaining:
+- What the issue means
+- Why it matters
+- How to fix it
+- Best practices to avoid it
 
 ## Requirements
 
 - PHP 8.1+
-- MySQL 5.7+ / MariaDB 10.2+
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
+- MySQL 5.7+ or MariaDB 10.2+
+- PDO MySQL extension
