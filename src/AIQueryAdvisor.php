@@ -7,10 +7,20 @@ namespace Koriym\SqlQuality;
 use PDO;
 use RuntimeException;
 
+use function array_filter;
+use function array_merge;
+use function array_unique;
+use function array_values;
+use function json_encode;
+use function preg_match;
+use function preg_match_all;
+use function preg_replace;
+
+use const JSON_THROW_ON_ERROR;
+
 /**
  * @psalm-import-type DetectedWarning from ExplainAnalyzer
  * @psalm-import-type ExplainResult from SqlFileAnalyzer
- *
  * @psalm-type SchemaColumn = array{
  *   column_name: string,
  *   data_type: string,
@@ -20,7 +30,6 @@ use RuntimeException;
  *   column_default: string|null,
  *   extra: string
  * }
- *
  * @psalm-type SchemaIndex = array{
  *   index_name: string,
  *   column_name: string,
@@ -28,7 +37,6 @@ use RuntimeException;
  *   seq_in_index: string,
  *   cardinality: string|null
  * }
- *
  * @psalm-type TableStatus = array{
  *   table_rows: int|null,
  *   data_length: int|null,
@@ -37,7 +45,6 @@ use RuntimeException;
  *   create_time: string|null,
  *   update_time: string|null
  * }
- *
  * @psalm-type SchemaInfo = array{
  *   columns: list<SchemaColumn>,
  *   indexes: list<SchemaIndex>,
@@ -52,15 +59,15 @@ final class AIQueryAdvisor
     }
 
     /**
-     * @param ExplainResult $explainResult
-     * @param list<DetectedWarning> $issues
+     * @param ExplainResult                  $explainResult
+     * @param list<DetectedWarning>          $issues
      * @param array<string, SchemaInfo>|null $schemaInfo
      */
     public function generatePrompt(
         string $sql,
         array $explainResult,
         array $issues,
-        ?array $schemaInfo = null,
+        array|null $schemaInfo = null,
     ): string {
         $context = $this->formatContext($sql, $explainResult, $issues, $schemaInfo);
 
@@ -87,15 +94,15 @@ PROMPT;
     }
 
     /**
-     * @param ExplainResult $explainResult
-     * @param list<DetectedWarning> $issues
+     * @param ExplainResult                  $explainResult
+     * @param list<DetectedWarning>          $issues
      * @param array<string, SchemaInfo>|null $schemaInfo
      */
     private function formatContext(
         string $sql,
         array $explainResult,
         array $issues,
-        ?array $schemaInfo,
+        array|null $schemaInfo,
     ): string {
         $context = "Original SQL:\n{$sql}\n\n";
 
@@ -115,11 +122,12 @@ PROMPT;
 
     /**
      * @return SchemaInfo
+     *
      * @throws RuntimeException
      */
     public function extractSchemaInfo(PDO $pdo, string $tableName): array
     {
-        if (!$this->isValidTableName($tableName)) {
+        if (! $this->isValidTableName($tableName)) {
             throw new RuntimeException('Invalid table name');
         }
 
@@ -136,9 +144,7 @@ PROMPT;
         }
     }
 
-    /**
-     * @return list<string>
-     */
+    /** @return list<string> */
     public function extractTableNames(string $sql): array
     {
         // SQLコメントを削除
@@ -148,6 +154,7 @@ PROMPT;
         // AS/ON/WHEREなどの後のテーブル名は除外
         if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
             $tables = array_filter(array_merge($matches[1], $matches[2]));
+
             return array_unique(array_values($tables));
         }
 
@@ -161,6 +168,7 @@ PROMPT;
 
     /**
      * @return list<SchemaColumn>
+     *
      * @throws RuntimeException
      */
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
@@ -191,6 +199,7 @@ PROMPT;
 
     /**
      * @return list<SchemaIndex>
+     *
      * @throws RuntimeException
      */
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
@@ -219,6 +228,7 @@ PROMPT;
 
     /**
      * @return TableStatus
+     *
      * @throws RuntimeException
      */
     private function getTableStatus(PDO $pdo, string $quotedTable): array
