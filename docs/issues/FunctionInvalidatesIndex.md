@@ -25,11 +25,15 @@ EXPLAIN FORMAT=JSON で以下のパターンを検出:
       "attached_condition": "function_call",  -- 関数使用
       "possible_keys": "index_name",          -- インデックスは存在するが
       "key": null,                           -- 使用されていない
-      "rows": "large_number"                 -- 多数の行をスキャン
+      "rows": "large_number",                -- 多数の行をスキャン
+      "filtered": "low_percentage",          -- 低いフィルタ率
+      "using_where": true,                   -- WHERE句での評価
+      "cost_info": {
+        "read_cost": "high_value"            -- 高い読み取りコスト
+      }
     }
   }
 }
-```
 
 ## 問題のあるクエリの例
 ```sql
