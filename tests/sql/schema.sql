@@ -1,8 +1,8 @@
 -- schema.sql
-DROP TABLE users;
-DROP TABLE posts;
-DROP TABLE comments;
-DROP TABLE orders;
+DROP TABLE IF EXISTS orders;
+DROP TABLE IF EXISTS comments;
+DROP TABLE IF EXISTS posts;
+DROP TABLE IF EXISTS users;
 
 CREATE TABLE users (
                        id INT PRIMARY KEY,
