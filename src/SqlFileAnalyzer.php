@@ -205,11 +205,11 @@ final class SqlFileAnalyzer
     {
         $output = '';
         foreach ($results as $sqlFile => $result) {
-            $output .= "Results for {$sqlFile}:\n";
-            $output .= $this->analyzer->formatResults($result['issues']);
-            $output .= "\nAI Analysis Suggestions:\n";
-            $output .= "```\n{$result['ai_suggestions']}\n```\n";
             $output .= str_repeat('=', 80) . "\n";
+            $output .= "▶ Query Analysis: {$sqlFile}\n\n";  // New format
+            $output .= $this->analyzer->formatResults($result['issues']);
+            $output .= "\nAI Prompt:\n";  // <- ここを変更
+            $output .= "```\n{$result['ai_suggestions']}\n```\n";
         }
 
         return $output;

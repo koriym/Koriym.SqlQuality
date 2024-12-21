@@ -72,23 +72,9 @@ final class AIQueryAdvisor
         $context = $this->formatContext($sql, $explainResult, $issues, $schemaInfo);
 
         return <<<PROMPT
-As an expert database performance consultant, please analyze this SQL query and its EXPLAIN results. 
-Provide specific, actionable recommendations for optimization.
+Based on the provided MySQL table schemas and EXPLAIN results, please provide: 1. Brief Assessment - Summarize key performance bottlenecks identified in the EXPLAIN output - Highlight any concerning access patterns (table scans, suboptimal joins) - Note any missing or underutilized indexes 2. Specific Optimization Recommendations a) Index Improvements - New indexes to create (with exact column combinations) - Existing indexes to modify or remove - Coverage analysis for frequently accessed columns b) Query Optimization - Join order and method improvements - Subquery optimization opportunities - Filtering and sorting efficiency c) Schema Enhancements (if applicable) - Table structure improvements - Partitioning considerations - Data type optimizations 3. Implementation Details For each recommendation: - Exact SQL statements for implementation - Estimated impact on query performance - Potential risks or trade-offs - Implementation priority (High/Medium/Low) 4. Additional Considerations - Impact on existing indexes and storage requirements - Effects on write performance - Maintenance requirements - Backup/restore implications. Please focus on practical, high-impact improvements that can be implemented with minimal risk.
 
-SQL Context:
 {$context}
-
-Please provide:
-1. A concise summary of the performance issues identified
-2. Specific, detailed recommendations for optimization, including:
-   - Index suggestions with exact column combinations
-   - Query restructuring proposals
-   - Schema optimization ideas if applicable
-3. Example SQL for implementing the suggested changes
-4. Expected benefits and potential trade-offs of each suggestion
-
-Focus on practical, implementable solutions that would have the highest impact on performance.
-
 {$this->instruction}
 PROMPT;
     }
@@ -104,7 +90,7 @@ PROMPT;
         array $issues,
         array|null $schemaInfo,
     ): string {
-        $context = "Original SQL:\n{$sql}\n\n";
+        $context = "Original SQL:\n{$sql}\n";
 
         if ($schemaInfo !== null) {
             $context .= "Schema Information:\n";
@@ -114,8 +100,9 @@ PROMPT;
         $context .= "EXPLAIN Results:\n";
         $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
 
-        $context .= "Identified Issues:\n";
-        $context .= json_encode($issues, JSON_THROW_ON_ERROR) . "\n";
+        foreach ($issues as $issue) {
+            $context .= "Detected Issue: {$issue['message']}\n";
+        }
 
         return $context;
     }

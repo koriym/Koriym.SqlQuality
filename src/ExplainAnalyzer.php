@@ -207,7 +207,7 @@ final class ExplainAnalyzer
         $output = '';
         foreach ($warnings as $warning) {
             $output .= sprintf(
-                "%s\nSee %s\n\n",
+                "%s\nSee %s\n",
                 $warning['message'],
                 $warning['documentation'],
             );
