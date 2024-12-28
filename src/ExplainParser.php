@@ -164,6 +164,34 @@ class ExplainParser
 /**
  * ORDER BY操作のパース
  */
+    private function parseGroupAndSort(array $operation): TreeNode
+    {
+        $attributes = [];
+        if (isset($operation['cost_info']['sort_cost'])) {
+            $attributes['sort_cost'] = $operation['cost_info']['sort_cost'];
+        }
+
+        $groupSortNode = new TreeNode(
+            'Group and Sort',
+            array_merge($attributes, [
+                'using_temporary_table' => $operation['using_temporary_table'] ? 'true' : 'false',
+                'using_filesort' => $operation['using_filesort'] ? 'true' : 'false',
+            ]),
+        );
+
+        if (isset($operation['grouping_operation']['table'])) {
+            $tableInfo = $operation['grouping_operation']['table'];
+            $tableScan = $this->parseSingleTable($tableInfo);
+            $groupSortNode = new TreeNode(
+                $groupSortNode->text,
+                $groupSortNode->attributes,
+                [$tableScan],
+            );
+        }
+
+        return $groupSortNode;
+    }
+
     private function parseOrderingOperation(array $operation): TreeNode
     {
         $attributes = [];

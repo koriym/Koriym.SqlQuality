@@ -134,6 +134,12 @@ PROMPT;
         $context .= "EXPLAIN Results:\n";
         $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
 
+        $parser = new ExplainParser();
+        $visualizer = new ExplainTreeVisualizer();
+        $tree = $parser->parse(json_encode($explainResult, JSON_THROW_ON_ERROR));
+        $context .= "EXPLAIN Tree:\n";
+        $context .= $visualizer->toString($tree) . "\n\n";
+
         foreach ($issues as $issue) {
             $context .= "Detected Issue: {$issue['message']}\n";
         }
