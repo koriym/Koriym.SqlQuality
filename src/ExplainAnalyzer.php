@@ -32,6 +32,15 @@ use function str_contains;
  *   message: string,
  *   documentation: string
  * }
+ * @psalm-type QueryCost = array{
+ *   total_cost: float,
+ *   details: array{
+ *     rows_examined: int,
+ *     temporary_tables: bool,
+ *     filesort: bool,
+ *     full_scan: bool
+ *   }
+ * }
  * @psalm-import-type ExplainResult from SqlFileAnalyzer
  * @psalm-import-type ShowWarnings from SqlFileAnalyzer
  */
@@ -205,6 +214,98 @@ final class ExplainAnalyzer
     public function formatResults(array $warnings): string
     {
         $output = '';
+        foreach ($warnings as $warning) {
+            $output .= sprintf(
+                "%s\nSee %s\n",
+                $warning['message'],
+                $warning['documentation'],
+            );
+        }
+
+        return $output;
+    }
+
+    /**
+     * @param ExplainResult $explainResult
+     *
+     * @return QueryCost
+     */
+    public function calculateQueryCost(array $explainResult): array
+    {
+        $cost = [
+            'total_cost' => 0.0,
+            'details' => [
+                'rows_examined' => 0,
+                'temporary_tables' => false,
+                'filesort' => false,
+                'full_scan' => false,
+            ],
+        ];
+
+        if (! isset($explainResult['query_block'])) {
+            return $cost;
+        }
+
+        // Calculate base cost from rows examined
+        if (isset($explainResult['query_block']['table']['rows'])) {
+            $cost['details']['rows_examined'] = $explainResult['query_block']['table']['rows'];
+            $cost['total_cost'] += $cost['details']['rows_examined'] * 0.1;
+        }
+
+        // Add cost for temporary tables
+        if (
+            isset($explainResult['query_block']['grouping_operation']['using_temporary_table'])
+            && $explainResult['query_block']['grouping_operation']['using_temporary_table']
+        ) {
+            $cost['details']['temporary_tables'] = true;
+            $cost['total_cost'] += 100;
+        }
+
+        // Add cost for filesort
+        if (
+            (isset($explainResult['query_block']['grouping_operation']['using_filesort'])
+                && $explainResult['query_block']['grouping_operation']['using_filesort'])
+            || (isset($explainResult['query_block']['ordering_operation']['using_filesort'])
+                && $explainResult['query_block']['ordering_operation']['using_filesort'])
+        ) {
+            $cost['details']['filesort'] = true;
+            $cost['total_cost'] += 50;
+        }
+
+        // Add cost for full table scans
+        if (
+            isset($explainResult['query_block']['table']['access_type'])
+            && $explainResult['query_block']['table']['access_type'] === 'ALL'
+        ) {
+            $cost['details']['full_scan'] = true;
+            $cost['total_cost'] += 200;
+        }
+
+        return $cost;
+    }
+
+    public function formatResultsWithCost(array $warnings, array $explainResult): string
+    {
+        $cost = $this->calculateQueryCost($explainResult);
+        $output = sprintf("Query Cost: %.2f\n", $cost['total_cost']);
+
+        if ($cost['details']['full_scan']) {
+            $output .= "- Full table scan detected\n";
+        }
+
+        if ($cost['details']['temporary_tables']) {
+            $output .= "- Using temporary tables\n";
+        }
+
+        if ($cost['details']['filesort']) {
+            $output .= "- Using filesort\n";
+        }
+
+        if ($cost['details']['rows_examined'] > 0) {
+            $output .= sprintf("- Examining approximately %d rows\n", $cost['details']['rows_examined']);
+        }
+
+        $output .= "\nDetected Issues:\n";
         foreach ($warnings as $warning) {
             $output .= sprintf(
                 "%s\nSee %s\n",

@@ -10,15 +10,22 @@ use RuntimeException;
 use function array_keys;
 use function array_map;
 use function array_values;
+use function date;
+use function error_log;
 use function file_exists;
 use function file_get_contents;
+use function file_put_contents;
 use function is_array;
 use function is_bool;
+use function is_dir;
 use function is_null;
 use function is_string;
 use function json_decode;
+use function mkdir;
+use function pathinfo;
 use function preg_replace;
-use function str_repeat;
+
+use const PATHINFO_FILENAME;
 
 /**
  * @psalm-import-type DetectedWarning from ExplainAnalyzer
@@ -49,7 +56,8 @@ use function str_repeat;
  * @psalm-type AnalysisResult = array{
  *   issues: list<DetectedWarning>,
  *   explain_result: ExplainResult,
- *   ai_suggestions: string
+ *   ai_suggestions: string,
+ *   cost: int
  * }
  * @psalm-type AnalysisResults = array<string, AnalysisResult>
  * @psalm-type ShowWarnings = list<array{
@@ -79,25 +87,37 @@ final class SqlFileAnalyzer
     {
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
+            error_log('Processing SQL file: ' . $sqlFile);
             $sql = $this->readSqlFile($sqlFile);
             $explainResult = $this->executeExplain($sql, $params);
             $warnings = $this->getWarnings();
             $issues = $this->analyzer->analyze($explainResult, $warnings);
             $schemaInfo = $this->getSchemaInfo($sql);
+            $cost = $this->calculateCost($explainResult);
+            $aiPrompt = $this->aiAdvisor->generatePrompt(
+                $sql,
+                $explainResult,
+                $issues,
+                $schemaInfo,
+            );
+            $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues);
 
-            $results[$sqlFile] = [
+            $results[(string) $sqlFile] = [
                 'issues' => $issues,
                 'explain_result' => $explainResult,
-                'ai_suggestions' => $this->aiAdvisor->generatePrompt(
-                    $sql,
-                    $explainResult,
-                    $issues,
-                    $schemaInfo,
-                ),
+                'ai_suggestions' => $aiPrompt,
+                'cost' => $cost,
             ];
         }
 
         return $results;
+    }
+
+    private function calculateCost(array $explainResult): float
+    {
+        $cost = $this->analyzer->calculateQueryCost($explainResult);
+
+        return $cost['total_cost'];
     }
 
     private function readSqlFile(string $filename): string
@@ -200,16 +220,53 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
+    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues): void
+    {
+        $promptDir = $this->sqlDir . '/ai_prompts'; // または設定で指定されたパス
+        if (! is_dir($promptDir) && ! mkdir($promptDir, 0777, true)) {
+            throw new RuntimeException("Failed to create directory: {$promptDir}");
+        }
+
+        $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
+        $date = date('Y-m-d H:i:s');
+        $content = <<<MARKDOWN
+# AI Analysis for {$sqlFile}
+
+**SQL File:** {$sqlFile}
+**Analysis Date:** {$date}
+
+## Detected Issues
+
+MARKDOWN;
+        foreach ($issues as $issue) {
+            $content .= "* {$issue['message']}  \n";
+        }
+
+        $content .= <<< MARKDOWN
+## AI Prompt
+{$prompt}
+MARKDOWN;
+
+        if (file_put_contents($promptFile, $content) === false) {
+            throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
+        }
+    }
+
     /** @param AnalysisResults $results */
     public function getFormattedResults(array $results): string
     {
         $output = '';
         foreach ($results as $sqlFile => $result) {
-            $output .= str_repeat('=', 80) . "\n";
-            $output .= "▶ Query Analysis: {$sqlFile}\n\n";  // New format
-            $output .= $this->analyzer->formatResults($result['issues']);
-            $output .= "\nAI Prompt:\n";  // <- ここを変更
-            $output .= "```\n{$result['ai_suggestions']}\n```\n";
+            $output .= "▶ Query Analysis: {$sqlFile} (Cost: {$result['cost']})\n\n";
+            $output .= "Query Cost: {$result['cost']}\n";
+            foreach ($result['issues'] as $issue) {
+                $output .= "- {$issue['message']}\n";
+                if (isset($issue['url'])) {
+                    $output .= "See {$issue['url']}\n";
+                }
+            }
+
+            $output .= "\n";
         }
 
         return $output;
