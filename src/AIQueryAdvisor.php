@@ -70,7 +70,7 @@ final class AIQueryAdvisor
         array|null $schemaInfo = null,
     ): string {
         // コスト情報の取得
-        $cost = $explainResult['query_cost'] ?? 'N/A';
+        $cost = $explainResult['query_block']['cost_info']['query_cost'] ?? 'N/A';
 
         // Detected Issuesのフォーマット
         $formattedIssues = '';

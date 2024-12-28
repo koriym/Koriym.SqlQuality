@@ -228,12 +228,10 @@ final class SqlFileAnalyzer
         }
 
         $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
-        $date = date('Y-m-d H:i:s');
         $content = <<<MARKDOWN
 # SQL Analysis
 
 - **SQL File:** `{$sqlFile}`
-- **Analysis Date:** {$date}
 
 {$prompt}
 MARKDOWN;
