@@ -230,20 +230,11 @@ final class SqlFileAnalyzer
         $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
         $date = date('Y-m-d H:i:s');
         $content = <<<MARKDOWN
-# AI Analysis for {$sqlFile}
+# SQL Analysis
 
-**SQL File:** {$sqlFile}
-**Analysis Date:** {$date}
+- **SQL File:** `{$sqlFile}`
+- **Analysis Date:** {$date}
 
-## Detected Issues
-
-MARKDOWN;
-        foreach ($issues as $issue) {
-            $content .= "* {$issue['message']}  \n";
-        }
-
-        $content .= <<< MARKDOWN
-## AI Prompt
 {$prompt}
 MARKDOWN;
 

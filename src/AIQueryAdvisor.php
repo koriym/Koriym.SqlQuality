@@ -69,9 +69,45 @@ final class AIQueryAdvisor
         array $issues,
         array|null $schemaInfo = null,
     ): string {
-        $context = $this->formatContext($sql, $explainResult, $issues, $schemaInfo);
+        // コスト情報の取得
+        $cost = $explainResult['query_cost'] ?? 'N/A';
+
+        // Detected Issuesのフォーマット
+        $formattedIssues = '';
+        foreach ($issues as $issue) {
+            $formattedIssues .= "- {$issue['message']}\n";
+        }
+
+        // Explain Treeの取得
+        $parser = new ExplainParser();
+        $visualizer = new ExplainTreeVisualizer();
+        $tree = $parser->parse(json_encode($explainResult, JSON_THROW_ON_ERROR));
+        $explainTree = $visualizer->toString($tree);
+
+        // Schema InformationとEXPLAIN Resultsを事前にフォーマット
+        $schemaInfoText = ! empty($schemaInfo) ? json_encode($schemaInfo, JSON_THROW_ON_ERROR) : 'N/A';
+        $explainResultText = ! empty($explainResult) ? json_encode($explainResult, JSON_THROW_ON_ERROR) : 'N/A';
 
         return <<<PROMPT
+## SQL
+
+```sql
+{$sql}
+```
+
+## Cost
+{$cost}
+
+## Detected Issues
+{$formattedIssues}
+
+## Explain Tree
+```
+{$explainTree}
+```
+
+## AI Prompt
+
 Based on the provided MySQL table schemas and EXPLAIN results, please provide:
 
 1. Brief Assessment
@@ -108,7 +144,11 @@ Based on the provided MySQL table schemas and EXPLAIN results, please provide:
 
 Please focus on practical, high-impact improvements that can be implemented with minimal risk.
 
-{$context}
+### Schema
+{$schemaInfoText}
+### EXPLAIN Results
+{$explainResultText}
+
 {$this->instruction}
 PROMPT;
     }
