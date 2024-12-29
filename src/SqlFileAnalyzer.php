@@ -7,13 +7,16 @@ namespace Koriym\SqlQuality;
 use PDO;
 use RuntimeException;
 
+use function array_any;
 use function array_keys;
 use function array_map;
+use function array_sum;
 use function array_values;
-use function error_log;
+use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
+use function implode;
 use function is_array;
 use function is_bool;
 use function is_dir;
@@ -24,6 +27,9 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function sprintf;
+use function str_contains;
+use function str_replace;
+use function trim;
 
 use const PATHINFO_FILENAME;
 
@@ -87,7 +93,6 @@ final class SqlFileAnalyzer
     {
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
-            error_log('Processing SQL file: ' . $sqlFile);
             $sql = $this->readSqlFile($sqlFile);
             $explainResult = $this->executeExplain($sql, $params);
             $warnings = $this->getWarnings();
@@ -235,28 +240,55 @@ final class SqlFileAnalyzer
         }
     }
 
-    /** @param AnalysisResults $results */
     public function getFormattedResults(array $results): string
     {
         $output = '';
         foreach ($results as $sqlFile => $result) {
-            $output .= "# SQL Performance Analysis\n\n";
-            $output .= "- **SQL File:** `{$sqlFile}`\n";
-            $output .= "- **Cost:** {$result['cost']}\n\n";
+            $issueMessages = array_map(
+                fn ($issue) => $this->simplifyIssueMessage($issue['message']),
+                $result['issues'],
+            );
 
-            $output .= "## Detected Issues\n";
-            foreach ($result['issues'] as $issue) {
-                $output .= sprintf(
-                    "- %s [Learn more](%s/%s)\n",
-                    $issue['message'],
-                    'https://koriym.github.io/Koriym.SqlQuality/issues',
-                    $issue['type'],
-                );
-            }
+            // 全クエリの結果を渡す
+            $costWarning = $this->getCostWarning($result['cost'], $results);
 
-            $output .= "\n";
+            $output .= sprintf(
+                "%s: Cost=%.2f%s, Issues=[%s]\n",
+                $sqlFile,
+                $result['cost'],
+                $costWarning,
+                implode(', ', $issueMessages),
+            );
         }
 
         return $output;
+    }
+
+    private function simplifyIssueMessage(string $message): string
+    {
+        return trim(str_replace([
+            'operation detected',
+            'required for grouping',
+            'detected',
+            '.',
+        ], '', $message));
+    }
+
+    private function getCostWarning(float $cost, array $results): string
+    {
+        // コストの評価
+        $allCosts = array_map(static fn ($result) => $result['cost'], $results);
+        $avgCost = array_sum($allCosts) / count($allCosts);
+
+        // 実行計画の評価
+        $hasFullTableScan = isset($results['issues']) &&
+            array_any(static fn ($issue) => str_contains($issue['message'], 'Full table scan'), $results['issues']);
+
+        // 警告条件
+        if ($cost > ($avgCost * 2) || ($hasFullTableScan && $cost > $avgCost)) {
+            return ' ⚠️';
+        }
+
+        return '';
     }
 }
