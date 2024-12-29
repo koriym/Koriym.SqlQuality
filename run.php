@@ -19,5 +19,15 @@ $analyzer = new SqlFileAnalyzer(
     new AIQueryAdvisor('以上の分析を日本語で記述してください')
 );
 $results = $analyzer->analyzeSQLFiles($sqlParams);
-echo $analyzer->getFormattedResults($results);
 
+$statistics = new QueryStatisticsCalculator();
+$classifier = new StatisticalQueryLevelClassifier();
+$reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
+
+// クエリ結果を統計計算に渡す
+$statistics->calculate($results);
+
+$reportPath = __DIR__ . '/tests/sql/ai_prompts/summary_report.md';
+$reportGenerator->saveSummaryReport('summary_report.md');
+
+echo "Summary report saved to: {$reportPath}\n";

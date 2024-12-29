@@ -1,0 +1,108 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Koriym\SqlQuality;
+
+use RuntimeException;
+
+use function array_column;
+use function count;
+use function error_log;
+use function file_put_contents;
+use function implode;
+use function is_dir;
+use function mkdir;
+use function number_format;
+use function pathinfo;
+use function sprintf;
+use function str_replace;
+use function uasort;
+
+use const PATHINFO_FILENAME;
+
+class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
+{
+    public function __construct(
+        private readonly QueryStatisticsInterface $statistics,
+        private readonly QueryLevelClassifierInterface $classifier,
+    ) {
+    }
+
+    public function generate(array $queryResults): string
+    {
+        $stats = $this->statistics->calculate($queryResults);
+
+        // クエリをコスト順にソート
+        uasort($queryResults, static fn ($a, $b) => $b['cost'] <=> $a['cost']);
+
+        $rows = [];
+        foreach ($queryResults as $filename => $result) {
+            $level = $this->classifier->classify(
+                $result['cost'],
+                $stats['avg_cost'],
+                $stats['std_dev'],
+            );
+
+            $issues = implode(', ', array_column($result['issues'], 'type'));
+            $escapedFilename = str_replace('_', '\\_', $filename);
+            $rows[] = sprintf(
+                '| %s | %.2f | %s | %s | [Details](%s.md) |',
+                $escapedFilename,
+                $result['cost'],
+                $level,
+                $issues ?: '-',
+                pathinfo($filename, PATHINFO_FILENAME),
+            );
+        }
+
+        return $this->formatReport($rows, $stats);
+    }
+
+    public function saveSummaryReport(string $fileName = 'summary_report.md'): void
+    {
+        $reportDir = __DIR__ . '/../tests/sql/ai_prompts';
+        if (! is_dir($reportDir) && ! mkdir($reportDir, 0777, true)) {
+            throw new RuntimeException("Failed to create directory: {$reportDir}");
+        }
+
+        $reportPath = $reportDir . '/' . $fileName;
+        $queryResults = $this->statistics->getQueryResults();
+        error_log('Query results count: ' . count($queryResults));
+        $reportContent = $this->generate($queryResults);
+
+        if (file_put_contents($reportPath, $reportContent) === false) {
+            throw new RuntimeException("Failed to save report to file: {$reportPath}");
+        }
+
+        error_log("Report successfully saved to: {$reportPath}");
+    }
+
+    private function formatReport(array $rows, array $stats): string
+    {
+        return <<<EOF
+# SQL Analysis Summary
+
+## Query Analysis List
+
+| SQL File | Cost | Level | Issues | Report |
+|----------|------|-------|---------|---------|
+{$this->formatRows($rows)}
+
+## Project Statistics
+- Total SQLs analyzed: {$stats['total_count']}
+- Average query cost: {$this->formatFloat($stats['avg_cost'])}
+- Standard deviation: {$this->formatFloat($stats['std_dev'])}
+EOF;
+    }
+
+    private function formatRows(array $rows): string
+    {
+        return implode("\n", $rows);
+    }
+
+    private function formatFloat(float $value): string
+    {
+        return number_format($value, 2);
+    }
+}

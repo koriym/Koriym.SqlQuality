@@ -16,7 +16,6 @@ use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
-use function implode;
 use function is_array;
 use function is_bool;
 use function is_dir;
@@ -26,7 +25,6 @@ use function json_decode;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
-use function sprintf;
 use function str_contains;
 use function str_replace;
 use function trim;
@@ -240,28 +238,13 @@ final class SqlFileAnalyzer
         }
     }
 
-    public function getFormattedResults(array $results): string
+    public function generateSummaryReport(array $results): string
     {
-        $output = '';
-        foreach ($results as $sqlFile => $result) {
-            $issueMessages = array_map(
-                fn ($issue) => $this->simplifyIssueMessage($issue['message']),
-                $result['issues'],
-            );
+        $statistics = new QueryStatisticsCalculator();
+        $classifier = new StatisticalQueryLevelClassifier();
+        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
 
-            // 全クエリの結果を渡す
-            $costWarning = $this->getCostWarning($result['cost'], $results);
-
-            $output .= sprintf(
-                "%s: Cost=%.2f%s, Issues=[%s]\n",
-                $sqlFile,
-                $result['cost'],
-                $costWarning,
-                implode(', ', $issueMessages),
-            );
-        }
-
-        return $output;
+        return $reportGenerator->generate($results);
     }
 
     private function simplifyIssueMessage(string $message): string
