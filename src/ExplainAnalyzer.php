@@ -232,6 +232,7 @@ final class ExplainAnalyzer
      */
     public function calculateQueryCost(array $explainResult): array
     {
+        // デフォルトのコスト構造
         $cost = [
             'total_cost' => 0.0,
             'details' => [
@@ -246,10 +247,14 @@ final class ExplainAnalyzer
             return $cost;
         }
 
-        // Calculate base cost from rows examined
+        // MySQLのquery_costを優先的に使用
+        if (isset($explainResult['query_block']['cost_info']['query_cost'])) {
+            $cost['total_cost'] = (float) $explainResult['query_block']['cost_info']['query_cost'];
+        }
+
+        // 詳細情報の収集（コスト計算とは独立）
         if (isset($explainResult['query_block']['table']['rows'])) {
             $cost['details']['rows_examined'] = $explainResult['query_block']['table']['rows'];
-            $cost['total_cost'] += $cost['details']['rows_examined'] * 0.1;
         }
 
         // Add cost for temporary tables
@@ -258,7 +263,6 @@ final class ExplainAnalyzer
             && $explainResult['query_block']['grouping_operation']['using_temporary_table']
         ) {
             $cost['details']['temporary_tables'] = true;
-            $cost['total_cost'] += 100;
         }
 
         // Add cost for filesort
@@ -269,7 +273,6 @@ final class ExplainAnalyzer
                 && $explainResult['query_block']['ordering_operation']['using_filesort'])
         ) {
             $cost['details']['filesort'] = true;
-            $cost['total_cost'] += 50;
         }
 
         // Add cost for full table scans
@@ -278,7 +281,6 @@ final class ExplainAnalyzer
             && $explainResult['query_block']['table']['access_type'] === 'ALL'
         ) {
             $cost['details']['full_scan'] = true;
-            $cost['total_cost'] += 200;
         }
 
         return $cost;
