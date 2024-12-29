@@ -1,71 +1,85 @@
 # Koriym.SqlQuality
 
-A powerful MySQL query analyzer that helps detect potential performance issues in SQL files and provides AI-powered optimization recommendations. This tool combines traditional SQL analysis with advanced AI suggestions to help you write more efficient queries.
+A powerful MySQL query analyzer that helps detect potential performance issues in SQL files and provides AI-powered optimization recommendations.
 
 ## Features
 
-### Comprehensive SQL Analysis
-- Detects common performance issues including:
-   - Full table scans and missing indexes
-   - Inefficient JOIN operations
-   - Index-preventing conditions (functions in WHERE clause)
-   - Problematic LIKE patterns with leading wildcards
-   - Implicit type conversions
-   - Inefficient sorting operations
-   - Temporary table usage for grouping
+- Detects common performance issues (full table scans, inefficient JOINs, etc.)
+- Provides AI-powered optimization recommendations
+- Supports multiple output languages
+- Generates detailed analysis reports
 
-### AI-Powered Optimization
-- Provides detailed performance impact analysis
-- Generates specific optimization recommendations
-- Suggests exact SQL statements for implementing changes
-- Evaluates cost-benefit trade-offs for suggested optimizations
-- Offers schema optimization suggestions
+## Requirements
 
-### Developer-Friendly Output
-- Clear, actionable warning messages
-- Links to detailed documentation for each issue
-- Formatted analysis results with examples
-- Support for multiple output languages
+- PHP 8.1+
+- MySQL 5.7+ or MariaDB 10.2+
+- PDO MySQL extension
 
 ## Installation
-
-Install via Composer:
 
 ```bash
 composer require koriym/sql-quality
 ```
 
-## Basic Usage
+## Usage
 
 ```php
+<?php
+
+declare(strict_types=1);
+
+namespace Koriym\SqlQuality;
+
 use PDO;
-use Koriym\SqlQuality\SqlFileAnalyzer;
-use Koriym\SqlQuality\ExplainAnalyzer;
-use Koriym\SqlQuality\AIQueryAdvisor;
+use RuntimeException;
 
-// Initialize database connection
-$pdo = new PDO('mysql:host=localhost;dbname=test', 'user', 'password');
+require __DIR__ . '/vendor/autoload.php';
 
-// Create analyzers
-$analyzer = new ExplainAnalyzer();
-$aiAdvisor = new AIQueryAdvisor();  // Default English output
-
-// Initialize SQL analyzer
-$sqlAnalyzer = new SqlFileAnalyzer(
-    $pdo,
-    $analyzer,
-    '/path/to/sql/dir',
-    $aiAdvisor
-);
-
-// Analyze SQL files with parameters
-$results = $sqlAnalyzer->analyzeSQLFiles([
-    'query1.sql' => ['user_id' => 1],
-    'query2.sql' => ['status' => 'active']
+$pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
 ]);
 
-// Output formatted results
-echo $sqlAnalyzer->getFormattedResults($results);
+$sqlParams = require __DIR__ . '/tests/params/sql_params.php';
+
+$analyzer = new SqlFileAnalyzer(
+    $pdo,
+    new ExplainAnalyzer(),
+    __DIR__ . '/tests/sql',
+    new AIQueryAdvisor('以上の分析を日本語で記述してください')
+);
+$results = $analyzer->analyzeSQLFiles($sqlParams);
+echo $analyzer->getFormattedResults($results);
+```
+
+## Output Format
+
+The analysis results are provided in two formats:
+
+1. Compact Overview (Console Output)
+```
+example.sql: Cost=498.45, Issues=[Full table scan]
+critical_query.sql: Cost=2949.45 ⚠️, Issues=[Full table scan, Ineffective sort]
+```
+* Cost: Query execution cost
+* ⚠️: Queries requiring special attention
+* Issues: Detected performance issues
+
+2. Detailed Report (Markdown)
+
+The analyzer generates detailed Markdown reports in the `ai_prompts` directory under your SQL directory. Each report includes:
+* SQL content
+* Execution plan details
+* Performance analysis
+* Optimization suggestions
+
+Example directory structure:
+```
+/path/to/sql/
+├── query1.sql
+├── query2.sql
+└── ai_prompts/
+    ├── query1.md
+    └── query2.md
 ```
 
 ## Multilingual Support
@@ -74,61 +88,12 @@ The AI advisor supports multiple languages for its analysis output:
 
 ```php
 // Japanese output
-$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください。');
+$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください');
 
-// French output
-$aiAdvisor = new AIQueryAdvisor('Veuillez fournir cette analyse en français.');
-
-// German output
-$aiAdvisor = new AIQueryAdvisor('Bitte stellen Sie diese Analyse auf Deutsch bereit.');
+// English output
+$aiAdvisor = new AIQueryAdvisor('Please provide the analysis in English');
 ```
 
-## Example Output
+## License
 
-```text
-▶ Query Analysis: query1.sql:
-
-Full table scan detected.
-See https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan
-
-Ineffective JOIN operation detected.
-See https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveJoin
-
-AI Prompt:
-Based on the provided MySQL table schemas and EXPLAIN results, please provide ...
-...
-```
-
-## CI Integration
-
-Integrate SQL quality checks into your CI pipeline:
-
-```php
-$analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), '/path/to/sql');
-$results = $analyzer->analyzeSQLFiles($sqlParams);
-
-// Exit with error if issues found
-$hasIssues = false;
-foreach ($results as $fileResults) {
-    if (!empty($fileResults['issues'])) {
-        $hasIssues = true;
-        break;
-    }
-}
-
-exit($hasIssues ? 1 : 0);
-```
-
-## Documentation
-
-Each detected issue links to detailed documentation explaining:
-- What the issue means
-- Why it matters
-- How to fix it
-- Best practices to avoid it
-
-## Requirements
-
-- PHP 8.1+
-- MySQL 5.7+ or MariaDB 10.2+
-- PDO MySQL extension
+This project is licensed under the MIT License - see the LICENSE file for details
