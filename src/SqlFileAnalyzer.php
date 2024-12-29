@@ -10,7 +10,6 @@ use RuntimeException;
 use function array_keys;
 use function array_map;
 use function array_values;
-use function date;
 use function error_log;
 use function file_exists;
 use function file_get_contents;
@@ -24,6 +23,7 @@ use function json_decode;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
+use function sprintf;
 
 use const PATHINFO_FILENAME;
 
@@ -95,7 +95,8 @@ final class SqlFileAnalyzer
             $schemaInfo = $this->getSchemaInfo($sql);
             $cost = $this->calculateCost($explainResult);
             $aiPrompt = $this->aiAdvisor->generatePrompt(
-                $sql,
+                $sqlFile,        // ファイル名を渡す
+                $sql,           // SQL内容を渡す
                 $explainResult,
                 $issues,
                 $schemaInfo,
@@ -228,14 +229,7 @@ final class SqlFileAnalyzer
         }
 
         $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
-        $content = <<<MARKDOWN
-# SQL Analysis
-
-- **SQL File:** `{$sqlFile}`
-
-{$prompt}
-MARKDOWN;
-
+        $content = $prompt;
         if (file_put_contents($promptFile, $content) === false) {
             throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
         }
@@ -246,13 +240,18 @@ MARKDOWN;
     {
         $output = '';
         foreach ($results as $sqlFile => $result) {
-            $output .= "▶ Query Analysis: {$sqlFile} (Cost: {$result['cost']})\n\n";
-            $output .= "Query Cost: {$result['cost']}\n";
+            $output .= "# SQL Performance Analysis\n\n";
+            $output .= "- **SQL File:** `{$sqlFile}`\n";
+            $output .= "- **Cost:** {$result['cost']}\n\n";
+
+            $output .= "## Detected Issues\n";
             foreach ($result['issues'] as $issue) {
-                $output .= "- {$issue['message']}\n";
-                if (isset($issue['url'])) {
-                    $output .= "See {$issue['url']}\n";
-                }
+                $output .= sprintf(
+                    "- %s [Learn more](%s/%s)\n",
+                    $issue['message'],
+                    'https://koriym.github.io/Koriym.SqlQuality/issues',
+                    $issue['type'],
+                );
             }
 
             $output .= "\n";

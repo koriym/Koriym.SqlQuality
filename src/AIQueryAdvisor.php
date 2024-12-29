@@ -8,13 +8,17 @@ use PDO;
 use RuntimeException;
 
 use function array_filter;
+use function array_map;
 use function array_merge;
 use function array_unique;
 use function array_values;
+use function implode;
 use function json_encode;
+use function max;
 use function preg_match;
 use function preg_match_all;
 use function preg_replace;
+use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -53,61 +57,41 @@ use const JSON_THROW_ON_ERROR;
  */
 final class AIQueryAdvisor
 {
-    public function __construct(
-        private readonly string $instruction = 'Please provide your analysis in English.',
-    ) {
-    }
+    private const ISSUE_DOC_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues';
 
-    /**
-     * @param ExplainResult                  $explainResult
-     * @param list<DetectedWarning>          $issues
-     * @param array<string, SchemaInfo>|null $schemaInfo
-     */
-    public function generatePrompt(
-        string $sql,
-        array $explainResult,
-        array $issues,
-        array|null $schemaInfo = null,
-    ): string {
-        // コスト情報の取得
-        $cost = $explainResult['query_block']['cost_info']['query_cost'] ?? 'N/A';
+    private const ANALYSIS_TEMPLATE = <<<'TEMPLATE'
+# SQL Performance Analysis
 
-        // Detected Issuesのフォーマット
-        $formattedIssues = '';
-        foreach ($issues as $issue) {
-            $formattedIssues .= "- {$issue['message']}\n";
-        }
+- **SQL File:** `%s`
+- **Cost:** %s
 
-        // Explain Treeの取得
-        $parser = new ExplainParser();
-        $visualizer = new ExplainTreeVisualizer();
-        $tree = $parser->parse(json_encode($explainResult, JSON_THROW_ON_ERROR));
-        $explainTree = $visualizer->toString($tree);
-
-        // Schema InformationとEXPLAIN Resultsを事前にフォーマット
-        $schemaInfoText = ! empty($schemaInfo) ? json_encode($schemaInfo, JSON_THROW_ON_ERROR) : 'N/A';
-        $explainResultText = ! empty($explainResult) ? json_encode($explainResult, JSON_THROW_ON_ERROR) : 'N/A';
-
-        return <<<PROMPT
 ## SQL
-
 ```sql
-{$sql}
+%s
 ```
 
-## Cost
-{$cost}
-
 ## Detected Issues
-{$formattedIssues}
+%s
 
 ## Explain Tree
 ```
-{$explainTree}
+%s
 ```
 
 ## AI Prompt
 
+%s
+
+### Schema
+%s
+
+### EXPLAIN Results
+%s
+
+%s
+TEMPLATE;
+
+    private const AI_PROMPT_TEMPLATE = <<<'TEMPLATE'
 Based on the provided MySQL table schemas and EXPLAIN results, please provide:
 
 1. Brief Assessment
@@ -140,17 +124,14 @@ Based on the provided MySQL table schemas and EXPLAIN results, please provide:
    - Impact on existing indexes and storage requirements
    - Effects on write performance
    - Maintenance requirements
-   - Backup/restore implications.
+   - Backup/restore implications
 
 Please focus on practical, high-impact improvements that can be implemented with minimal risk.
+TEMPLATE;
 
-### Schema
-{$schemaInfoText}
-### EXPLAIN Results
-{$explainResultText}
-
-{$this->instruction}
-PROMPT;
+    public function __construct(
+        private readonly string $instruction = 'Please provide your analysis in English.',
+    ) {
     }
 
     /**
@@ -158,33 +139,96 @@ PROMPT;
      * @param list<DetectedWarning>          $issues
      * @param array<string, SchemaInfo>|null $schemaInfo
      */
-    private function formatContext(
+    public function generatePrompt(
+        string $sqlFile,
         string $sql,
         array $explainResult,
         array $issues,
-        array|null $schemaInfo,
+        array|null $schemaInfo = null,
     ): string {
-        $context = "Original SQL:\n{$sql}\n\n";
+        return sprintf(
+            self::ANALYSIS_TEMPLATE,
+            $sqlFile,
+            $this->extractCost($explainResult),
+            $sql,
+            $this->formatIssues($issues),
+            $this->generateExplainTree($explainResult),
+            self::AI_PROMPT_TEMPLATE,
+            $this->formatSchemaInfo($schemaInfo),
+            $this->formatExplainResult($explainResult),
+            $this->instruction,
+        );
+    }
 
-        if ($schemaInfo !== null) {
-            $context .= "Schema Information:\n";
-            $context .= json_encode($schemaInfo, JSON_THROW_ON_ERROR) . "\n\n";
+    private function extractCost(array $explainResult): string
+    {
+        // クエリブロックレベルのコスト
+        $queryCost = $explainResult['query_block']['cost_info']['query_cost'] ?? null;
+
+        // 実行計画の詳細コスト
+        $planCost = 0.0;
+        if (isset($explainResult['query_block'])) {
+            // テーブルスキャンのコスト
+            if (isset($explainResult['query_block']['table']['cost_info'])) {
+                $tableCost = $explainResult['query_block']['table']['cost_info'];
+                $planCost += ($tableCost['read_cost'] ?? 0) + ($tableCost['eval_cost'] ?? 0);
+            }
+
+            // ソート操作のコスト
+            if (isset($explainResult['query_block']['ordering_operation']['cost_info'])) {
+                $sortCost = $explainResult['query_block']['ordering_operation']['cost_info'];
+                $planCost += $sortCost['sort_cost'] ?? 0;
+            }
+
+            // 一時テーブルのコスト
+            if (isset($explainResult['query_block']['grouping_operation']['cost_info'])) {
+                $groupCost = $explainResult['query_block']['grouping_operation']['cost_info'];
+                $planCost += $groupCost['tmp_table_cost'] ?? 0;
+            }
         }
 
-        $context .= "EXPLAIN Results:\n";
-        $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
+        // クエリコストと実行計画コストを比較して、大きい方を採用
+        $finalCost = max($queryCost ?? 0, $planCost);
 
+        return $finalCost > 0 ? (string) $finalCost : 'N/A';
+    }
+
+    /** @param list<DetectedWarning> $issues */
+    private function formatIssues(array $issues): string
+    {
+        return implode("\n", array_map(
+            static fn (array $issue): string => sprintf(
+                '- %s [Learn more](%s/%s)',
+                $issue['message'],
+                self::ISSUE_DOC_URL,
+                $issue['type'],
+            ),
+            $issues,
+        ));
+    }
+
+    private function generateExplainTree(array $explainResult): string
+    {
         $parser = new ExplainParser();
         $visualizer = new ExplainTreeVisualizer();
         $tree = $parser->parse(json_encode($explainResult, JSON_THROW_ON_ERROR));
-        $context .= "EXPLAIN Tree:\n";
-        $context .= $visualizer->toString($tree) . "\n\n";
 
-        foreach ($issues as $issue) {
-            $context .= "Detected Issue: {$issue['message']}\n";
+        return $visualizer->toString($tree);
+    }
+
+    /** @param array<string, SchemaInfo>|null $schemaInfo */
+    private function formatSchemaInfo(array|null $schemaInfo): string
+    {
+        if (empty($schemaInfo)) {
+            return 'N/A';
         }
 
-        return $context;
+        return json_encode($schemaInfo, JSON_THROW_ON_ERROR);
+    }
+
+    private function formatExplainResult(array $explainResult): string
+    {
+        return json_encode($explainResult, JSON_THROW_ON_ERROR);
     }
 
     /**
@@ -311,7 +355,7 @@ PROMPT;
         FROM information_schema.tables 
         WHERE table_schema = DATABASE()
         AND table_name = {$quotedTable}
-    ";
+        ";
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {
