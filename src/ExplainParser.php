@@ -10,6 +10,7 @@ use function array_filter;
 use function array_merge;
 use function implode;
 use function json_decode;
+use function sprintf;
 use function str_contains;
 
 /**
@@ -26,6 +27,7 @@ class ExplainParser
         $data = json_decode($explainJson, true);
         $queryBlock = $data['query_block'];
 
+        // 1) ordering_operation のチェック
         if (isset($queryBlock['ordering_operation'])) {
             /** @var ExplainOperation $orderingOp */
             $orderingOp = $queryBlock['ordering_operation'];
@@ -36,6 +38,7 @@ class ExplainParser
             return $this->parseOrderingOperation($orderingOp);
         }
 
+        // 2) grouping_operation のチェック
         if (isset($queryBlock['grouping_operation']['nested_loop'])) {
             /** @var array<array{table: ExplainTable}> $nestedLoop */
             $nestedLoop = $queryBlock['grouping_operation']['nested_loop'];
@@ -43,11 +46,68 @@ class ExplainParser
             return $this->parseNestedLoop($nestedLoop);
         }
 
+        // 3) 単一テーブルの場合
         if (isset($queryBlock['table'])) {
-            return $this->parseSingleTable($queryBlock['table']);
+            // TableNode を一旦作る
+            $tableNode = $this->parseSingleTable($queryBlock['table']);
+
+            // 4) select_list_subqueries があれば、ここでパースして子ノードとして追加する
+            if (isset($queryBlock['select_list_subqueries'])) {
+                $subqueryNodes = $this->parseSelectListSubqueries($queryBlock['select_list_subqueries']);
+                // もとのテーブルノードを、新しい子ノードを付与した形で再生成
+                // TreeNode はイミュータブルな実装の場合があるので要注意
+                $tableNode = new TreeNode(
+                    $tableNode->text,
+                    $tableNode->attributes,
+                    // 既存の子ノード + サブクエリノードを追加
+                    array_merge($tableNode->children, $subqueryNodes),
+                );
+            }
+
+            return $tableNode;
         }
 
         throw new RuntimeException('Unsupported EXPLAIN format');
+    }
+
+    /**
+     * @param array<int, mixed> $subqueries
+     *
+     * @return list<TreeNode>
+     */
+    private function parseSelectListSubqueries(array $subqueries): array
+    {
+        $nodes = [];
+        foreach ($subqueries as $subquery) {
+            // EXPLAIN の構造上、サブクエリは「query_block」キー以下に入っている想定
+            if (isset($subquery['query_block']['table'])) {
+                $table = $subquery['query_block']['table'];
+                $nodes[] = $this->parseSingleSubquery($table);
+            }
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * サブクエリ用のパーサ
+     * "Subquery (xxx)" というタイトルでノードを作る
+     */
+    private function parseSingleSubquery(array $table): TreeNode
+    {
+        // テーブル名を元に "Subquery (table_name)" のような文字列にする
+        $subqueryTitle = sprintf('Subquery (%s)', $table['table_name']);
+
+        // 属性を組み立てる
+        $attributes = array_filter([
+            'access_type' => $table['access_type'] ?? null,
+            'key'         => $table['key']         ?? null,
+            'rows'        => isset($table['rows_examined_per_scan']) ? (string) $table['rows_examined_per_scan'] : null,
+            'filtered'    => $table['filtered']    ?? null,
+            'using_index' => isset($table['using_index']) && $table['using_index'] === true ? 'true' : null,
+        ]);
+
+        return new TreeNode($subqueryTitle, $attributes);
     }
 
     /** @param array<array{table: ExplainTable}> $nestedLoop */
