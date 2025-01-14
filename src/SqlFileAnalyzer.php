@@ -120,8 +120,7 @@ final class SqlFileAnalyzer
     private function calculateCost(array $explainResult): float
     {
         $cost = $this->analyzer->calculateQueryCost($explainResult);
-
-        return $cost['total_cost'];
+        return (float) $cost['total_cost']; // If you intend it to be float
     }
 
     private function readSqlFile(string $filename): string
