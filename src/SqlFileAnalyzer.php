@@ -43,13 +43,59 @@ final class SqlFileAnalyzer
     }
 
     /**
+     * Analyzes the SQL files contained in the specified parameters, generates statistical analyses,
+     * outputs detailed Markdown reports for each SQL file, and creates a summary report.
+     *
+     * @param array<string, mixed> $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
+     * @param string               $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
+     *
+     *               example: $sqlParams [
+     *                  1_full_table_scan.sql' => ['min_views' => 1000],
+     *                  2_filesort.sql' => ['status' => 'published', 'limit' => 10],
+     *               ]
+     *
+     * @return array<string, array<string, mixed>> Returns an associative array where the keys are SQL file paths and the values are their respective analysis results, including AI suggestions and identified issues.
+     */
+    public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
+    {
+        // 1) すべての SQL を分析
+        $results = $this->analyzeSQLFiles($sqlParams, $outputDir);
+
+        // 2) 解析結果を統計計算にかける
+        $statistics = new QueryStatisticsCalculator();
+        $statistics->calculate($results);
+
+        // 3) レベル分類クラスとレポート生成クラスを用意
+        $classifier = new StatisticalQueryLevelClassifier();
+        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
+
+        // 4) それぞれの SQL に対応する Markdown レポート(= AI prompt)を出力
+        //    → ここでは SqlFileAnalyzer::savePromptToMarkdown を呼ぶ想定
+        //    （すでに内部で呼んでいる場合は省略可）
+        foreach ($results as $sqlFile => $analysisResult) {
+            $this->savePromptToMarkdown(
+                $sqlFile,
+                $analysisResult['ai_suggestions'],
+                $analysisResult['issues'],
+                $outputDir,
+            );
+        }
+
+        // 5) まとめレポート（summary_report.md）を出力
+        //    デフォルトのファイル名を summary_report.md とする
+        $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
+
+        return $results;
+    }
+
+    /**
      * @param SqlParams $sqlParams
      *
      * @return array<string, AnalysisResult>
      *
      * @throws RuntimeException
      */
-    public function analyzeSQLFiles(array $sqlParams): array
+    public function analyzeSQLFiles(array $sqlParams, string $outputDir): array
     {
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
@@ -72,7 +118,7 @@ final class SqlFileAnalyzer
                 $schemaInfo,
             );
 
-            $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues);
+            $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
 
             // (string)キャストを削除し、$sqlFileは既にstring型であることを前提とする
             $results[$sqlFile] = [
@@ -196,21 +242,20 @@ final class SqlFileAnalyzer
      *
      * @throws RuntimeException
      */
-    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues): void
+    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues, string $outputDir): void
     {
-        $promptDir = $this->sqlDir . '/ai_prompts';
-        if (! is_dir($promptDir) && ! mkdir($promptDir, 0777, true)) {
-            throw new RuntimeException("Failed to create directory: {$promptDir}");
+        if (! is_dir($outputDir) && ! mkdir($outputDir, 0777, true)) {
+            throw new RuntimeException("Failed to create directory: {$outputDir}");
         }
 
-        $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
+        $promptFile = $outputDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
         if (file_put_contents($promptFile, $prompt) === false) {
             throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
         }
     }
 
     /** @param array<string, AnalysisResult> $results */
-    public function generateSummaryReport(array $results): string
+    public function generateSummaryReport(array $results, $outputDir): string
     {
         $statistics = new QueryStatisticsCalculator();
         $classifier = new StatisticalQueryLevelClassifier();

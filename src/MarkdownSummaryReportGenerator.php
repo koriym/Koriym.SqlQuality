@@ -32,14 +32,13 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
     ) {
     }
 
-    public function saveSummaryReport(string $fileName = 'summary_report.md'): void
+    public function saveSummaryReport(string $outputDir, string $fileName = 'summary_report.md'): void
     {
-        $reportDir = __DIR__ . '/../tests/sql/ai_prompts';
-        if (! is_dir($reportDir) && ! @mkdir($reportDir, 0777, true)) {
-            throw new RuntimeException("Failed to create directory: {$reportDir}");
+        if (! is_dir($outputDir) && ! @mkdir($outputDir, 0777, true)) {
+            throw new RuntimeException("Failed to create directory: {$outputDir}");
         }
 
-        $reportPath = $reportDir . '/' . $fileName;
+        $reportPath = $outputDir . '/' . $fileName;
         $queryResults = $this->statistics->getQueryResults();
         error_log('Query results count: ' . count($queryResults));
         $reportContent = $this->generate($queryResults);
