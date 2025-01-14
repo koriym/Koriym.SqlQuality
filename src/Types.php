@@ -18,6 +18,29 @@ use PDO;
  * @psalm-type SqlFile = non-empty-string
  * @psalm-type TableName = non-empty-string
  *
+ * Tree Types
+ * @psalm-type TreeNodeText = string
+ * @psalm-type TreeNodeAttributes = array<string, string>
+ * @psalm-type TreeNodeChildren = array<TreeNode>
+ *
+ * Explain Tree Types
+ * @psalm-type ExplainTreeBranch = string
+ * @psalm-type ExplainTreePipe = string
+ * @psalm-type ExplainTreeSpace = string
+ * @psalm-type ExplainTreeParentPipes = array<int, bool>
+ *
+ * Query Statistics Types
+ * @psalm-type QueryStatisticsResult = array{
+ *   total_count: int,
+ *   avg_cost: float,
+ *   std_dev: float
+ * }
+ * @psalm-type QueryResults = array<string, array{
+ *   cost: float,
+ *   issues: array<string>,
+ *   explain_result: array
+ * }>
+ *
  * Explain Analyzer Types
  * @psalm-type WarningMessages = array{
  *   FullTableScan: string,
@@ -57,6 +80,11 @@ use PDO;
  *     full_scan: bool
  *   }
  * }
+ * @psalm-type TreeNodeData = array{
+ *   text: string,
+ *   attributes: array<string, string|float|null>,
+ *   children: list<TreeNodeData>
+ * }
  * @psalm-type ExplainResult = array{
  *   query_block: array{
  *     select_id: int,
@@ -66,22 +94,37 @@ use PDO;
  *       possible_keys?: string|null,
  *       key?: string|null,
  *       rows: int,
- *       filtered: float
+ *       rows_examined_per_scan: int,
+ *       filtered: float,
+ *       attached_condition?: string,
+ *       cost_info?: array{
+ *         read_cost: float,
+ *         eval_cost: float,
+ *         sort_cost?: float
+ *       },
+ *       using_temporary_table?: bool,
+ *       using_filesort?: bool
  *     },
  *     ordering_operation?: array{
  *       using_filesort: bool,
- *       table: array
+ *       table: array,
+ *       cost_info?: array{
+ *         sort_cost: float
+ *       }
  *     },
  *     grouping_operation?: array{
  *       using_temporary_table: bool,
  *       using_filesort: bool,
- *       table: array
+ *       table: array,
+ *       cost_info?: array{
+ *         tmp_table_cost: float,
+ *         sort_cost?: float
+ *       }
  *     }
  *   }
  * }
- * @psalm-type ShowWarnings = list<ShowWarning>
  *
- * AI Advisor Types
+ * Schema Types
  * @psalm-type SchemaColumn = array{
  *   column_name: string,
  *   data_type: string,
@@ -112,13 +155,7 @@ use PDO;
  *   status: TableStatus
  * }
  *
- * Query Statistic Types
- * @psalm-type QueryCostWithIssues = array{
- *   cost: float,
- *   issues: list<DetectedWarning>
- * }
- *
- * SQL File Analyzer Types
+ * SQL File Analysis Types
  * @psalm-type SqlParams = array<string, array<string, mixed>>
  * @psalm-type AnalysisResult = array{
  *   issues: list<DetectedWarning>,
@@ -127,8 +164,7 @@ use PDO;
  *   cost: float
  * }
  * @psalm-type AnalysisResults = array<string, AnalysisResult>
- *
- * @phpcs:enable
+ * @psalm-type ShowWarnings = list<ShowWarning>
  */
 final class Types
 {
