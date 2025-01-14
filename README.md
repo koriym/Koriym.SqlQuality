@@ -39,11 +39,16 @@ $pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
 
 $sqlParams = require dirname(__DIR__) . '/tests/params/sql_params.php';
 
+//return [
+//    '1_full_table_scan.sql' => ['min_views' => 1000],
+//    '2_filesort.sql' => ['status' => 'published','limit' => 10]
+//];
+
 $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
     dirname(__DIR__) . '/tests/sql',
-    new AIQueryAdvisor('以上の分析を日本語でなるべく記述してください。') // 'Please describe the above analysis in YOURLANGUAGE'.
+    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
 );
 
 // Output to build/sql-quality
