@@ -256,22 +256,4 @@ final class SqlFileAnalyzer
             '.',
         ], '', $message));
     }
-
-    private function getCostWarning(float $cost, array $results): string
-    {
-        // コストの評価
-        $allCosts = array_map(static fn ($result) => $result['cost'], $results);
-        $avgCost = array_sum($allCosts) / count($allCosts);
-
-        // 実行計画の評価
-        $hasFullTableScan = isset($results['issues']) &&
-            array_any(static fn ($issue) => str_contains($issue['message'], 'Full table scan'), $results['issues']);
-
-        // 警告条件
-        if ($cost > ($avgCost * 2) || ($hasFullTableScan && $cost > $avgCost)) {
-            return ' ⚠️';
-        }
-
-        return '';
-    }
 }
