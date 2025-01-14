@@ -114,8 +114,8 @@ final class ExplainAnalyzer
     }
 
     /**
-     * @param ExplainResult $explainResult
-     * @param ShowWarnings  $warnings
+     * @param array $explainResult
+     * @param array $warnings
      *
      * @return list<DetectedWarning>
      */
@@ -137,8 +137,8 @@ final class ExplainAnalyzer
     }
 
     /**
-     * @param ExplainResult  $explainResult
-     * @param ShowWarnings   $warnings
+     * @param array $explainResult
+     * @param array $warnings
      * @param WarningPattern $pattern
      */
     private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
@@ -162,7 +162,9 @@ final class ExplainAnalyzer
         return true;
     }
 
-    /** @param ExplainResult $explainResult */
+    /**
+     * @param array $explainResult
+     */
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
         if (isset($explainResult['query_block'])) {
@@ -174,7 +176,9 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param ShowWarnings $warnings */
+    /**
+     * @param array $warnings
+     */
     private function matchWarningPattern(array $warnings, string $pattern): bool
     {
         foreach ($warnings as $warning) {
@@ -226,7 +230,7 @@ final class ExplainAnalyzer
     }
 
     /**
-     * @param ExplainResult $explainResult
+     * @param array $explainResult
      *
      * @return QueryCost
      */
