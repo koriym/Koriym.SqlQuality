@@ -9,31 +9,16 @@ use function sprintf;
 use function str_contains;
 
 /**
- * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
- * @psalm-type WarningMessages = array{
- *   FullTableScan: string,
- *   IneffectiveJoin: string,
- *   FunctionInvalidatesIndex: string,
- *   IneffectiveLikePattern: string,
- *   ImplicitTypeConversion: string,
- *   IneffectiveSort: string,
- *   TemporaryTableGrouping: string
- * }
- * @psalm-type WarningPattern = array{
- *   explain?: array<string, mixed>,
- *   warnings?: list<string>
- * }
- * @psalm-type Warning = array{
- *   message: string,
- *   pattern: WarningPattern
- * }
- * @psalm-type DetectedWarning = array{
- *   type: WarningType,
- *   message: string,
- *   documentation: string
- * }
- * @psalm-import-type ExplainResult from SqlFileAnalyzer
- * @psalm-import-type ShowWarnings from SqlFileAnalyzer
+ * @psalm-import-type WarningType from Types
+ * @psalm-import-type WarningMessages from Types
+ * @psalm-import-type WarningPattern from Types
+ * @psalm-import-type Warning from Types
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type ShowWarning from Types
+ * @psalm-import-type ShowWarnings from Types
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainOperation from Types
+ * @psalm-import-type QueryCost from Types
  */
 final class ExplainAnalyzer
 {
@@ -104,12 +89,7 @@ final class ExplainAnalyzer
         ];
     }
 
-    /**
-     * @param ExplainResult $explainResult
-     * @param ShowWarnings  $warnings
-     *
-     * @return list<DetectedWarning>
-     */
+    /** @return list<DetectedWarning> */
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
@@ -127,11 +107,7 @@ final class ExplainAnalyzer
         return $detectedWarnings;
     }
 
-    /**
-     * @param ExplainResult  $explainResult
-     * @param ShowWarnings   $warnings
-     * @param WarningPattern $pattern
-     */
+    /** @param WarningPattern $pattern */
     private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
     {
         if (isset($pattern['explain'])) {
@@ -153,7 +129,6 @@ final class ExplainAnalyzer
         return true;
     }
 
-    /** @param ExplainResult $explainResult */
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
         if (isset($explainResult['query_block'])) {
@@ -165,7 +140,6 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param ShowWarnings $warnings */
     private function matchWarningPattern(array $warnings, string $pattern): bool
     {
         foreach ($warnings as $warning) {
@@ -205,6 +179,96 @@ final class ExplainAnalyzer
     public function formatResults(array $warnings): string
     {
         $output = '';
+        foreach ($warnings as $warning) {
+            $output .= sprintf(
+                "%s\nSee %s\n",
+                $warning['message'],
+                $warning['documentation'],
+            );
+        }
+
+        return $output;
+    }
+
+    /** @return QueryCost */
+    public function calculateQueryCost(array $explainResult): array
+    {
+        // デフォルトのコスト構造
+        $cost = [
+            'total_cost' => 0.0,
+            'details' => [
+                'rows_examined' => 0,
+                'temporary_tables' => false,
+                'filesort' => false,
+                'full_scan' => false,
+            ],
+        ];
+
+        if (! isset($explainResult['query_block'])) {
+            return $cost;
+        }
+
+        // MySQLのquery_costを優先的に使用
+        if (isset($explainResult['query_block']['cost_info']['query_cost'])) {
+            $cost['total_cost'] = (float) $explainResult['query_block']['cost_info']['query_cost'];
+        }
+
+        // 詳細情報の収集（コスト計算とは独立）
+        if (isset($explainResult['query_block']['table']['rows'])) {
+            $cost['details']['rows_examined'] = $explainResult['query_block']['table']['rows'];
+        }
+
+        // Add cost for temporary tables
+        if (
+            isset($explainResult['query_block']['grouping_operation']['using_temporary_table'])
+            && $explainResult['query_block']['grouping_operation']['using_temporary_table']
+        ) {
+            $cost['details']['temporary_tables'] = true;
+        }
+
+        // Add cost for filesort
+        if (
+            (isset($explainResult['query_block']['grouping_operation']['using_filesort'])
+                && $explainResult['query_block']['grouping_operation']['using_filesort'])
+            || (isset($explainResult['query_block']['ordering_operation']['using_filesort'])
+                && $explainResult['query_block']['ordering_operation']['using_filesort'])
+        ) {
+            $cost['details']['filesort'] = true;
+        }
+
+        // Add cost for full table scans
+        if (
+            isset($explainResult['query_block']['table']['access_type'])
+            && $explainResult['query_block']['table']['access_type'] === 'ALL'
+        ) {
+            $cost['details']['full_scan'] = true;
+        }
+
+        return $cost;
+    }
+
+    public function formatResultsWithCost(array $warnings, array $explainResult): string
+    {
+        $cost = $this->calculateQueryCost($explainResult);
+        $output = sprintf("Query Cost: %.2f\n", $cost['total_cost']);
+
+        if ($cost['details']['full_scan']) {
+            $output .= "- Full table scan detected\n";
+        }
+
+        if ($cost['details']['temporary_tables']) {
+            $output .= "- Using temporary tables\n";
+        }
+
+        if ($cost['details']['filesort']) {
+            $output .= "- Using filesort\n";
+        }
+
+        if ($cost['details']['rows_examined'] > 0) {
+            $output .= sprintf("- Examining approximately %d rows\n", $cost['details']['rows_examined']);
+        }
+
+        $output .= "\nDetected Issues:\n";
         foreach ($warnings as $warning) {
             $output .= sprintf(
                 "%s\nSee %s\n",

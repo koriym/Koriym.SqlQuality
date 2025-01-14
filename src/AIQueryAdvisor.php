@@ -8,51 +8,99 @@ use PDO;
 use RuntimeException;
 
 use function array_filter;
+use function array_map;
 use function array_merge;
 use function array_unique;
 use function array_values;
+use function implode;
 use function json_encode;
+use function max;
 use function preg_match;
 use function preg_match_all;
 use function preg_replace;
+use function sprintf;
 
 use const JSON_THROW_ON_ERROR;
 
 /**
- * @psalm-import-type DetectedWarning from ExplainAnalyzer
- * @psalm-import-type ExplainResult from SqlFileAnalyzer
- * @psalm-type SchemaColumn = array{
- *   column_name: string,
- *   data_type: string,
- *   column_type: string,
- *   is_nullable: string,
- *   column_key: string,
- *   column_default: string|null,
- *   extra: string
- * }
- * @psalm-type SchemaIndex = array{
- *   index_name: string,
- *   column_name: string,
- *   non_unique: string,
- *   seq_in_index: string,
- *   cardinality: string|null
- * }
- * @psalm-type TableStatus = array{
- *   table_rows: int|null,
- *   data_length: int|null,
- *   index_length: int|null,
- *   auto_increment: int|null,
- *   create_time: string|null,
- *   update_time: string|null
- * }
- * @psalm-type SchemaInfo = array{
- *   columns: list<SchemaColumn>,
- *   indexes: list<SchemaIndex>,
- *   status: TableStatus
- * }
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type SchemaInfo from Types
+ * @psalm-import-type SchemaColumn from Types
+ * @psalm-import-type SchemaIndex from Types
+ * @psalm-import-type TableStatus from Types
+ * @psalm-import-type ExplainResult from Types
  */
 final class AIQueryAdvisor
 {
+    private const ISSUE_DOC_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues';
+
+    private const ANALYSIS_TEMPLATE = <<<'TEMPLATE'
+# SQL Performance Analysis
+- **SQL File:** `%s`
+- **Cost:** %s
+
+## SQL
+```sql
+%s
+```
+
+## Detected Issues
+%s
+
+## Explain Tree
+```
+%s
+```
+
+## AI Prompt
+%s
+
+### Schema
+%s
+
+### EXPLAIN Results
+%s
+%s
+TEMPLATE;
+
+    private const AI_PROMPT_TEMPLATE = <<<'TEMPLATE'
+Based on the provided MySQL table schemas and EXPLAIN results, please provide:
+
+1. Brief Assessment
+   - Summarize key performance bottlenecks identified in the EXPLAIN output
+   - Highlight any concerning access patterns (table scans, suboptimal joins)
+   - Note any missing or underutilized indexes
+
+2. Specific Optimization Recommendations
+   a) Index Improvements
+      - New indexes to create (with exact column combinations)
+      - Existing indexes to modify or remove
+      - Coverage analysis for frequently accessed columns
+   b) Query Optimization
+      - Join order and method improvements
+      - Subquery optimization opportunities
+      - Filtering and sorting efficiency
+   c) Schema Enhancements (if applicable)
+      - Table structure improvements
+      - Partitioning considerations
+      - Data type optimizations
+
+3. Implementation Details
+   For each recommendation:
+     - Exact SQL statements for implementation
+     - Estimated impact on query performance
+     - Potential risks or trade-offs
+     - Implementation priority (High/Medium/Low)
+
+4. Additional Considerations
+   - Impact on existing indexes and storage requirements
+   - Effects on write performance
+   - Maintenance requirements
+   - Backup/restore implications
+
+Please focus on practical, high-impact improvements that can be implemented with minimal risk.
+TEMPLATE;
+
     public function __construct(
         private readonly string $instruction = 'Please provide your analysis in English.',
     ) {
@@ -64,47 +112,125 @@ final class AIQueryAdvisor
      * @param array<string, SchemaInfo>|null $schemaInfo
      */
     public function generatePrompt(
+        string $sqlFile,
         string $sql,
         array $explainResult,
         array $issues,
         array|null $schemaInfo = null,
     ): string {
-        $context = $this->formatContext($sql, $explainResult, $issues, $schemaInfo);
-
-        return <<<PROMPT
-Based on the provided MySQL table schemas and EXPLAIN results, please provide: 1. Brief Assessment - Summarize key performance bottlenecks identified in the EXPLAIN output - Highlight any concerning access patterns (table scans, suboptimal joins) - Note any missing or underutilized indexes 2. Specific Optimization Recommendations a) Index Improvements - New indexes to create (with exact column combinations) - Existing indexes to modify or remove - Coverage analysis for frequently accessed columns b) Query Optimization - Join order and method improvements - Subquery optimization opportunities - Filtering and sorting efficiency c) Schema Enhancements (if applicable) - Table structure improvements - Partitioning considerations - Data type optimizations 3. Implementation Details For each recommendation: - Exact SQL statements for implementation - Estimated impact on query performance - Potential risks or trade-offs - Implementation priority (High/Medium/Low) 4. Additional Considerations - Impact on existing indexes and storage requirements - Effects on write performance - Maintenance requirements - Backup/restore implications. Please focus on practical, high-impact improvements that can be implemented with minimal risk.
-
-{$context}
-{$this->instruction}
-PROMPT;
+        return sprintf(
+            self::ANALYSIS_TEMPLATE,
+            $sqlFile,
+            $this->extractCost($explainResult),
+            $sql,
+            $this->formatIssues($issues),
+            $this->generateExplainTree($explainResult),
+            self::AI_PROMPT_TEMPLATE,
+            $this->formatSchemaInfo($schemaInfo),
+            $this->formatExplainResult($explainResult),
+            $this->instruction,
+        );
     }
 
-    /**
-     * @param ExplainResult                  $explainResult
-     * @param list<DetectedWarning>          $issues
-     * @param array<string, SchemaInfo>|null $schemaInfo
-     */
-    private function formatContext(
-        string $sql,
-        array $explainResult,
-        array $issues,
-        array|null $schemaInfo,
-    ): string {
-        $context = "Original SQL:\n{$sql}\n";
+    /** @param ExplainResult $explainResult */
+    private function extractCost(array $explainResult): string
+    {
+        // クエリブロックレベルのコスト
+        /** @var float|null $queryCost */
+        $queryCost = $explainResult['query_block']['cost_info']['query_cost'] ?? null;
 
-        if ($schemaInfo !== null) {
-            $context .= "Schema Information:\n";
-            $context .= json_encode($schemaInfo, JSON_THROW_ON_ERROR) . "\n\n";
+        // 実行計画の詳細コスト
+        $planCost = 0.0;
+
+        /** @var array $queryBlock */
+        $queryBlock = $explainResult['query_block'];
+        if (isset($queryBlock)) {
+            // テーブルスキャンのコスト
+            if (isset($queryBlock['table']['cost_info'])) {
+                $tableCost = $queryBlock['table']['cost_info'];
+                $planCost += ($tableCost['read_cost'] ?? 0) + ($tableCost['eval_cost'] ?? 0);
+            }
+
+            // ソート操作のコスト
+            if (isset($queryBlock['ordering_operation']['cost_info'])) {
+                $sortCost = $queryBlock['ordering_operation']['cost_info'];
+                $planCost += $sortCost['sort_cost'] ?? 0;
+            }
+
+            // 一時テーブルのコスト
+            if (isset($queryBlock['grouping_operation']['cost_info'])) {
+                $groupCost = $queryBlock['grouping_operation']['cost_info'];
+                $planCost += $groupCost['tmp_table_cost'] ?? 0;
+            }
         }
 
-        $context .= "EXPLAIN Results:\n";
-        $context .= json_encode($explainResult, JSON_THROW_ON_ERROR) . "\n\n";
+        $finalCost = max($queryCost ?? 0, $planCost);
 
-        foreach ($issues as $issue) {
-            $context .= "Detected Issue: {$issue['message']}\n";
+        return $finalCost > 0 ? (string) $finalCost : 'N/A';
+    }
+
+    /** @param list<DetectedWarning> $issues */
+    private function formatIssues(array $issues): string
+    {
+        return implode(
+            "\n",
+            array_map(
+                static fn (array $issue): string => sprintf(
+                    '- %s [Learn more](%s/%s)',
+                    $issue['message'],
+                    self::ISSUE_DOC_URL,
+                    $issue['type'],
+                ),
+                $issues,
+            ),
+        );
+    }
+
+    private function generateExplainTree(array $explainResult): string
+    {
+        $parser = new ExplainParser();
+        $visualizer = new ExplainTreeVisualizer();
+        $tree = $parser->parse(json_encode($explainResult, JSON_THROW_ON_ERROR));
+
+        return $visualizer->toString($tree);
+    }
+
+    /** @param array<string, SchemaInfo>|null $schemaInfo */
+    private function formatSchemaInfo(array|null $schemaInfo): string
+    {
+        if (empty($schemaInfo)) {
+            return 'N/A';
         }
 
-        return $context;
+        return json_encode($schemaInfo, JSON_THROW_ON_ERROR);
+    }
+
+    /** @param ExplainResult $explainResult */
+    private function formatExplainResult(array $explainResult): string
+    {
+        return json_encode($explainResult, JSON_THROW_ON_ERROR);
+    }
+
+    /** @return list<string> */
+    public function extractTableNames(string $sql): array
+    {
+        // SQLコメントを削除
+        $sql = preg_replace('/--.*$/m', '', $sql);
+
+        // キーワードの後にあるテーブル名を抽出
+        // AS/ON/WHEREなどの後のテーブル名は除外
+        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
+            $tables = array_filter(array_merge($matches[1], $matches[2]));
+
+            return array_values(array_unique($tables));
+        }
+
+        return [];
+    }
+
+    private function isValidTableName(string $tableName): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
     }
 
     /**
@@ -131,28 +257,6 @@ PROMPT;
         }
     }
 
-    /** @return list<string> */
-    public function extractTableNames(string $sql): array
-    {
-        // SQLコメントを削除
-        $sql = preg_replace('/--.*$/m', '', $sql);
-
-        // キーワードの後にあるテーブル名を抽出
-        // AS/ON/WHEREなどの後のテーブル名は除外
-        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
-            $tables = array_filter(array_merge($matches[1], $matches[2]));
-
-            return array_unique(array_values($tables));
-        }
-
-        return [];
-    }
-
-    private function isValidTableName(string $tableName): bool
-    {
-        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
-    }
-
     /**
      * @return list<SchemaColumn>
      *
@@ -160,7 +264,7 @@ PROMPT;
      */
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
             SELECT 
                 column_name,
                 data_type,
@@ -173,7 +277,7 @@ PROMPT;
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}
             ORDER BY ordinal_position
-        ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {
@@ -191,7 +295,7 @@ PROMPT;
      */
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
             SELECT 
                 index_name,
                 column_name,
@@ -202,7 +306,7 @@ PROMPT;
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}
             ORDER BY index_name, seq_in_index
-        ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {
@@ -220,7 +324,7 @@ PROMPT;
      */
     private function getTableStatus(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
         SELECT 
             TABLE_ROWS as table_rows,
             DATA_LENGTH as data_length,
@@ -231,7 +335,7 @@ PROMPT;
         FROM information_schema.tables 
         WHERE table_schema = DATABASE()
         AND table_name = {$quotedTable}
-    ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {

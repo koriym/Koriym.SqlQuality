@@ -12,51 +12,25 @@ use function array_map;
 use function array_values;
 use function file_exists;
 use function file_get_contents;
+use function file_put_contents;
 use function is_array;
 use function is_bool;
+use function is_dir;
 use function is_null;
 use function is_string;
 use function json_decode;
+use function mkdir;
+use function pathinfo;
 use function preg_replace;
-use function str_repeat;
+
+use const PATHINFO_FILENAME;
 
 /**
- * @psalm-import-type DetectedWarning from ExplainAnalyzer
- * @psalm-import-type SchemaInfo from AIQueryAdvisor
- * @psalm-type SqlParams = array<string, array<string, mixed>>
- * @psalm-type ExplainResult = array{
- *   query_block: array{
- *     select_id: int,
- *     table?: array{
- *       table_name: string,
- *       access_type: string,
- *       possible_keys?: string|null,
- *       key?: string|null,
- *       rows: int,
- *       filtered: float
- *     },
- *     ordering_operation?: array{
- *       using_filesort: bool,
- *       table: array
- *     },
- *     grouping_operation?: array{
- *       using_temporary_table: bool,
- *       using_filesort: bool,
- *       table: array
- *     }
- *   }
- * }
- * @psalm-type AnalysisResult = array{
- *   issues: list<DetectedWarning>,
- *   explain_result: ExplainResult,
- *   ai_suggestions: string
- * }
- * @psalm-type AnalysisResults = array<string, AnalysisResult>
- * @psalm-type ShowWarnings = list<array{
- *   Level: string,
- *   Code: int,
- *   Message: string
- * }>
+ * @psalm-import-type SqlParams from Types
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type SchemaInfo from Types
  */
 final class SqlFileAnalyzer
 {
@@ -69,35 +43,101 @@ final class SqlFileAnalyzer
     }
 
     /**
+     * Analyzes the SQL files contained in the specified parameters, generates statistical analyses,
+     * outputs detailed Markdown reports for each SQL file, and creates a summary report.
+     *
+     * @param array<string, mixed> $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
+     * @param string               $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
+     *
+     *               example: $sqlParams [
+     *                  1_full_table_scan.sql' => ['min_views' => 1000],
+     *                  2_filesort.sql' => ['status' => 'published', 'limit' => 10],
+     *               ]
+     *
+     * @return array<string, array<string, mixed>> Returns an associative array where the keys are SQL file paths and the values are their respective analysis results, including AI suggestions and identified issues.
+     */
+    public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
+    {
+        // 1) すべての SQL を分析
+        $results = $this->analyzeSQLFiles($sqlParams, $outputDir);
+
+        // 2) 解析結果を統計計算にかける
+        $statistics = new QueryStatisticsCalculator();
+        $statistics->calculate($results);
+
+        // 3) レベル分類クラスとレポート生成クラスを用意
+        $classifier = new StatisticalQueryLevelClassifier();
+        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
+
+        // 4) それぞれの SQL に対応する Markdown レポート(= AI prompt)を出力
+        //    → ここでは SqlFileAnalyzer::savePromptToMarkdown を呼ぶ想定
+        //    （すでに内部で呼んでいる場合は省略可）
+        foreach ($results as $sqlFile => $analysisResult) {
+            $this->savePromptToMarkdown(
+                $sqlFile,
+                $analysisResult['ai_suggestions'],
+                $analysisResult['issues'],
+                $outputDir,
+            );
+        }
+
+        // 5) まとめレポート（summary_report.md）を出力
+        //    デフォルトのファイル名を summary_report.md とする
+        $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
+
+        return $results;
+    }
+
+    /**
      * @param SqlParams $sqlParams
      *
-     * @return AnalysisResults
+     * @return array<string, AnalysisResult>
      *
      * @throws RuntimeException
      */
-    public function analyzeSQLFiles(array $sqlParams): array
+    public function analyzeSQLFiles(array $sqlParams, string $outputDir): array
     {
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
             $sql = $this->readSqlFile($sqlFile);
+            /** @var ExplainResult $explainResult */
             $explainResult = $this->executeExplain($sql, $params);
+            /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
             $warnings = $this->getWarnings();
+            /** @var list<DetectedWarning> $issues */
             $issues = $this->analyzer->analyze($explainResult, $warnings);
+            /** @var array<string, SchemaInfo> $schemaInfo */
             $schemaInfo = $this->getSchemaInfo($sql);
+            $cost = $this->calculateCost($explainResult);
 
+            $aiPrompt = $this->aiAdvisor->generatePrompt(
+                $sqlFile,
+                $sql,
+                $explainResult,
+                $issues,
+                $schemaInfo,
+            );
+
+            $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
+
+            // (string)キャストを削除し、$sqlFileは既にstring型であることを前提とする
             $results[$sqlFile] = [
                 'issues' => $issues,
                 'explain_result' => $explainResult,
-                'ai_suggestions' => $this->aiAdvisor->generatePrompt(
-                    $sql,
-                    $explainResult,
-                    $issues,
-                    $schemaInfo,
-                ),
+                'ai_suggestions' => $aiPrompt,
+                'cost' => $cost,
             ];
         }
 
         return $results;
+    }
+
+    /** @param ExplainResult $explainResult */
+    private function calculateCost(array $explainResult): float
+    {
+        $cost = $this->analyzer->calculateQueryCost($explainResult);
+
+        return (float) $cost['total_cost'];
     }
 
     private function readSqlFile(string $filename): string
@@ -117,8 +157,6 @@ final class SqlFileAnalyzer
 
     /**
      * @param array<string, mixed> $params
-     *
-     * @return ExplainResult
      *
      * @throws RuntimeException
      */
@@ -140,17 +178,17 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        /** @var array */
         $explainData = json_decode($explainJson, true);
         if (! is_array($explainData)) {
             throw new RuntimeException('Failed to decode EXPLAIN result');
         }
 
-        /** @var ExplainResult */
         return $explainData;
     }
 
     /**
-     * @return ShowWarnings
+     * @return list<array{Level: string, Code: int, Message: string}>
      *
      * @throws RuntimeException
      */
@@ -161,7 +199,6 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to execute SHOW WARNINGS');
         }
 
-        /** @var ShowWarnings */
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -200,18 +237,30 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
-    /** @param AnalysisResults $results */
-    public function getFormattedResults(array $results): string
+    /**
+     * @param list<DetectedWarning> $issues
+     *
+     * @throws RuntimeException
+     */
+    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues, string $outputDir): void
     {
-        $output = '';
-        foreach ($results as $sqlFile => $result) {
-            $output .= str_repeat('=', 80) . "\n";
-            $output .= "▶ Query Analysis: {$sqlFile}\n\n";  // New format
-            $output .= $this->analyzer->formatResults($result['issues']);
-            $output .= "\nAI Prompt:\n";  // <- ここを変更
-            $output .= "```\n{$result['ai_suggestions']}\n```\n";
+        if (! is_dir($outputDir) && ! mkdir($outputDir, 0777, true)) {
+            throw new RuntimeException("Failed to create directory: {$outputDir}");
         }
 
-        return $output;
+        $promptFile = $outputDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
+        if (file_put_contents($promptFile, $prompt) === false) {
+            throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
+        }
+    }
+
+    /** @param array<string, AnalysisResult> $results */
+    public function generateSummaryReport(array $results, $outputDir): string
+    {
+        $statistics = new QueryStatisticsCalculator();
+        $classifier = new StatisticalQueryLevelClassifier();
+        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
+
+        return $reportGenerator->generate($results);
     }
 }
