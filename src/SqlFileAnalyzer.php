@@ -61,7 +61,7 @@ use const PATHINFO_FILENAME;
  *   issues: list<DetectedWarning>,
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
- *   cost: int
+ *   cost: float
  * }
  * @psalm-type AnalysisResults = array<string, AnalysisResult>
  * @psalm-type ShowWarnings = list<array{
