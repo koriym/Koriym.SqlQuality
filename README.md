@@ -7,7 +7,7 @@ A powerful MySQL query analyzer that helps detect potential performance issues i
 - Detects common performance issues (full table scans, inefficient JOINs, etc.)
 - Provides AI-powered optimization recommendations
 - Supports multiple output languages
-- Generates detailed analysis reports
+- Generates detailed analysis reports in Markdown format
 
 ## Requirements
 
@@ -26,74 +26,65 @@ composer require koriym/sql-quality
 ```php
 <?php
 
-declare(strict_types=1);
-
 namespace Koriym\SqlQuality;
 
 use PDO;
-use RuntimeException;
+use function dirname;
 
-require __DIR__ . '/vendor/autoload.php';
+require dirname(__DIR__) . '/vendor/autoload.php';
 
 $pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
 ]);
 
-$sqlParams = require __DIR__ . '/tests/params/sql_params.php';
+$sqlParams = require dirname(__DIR__) . '/tests/params/sql_params.php';
 
 $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
-    __DIR__ . '/tests/sql',
-    new AIQueryAdvisor('以上の分析を日本語で記述してください')
+    dirname(__DIR__) . '/tests/sql',
+    new AIQueryAdvisor('以上の分析を日本語でなるべく記述してください。') // 'Please describe the above analysis in YOURLANGUAGE'.
 );
-$results = $analyzer->analyzeSQLFiles($sqlParams);
-echo $analyzer->getFormattedResults($results);
+
+// Output to build/sql-quality
+$analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```
 
 ## Output Format
 
-The analysis results are provided in two formats:
+The analyzer generates a **summary report** and **detailed reports** for each SQL file in the specified output directory (e.g., `build/sql-quality`).
 
-1. Compact Overview (Console Output)
-```
-example.sql: Cost=498.45, Issues=[Full table scan]
-critical_query.sql: Cost=2949.45 ⚠️, Issues=[Full table scan, Ineffective sort]
-```
-* Cost: Query execution cost
-* ⚠️: Queries requiring special attention
-* Issues: Detected performance issues
+### 1. **Summary Report (`summary_report.md`)**
+The summary report provides an overview of all analyzed SQL files, including their cost, severity level, and detected issues.
 
-2. Detailed Report (Markdown)
+Example:
 
-The analyzer generates detailed Markdown reports in the `ai_prompts` directory under your SQL directory. Each report includes:
-* SQL content
-* Execution plan details
-* Performance analysis
-* Optimization suggestions
+* [SQL Analysis Summary](demo/build/sql-quality/summary_report.md)
 
-Example directory structure:
-```
-/path/to/sql/
-├── query1.sql
-├── query2.sql
-└── ai_prompts/
-    ├── query1.md
-    └── query2.md
+```markdown
+# SQL Analysis Summary
+
+## Query Analysis List
+| SQL File | Cost | Level | Issues | Report |
+|----------|------|-------|---------|---------|
+| 1_full_table_scan.sql | 523.20 | Medium (μ ± σ) | FullTableScan | [Details](1_full_table_scan.md) |
+| 2_filesort.sql | 523.20 | Medium (μ ± σ) | FullTableScan, IneffectiveSort | [Details](2_filesort.md) |
+| 3_function_on_indexed_column.sql | 523.20 | Medium (μ ± σ) | FullTableScan | [Details](3_function_on_indexed_column.md) |
+
+## Project Statistics
+- Total SQLs analyzed: 10
+- Average query cost: 724.19
+- Standard deviation: 795.91
 ```
 
 ## Multilingual Support
 
-The AI advisor supports multiple languages for its analysis output:
+The AI advisor supports multiple languages for its analysis output. You can specify the desired language in the `AIQueryAdvisor` constructor.
 
 ```php
 // Japanese output
-$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください');
+$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語でなるべく記述してください。');
 
 // English output
 $aiAdvisor = new AIQueryAdvisor('Please provide the analysis in English');
 ```
-
-## License
-
-This project is licensed under the MIT License - see the LICENSE file for details
