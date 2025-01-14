@@ -44,7 +44,7 @@
             "./vendor/bin/psalm --clear-cache"
         ],
         "sa": [
-            "./vendor/bin/psalm --show-info=true"
+            "./vendor/bin/psalm --show-info=false"
         ],
         "tests": [
             "@cs",
