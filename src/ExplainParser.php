@@ -12,8 +12,17 @@ use function implode;
 use function json_decode;
 use function str_contains;
 
+/**
+ * @psalm-import-type TreeNode from Types
+ * @psalm-import-type ExplainResult from Types
+ */
 class ExplainParser
 {
+    /**
+     * @psalm-param string $explainJson
+     *
+     * @psalm-return TreeNode
+     */
     public function parse(string $explainJson): TreeNode
     {
         $data = json_decode($explainJson, true);
@@ -65,6 +74,9 @@ class ExplainParser
         throw new RuntimeException('Unsupported EXPLAIN format');
     }
 
+    /**
+     * @param ExplainResult $nestedLoop
+     */
     private function parseNestedLoop(array $nestedLoop): TreeNode
     {
         $children = [];
@@ -135,6 +147,9 @@ class ExplainParser
 /**
  * 単一テーブルアクセスのパース
  */
+    /**
+     * @param ExplainResult $table
+     */
     private function parseSingleTable(array $table): TreeNode
     {
         $attributes = [
@@ -164,6 +179,9 @@ class ExplainParser
 /**
  * ORDER BY操作のパース
  */
+    /**
+     * @param ExplainResult $operation
+     */
     private function parseGroupAndSort(array $operation): TreeNode
     {
         $attributes = [];
@@ -192,6 +210,9 @@ class ExplainParser
         return $groupSortNode;
     }
 
+    /**
+     * @param ExplainResult $operation
+     */
     private function parseOrderingOperation(array $operation): TreeNode
     {
         $attributes = [];
