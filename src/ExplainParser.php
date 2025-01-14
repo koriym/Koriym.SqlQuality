@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use RuntimeException;
+
 use function array_filter;
 use function array_merge;
 use function implode;
@@ -13,16 +14,12 @@ use function str_contains;
 
 /**
  * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainTreeOperation from Types
- * @psalm-import-type ExplainTreeNodeData from Types
+ * @psalm-import-type ExplainOperation from Types
+ * @psalm-import-type ExplainTable from Types
  * @psalm-import-type TreeNodeAttributes from Types
  */
 class ExplainParser
 {
-    /**
-     * @psalm-param string $explainJson
-     * @return TreeNode
-     */
     public function parse(string $explainJson): TreeNode
     {
         /** @var ExplainResult $data */
@@ -30,57 +27,35 @@ class ExplainParser
         $queryBlock = $data['query_block'];
 
         if (isset($queryBlock['ordering_operation'])) {
+            /** @var ExplainOperation $orderingOp */
             $orderingOp = $queryBlock['ordering_operation'];
             if (isset($orderingOp['using_temporary_table'])) {
                 return $this->parseGroupAndSort($orderingOp);
             }
+
             return $this->parseOrderingOperation($orderingOp);
         }
 
         if (isset($queryBlock['grouping_operation']['nested_loop'])) {
-            return $this->parseNestedLoop($queryBlock['grouping_operation']['nested_loop']);
+            /** @var array<array{table: ExplainTable}> $nestedLoop */
+            $nestedLoop = $queryBlock['grouping_operation']['nested_loop'];
+
+            return $this->parseNestedLoop($nestedLoop);
         }
 
         if (isset($queryBlock['table'])) {
-            $rootNode = $this->parseSingleTable($queryBlock['table']);
-
-            // サブクエリの処理
-            if (isset($queryBlock['select_list_subqueries'])) {
-                $children = $rootNode->children;
-                foreach ($queryBlock['select_list_subqueries'] as $subquery) {
-                    $subqueryTable = $subquery['query_block']['table'];
-                    /** @var TreeNodeAttributes $attributes */
-                    $attributes = array_filter([
-                        'access_type' => $subqueryTable['access_type'],
-                        'key' => $subqueryTable['key'] ?? null,
-                        'rows' => (string) $subqueryTable['rows_examined_per_scan'],
-                        'filtered' => (string) $subqueryTable['filtered'],
-                        'using_index' => isset($subqueryTable['using_index']) && $subqueryTable['using_index'] ? 'true' : null,
-                    ]);
-                    $children[] = new TreeNode(
-                        'Subquery (' . $subqueryTable['table_name'] . ')',
-                        $attributes
-                    );
-                }
-                $rootNode = new TreeNode(
-                    $rootNode->text,
-                    $rootNode->attributes,
-                    $children,
-                );
-            }
-            return $rootNode;
+            return $this->parseSingleTable($queryBlock['table']);
         }
 
         throw new RuntimeException('Unsupported EXPLAIN format');
     }
 
-    /**
-     * @param array<mixed> $nestedLoop
-     */
+    /** @param array<array{table: ExplainTable}> $nestedLoop */
     private function parseNestedLoop(array $nestedLoop): TreeNode
     {
         $children = [];
         foreach ($nestedLoop as $table) {
+            /** @var ExplainTable $tableInfo */
             $tableInfo = $table['table'];
             switch ($tableInfo['access_type']) {
                 case 'index':
@@ -141,9 +116,7 @@ class ExplainParser
         return new TreeNode('JOIN', [], $children);
     }
 
-    /**
-     * @param ExplainTreeOperation['table'] $table
-     */
+    /** @param ExplainTable $table */
     private function parseSingleTable(array $table): TreeNode
     {
         /** @var TreeNodeAttributes $attributes */
@@ -169,9 +142,7 @@ class ExplainParser
         );
     }
 
-    /**
-     * @param ExplainTreeOperation $operation
-     */
+    /** @param ExplainOperation $operation */
     private function parseGroupAndSort(array $operation): TreeNode
     {
         /** @var TreeNodeAttributes $attributes */
@@ -188,9 +159,8 @@ class ExplainParser
             ]),
         );
 
-        if (isset($operation['grouping_operation']['table'])) {
-            $tableInfo = $operation['grouping_operation']['table'];
-            $tableScan = $this->parseSingleTable($tableInfo);
+        if (isset($operation['table'])) {
+            $tableScan = $this->parseSingleTable($operation['table']);
             $groupSortNode = new TreeNode(
                 $groupSortNode->text,
                 $groupSortNode->attributes,
@@ -201,9 +171,7 @@ class ExplainParser
         return $groupSortNode;
     }
 
-    /**
-     * @param ExplainTreeOperation $operation
-     */
+    /** @param ExplainOperation $operation */
     private function parseOrderingOperation(array $operation): TreeNode
     {
         /** @var TreeNodeAttributes $attributes */
@@ -218,18 +186,16 @@ class ExplainParser
         );
 
         if (isset($operation['table'])) {
-            $tableInfo = $operation['table'];
-
-            // IN条件のチェック
-            if (isset($tableInfo['attached_condition']) && str_contains($tableInfo['attached_condition'], ' in (')) {
-                /** @var TreeNodeAttributes $filterAttributes */
-                $filterAttributes = [];
+            if (
+                isset($operation['table']['attached_condition']) &&
+                str_contains($operation['table']['attached_condition'], ' in (')
+            ) {
                 /** @var TreeNodeAttributes $tableAttributes */
                 $tableAttributes = array_filter([
-                    'table' => $tableInfo['table_name'],
-                    'rows' => (string) $tableInfo['rows_examined_per_scan'],
-                    'filtered' => (string) $tableInfo['filtered'],
-                    'condition' => $tableInfo['attached_condition'],
+                    'table' => $operation['table']['table_name'],
+                    'rows' => (string) $operation['table']['rows_examined_per_scan'],
+                    'filtered' => (string) $operation['table']['filtered'],
+                    'condition' => $operation['table']['attached_condition'],
                 ]);
 
                 $sortNode = new TreeNode(
@@ -238,7 +204,7 @@ class ExplainParser
                     [
                         new TreeNode(
                             'Filter with IN condition',
-                            $filterAttributes,
+                            [],
                             [
                                 new TreeNode(
                                     'Table scan',

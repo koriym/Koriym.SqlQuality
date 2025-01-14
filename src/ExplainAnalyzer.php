@@ -9,40 +9,16 @@ use function sprintf;
 use function str_contains;
 
 /**
- * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
- * @psalm-type WarningMessages = array{
- *   FullTableScan: string,
- *   IneffectiveJoin: string,
- *   FunctionInvalidatesIndex: string,
- *   IneffectiveLikePattern: string,
- *   ImplicitTypeConversion: string,
- *   IneffectiveSort: string,
- *   TemporaryTableGrouping: string
- * }
- * @psalm-type WarningPattern = array{
- *   explain?: array<string, mixed>,
- *   warnings?: list<string>
- * }
- * @psalm-type Warning = array{
- *   message: string,
- *   pattern: WarningPattern
- * }
- * @psalm-type DetectedWarning = array{
- *   type: WarningType,
- *   message: string,
- *   documentation: string
- * }
- * @psalm-type QueryCost = array{
- *   total_cost: float,
- *   details: array{
- *     rows_examined: int,
- *     temporary_tables: bool,
- *     filesort: bool,
- *     full_scan: bool
- *   }
- * }
- * @psalm-import-type ExplainResult from SqlFileAnalyzer
- * @psalm-import-type ShowWarnings from SqlFileAnalyzer
+ * @psalm-import-type WarningType from Types
+ * @psalm-import-type WarningMessages from Types
+ * @psalm-import-type WarningPattern from Types
+ * @psalm-import-type Warning from Types
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type ShowWarning from Types
+ * @psalm-import-type ShowWarnings from Types
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainOperation from Types
+ * @psalm-import-type QueryCost from Types
  */
 final class ExplainAnalyzer
 {
@@ -113,12 +89,7 @@ final class ExplainAnalyzer
         ];
     }
 
-    /**
-     * @param array $explainResult
-     * @param array $warnings
-     *
-     * @return list<DetectedWarning>
-     */
+    /** @return list<DetectedWarning> */
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
@@ -136,11 +107,7 @@ final class ExplainAnalyzer
         return $detectedWarnings;
     }
 
-    /**
-     * @param array $explainResult
-     * @param array $warnings
-     * @param WarningPattern $pattern
-     */
+    /** @param WarningPattern $pattern */
     private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
     {
         if (isset($pattern['explain'])) {
@@ -162,9 +129,6 @@ final class ExplainAnalyzer
         return true;
     }
 
-    /**
-     * @param array $explainResult
-     */
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
         if (isset($explainResult['query_block'])) {
@@ -176,9 +140,6 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /**
-     * @param array $warnings
-     */
     private function matchWarningPattern(array $warnings, string $pattern): bool
     {
         foreach ($warnings as $warning) {
@@ -229,11 +190,7 @@ final class ExplainAnalyzer
         return $output;
     }
 
-    /**
-     * @param array $explainResult
-     *
-     * @return QueryCost
-     */
+    /** @return QueryCost */
     public function calculateQueryCost(array $explainResult): array
     {
         // デフォルトのコスト構造

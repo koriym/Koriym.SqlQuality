@@ -23,37 +23,12 @@ use function sprintf;
 use const JSON_THROW_ON_ERROR;
 
 /**
- * @psalm-import-type DetectedWarning from ExplainAnalyzer
- * @psalm-import-type ExplainResult from SqlFileAnalyzer
- * @psalm-type SchemaColumn = array{
- *   column_name: string,
- *   data_type: string,
- *   column_type: string,
- *   is_nullable: string,
- *   column_key: string,
- *   column_default: string|null,
- *   extra: string
- * }
- * @psalm-type SchemaIndex = array{
- *   index_name: string,
- *   column_name: string,
- *   non_unique: string,
- *   seq_in_index: string,
- *   cardinality: string|null
- * }
- * @psalm-type TableStatus = array{
- *   table_rows: int|null,
- *   data_length: int|null,
- *   index_length: int|null,
- *   auto_increment: int|null,
- *   create_time: string|null,
- *   update_time: string|null
- * }
- * @psalm-type SchemaInfo = array{
- *   columns: list<SchemaColumn>,
- *   indexes: list<SchemaIndex>,
- *   status: TableStatus
- * }
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type SchemaInfo from Types
+ * @psalm-import-type SchemaColumn from Types
+ * @psalm-import-type SchemaIndex from Types
+ * @psalm-import-type TableStatus from Types
+ * @psalm-import-type ExplainResult from Types
  */
 final class AIQueryAdvisor
 {
@@ -61,7 +36,6 @@ final class AIQueryAdvisor
 
     private const ANALYSIS_TEMPLATE = <<<'TEMPLATE'
 # SQL Performance Analysis
-
 - **SQL File:** `%s`
 - **Cost:** %s
 
@@ -79,7 +53,6 @@ final class AIQueryAdvisor
 ```
 
 ## AI Prompt
-
 %s
 
 ### Schema
@@ -87,7 +60,6 @@ final class AIQueryAdvisor
 
 ### EXPLAIN Results
 %s
-
 %s
 TEMPLATE;
 
@@ -160,34 +132,38 @@ TEMPLATE;
         );
     }
 
+    /** @param ExplainResult $explainResult */
     private function extractCost(array $explainResult): string
     {
         // クエリブロックレベルのコスト
+        /** @var float|null $queryCost */
         $queryCost = $explainResult['query_block']['cost_info']['query_cost'] ?? null;
 
         // 実行計画の詳細コスト
         $planCost = 0.0;
-        if (isset($explainResult['query_block'])) {
+
+        /** @var array $queryBlock */
+        $queryBlock = $explainResult['query_block'];
+        if (isset($queryBlock)) {
             // テーブルスキャンのコスト
-            if (isset($explainResult['query_block']['table']['cost_info'])) {
-                $tableCost = $explainResult['query_block']['table']['cost_info'];
+            if (isset($queryBlock['table']['cost_info'])) {
+                $tableCost = $queryBlock['table']['cost_info'];
                 $planCost += ($tableCost['read_cost'] ?? 0) + ($tableCost['eval_cost'] ?? 0);
             }
 
             // ソート操作のコスト
-            if (isset($explainResult['query_block']['ordering_operation']['cost_info'])) {
-                $sortCost = $explainResult['query_block']['ordering_operation']['cost_info'];
+            if (isset($queryBlock['ordering_operation']['cost_info'])) {
+                $sortCost = $queryBlock['ordering_operation']['cost_info'];
                 $planCost += $sortCost['sort_cost'] ?? 0;
             }
 
             // 一時テーブルのコスト
-            if (isset($explainResult['query_block']['grouping_operation']['cost_info'])) {
-                $groupCost = $explainResult['query_block']['grouping_operation']['cost_info'];
+            if (isset($queryBlock['grouping_operation']['cost_info'])) {
+                $groupCost = $queryBlock['grouping_operation']['cost_info'];
                 $planCost += $groupCost['tmp_table_cost'] ?? 0;
             }
         }
 
-        // クエリコストと実行計画コストを比較して、大きい方を採用
         $finalCost = max($queryCost ?? 0, $planCost);
 
         return $finalCost > 0 ? (string) $finalCost : 'N/A';
@@ -196,15 +172,18 @@ TEMPLATE;
     /** @param list<DetectedWarning> $issues */
     private function formatIssues(array $issues): string
     {
-        return implode("\n", array_map(
-            static fn (array $issue): string => sprintf(
-                '- %s [Learn more](%s/%s)',
-                $issue['message'],
-                self::ISSUE_DOC_URL,
-                $issue['type'],
+        return implode(
+            "\n",
+            array_map(
+                static fn (array $issue): string => sprintf(
+                    '- %s [Learn more](%s/%s)',
+                    $issue['message'],
+                    self::ISSUE_DOC_URL,
+                    $issue['type'],
+                ),
+                $issues,
             ),
-            $issues,
-        ));
+        );
     }
 
     private function generateExplainTree(array $explainResult): string
@@ -226,9 +205,32 @@ TEMPLATE;
         return json_encode($schemaInfo, JSON_THROW_ON_ERROR);
     }
 
+    /** @param ExplainResult $explainResult */
     private function formatExplainResult(array $explainResult): string
     {
         return json_encode($explainResult, JSON_THROW_ON_ERROR);
+    }
+
+    /** @return list<string> */
+    public function extractTableNames(string $sql): array
+    {
+        // SQLコメントを削除
+        $sql = preg_replace('/--.*$/m', '', $sql);
+
+        // キーワードの後にあるテーブル名を抽出
+        // AS/ON/WHEREなどの後のテーブル名は除外
+        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
+            $tables = array_filter(array_merge($matches[1], $matches[2]));
+
+            return array_values(array_unique($tables));
+        }
+
+        return [];
+    }
+
+    private function isValidTableName(string $tableName): bool
+    {
+        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
     }
 
     /**
@@ -255,28 +257,6 @@ TEMPLATE;
         }
     }
 
-    /** @return list<string> */
-    public function extractTableNames(string $sql): array
-    {
-        // SQLコメントを削除
-        $sql = preg_replace('/--.*$/m', '', $sql);
-
-        // キーワードの後にあるテーブル名を抽出
-        // AS/ON/WHEREなどの後のテーブル名は除外
-        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
-            $tables = array_filter(array_merge($matches[1], $matches[2]));
-
-            return array_unique(array_values($tables));
-        }
-
-        return [];
-    }
-
-    private function isValidTableName(string $tableName): bool
-    {
-        return (bool) preg_match('/^[a-zA-Z0-9_]+$/', $tableName);
-    }
-
     /**
      * @return list<SchemaColumn>
      *
@@ -284,7 +264,7 @@ TEMPLATE;
      */
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
             SELECT 
                 column_name,
                 data_type,
@@ -297,7 +277,7 @@ TEMPLATE;
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}
             ORDER BY ordinal_position
-        ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {
@@ -315,7 +295,7 @@ TEMPLATE;
      */
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
             SELECT 
                 index_name,
                 column_name,
@@ -326,7 +306,7 @@ TEMPLATE;
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}
             ORDER BY index_name, seq_in_index
-        ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {
@@ -344,7 +324,7 @@ TEMPLATE;
      */
     private function getTableStatus(PDO $pdo, string $quotedTable): array
     {
-        $sql = "
+        $sql = <<<SQL
         SELECT 
             TABLE_ROWS as table_rows,
             DATA_LENGTH as data_length,
@@ -355,7 +335,7 @@ TEMPLATE;
         FROM information_schema.tables 
         WHERE table_schema = DATABASE()
         AND table_name = {$quotedTable}
-        ";
+SQL;
 
         $stmt = $pdo->query($sql);
         if ($stmt === false) {

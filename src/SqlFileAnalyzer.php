@@ -7,12 +7,9 @@ namespace Koriym\SqlQuality;
 use PDO;
 use RuntimeException;
 
-use function array_any;
 use function array_keys;
 use function array_map;
-use function array_sum;
 use function array_values;
-use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -25,50 +22,15 @@ use function json_decode;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
-use function str_contains;
-use function str_replace;
-use function trim;
 
 use const PATHINFO_FILENAME;
 
 /**
- * @psalm-import-type DetectedWarning from ExplainAnalyzer
- * @psalm-import-type SchemaInfo from AIQueryAdvisor
- * @psalm-type SqlParams = array<string, array<string, mixed>>
- * @psalm-type ExplainResult = array{
- *   query_block: array{
- *     select_id: int,
- *     table?: array{
- *       table_name: string,
- *       access_type: string,
- *       possible_keys?: string|null,
- *       key?: string|null,
- *       rows: int,
- *       filtered: float
- *     },
- *     ordering_operation?: array{
- *       using_filesort: bool,
- *       table: array
- *     },
- *     grouping_operation?: array{
- *       using_temporary_table: bool,
- *       using_filesort: bool,
- *       table: array
- *     }
- *   }
- * }
- * @psalm-type AnalysisResult = array{
- *   issues: list<DetectedWarning>,
- *   explain_result: ExplainResult,
- *   ai_suggestions: string,
- *   cost: float
- * }
- * @psalm-type AnalysisResults = array<string, AnalysisResult>
- * @psalm-type ShowWarnings = list<array{
- *   Level: string,
- *   Code: int,
- *   Message: string
- * }>
+ * @psalm-import-type SqlParams from Types
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type DetectedWarning from Types
+ * @psalm-import-type SchemaInfo from Types
  */
 final class SqlFileAnalyzer
 {
@@ -83,7 +45,7 @@ final class SqlFileAnalyzer
     /**
      * @param SqlParams $sqlParams
      *
-     * @return AnalysisResults
+     * @return array<string, AnalysisResult>
      *
      * @throws RuntimeException
      */
@@ -92,21 +54,28 @@ final class SqlFileAnalyzer
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
             $sql = $this->readSqlFile($sqlFile);
+            /** @var ExplainResult $explainResult */
             $explainResult = $this->executeExplain($sql, $params);
+            /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
             $warnings = $this->getWarnings();
+            /** @var list<DetectedWarning> $issues */
             $issues = $this->analyzer->analyze($explainResult, $warnings);
+            /** @var array<string, SchemaInfo> $schemaInfo */
             $schemaInfo = $this->getSchemaInfo($sql);
             $cost = $this->calculateCost($explainResult);
+
             $aiPrompt = $this->aiAdvisor->generatePrompt(
-                $sqlFile,        // ファイル名を渡す
-                $sql,           // SQL内容を渡す
+                $sqlFile,
+                $sql,
                 $explainResult,
                 $issues,
                 $schemaInfo,
             );
+
             $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues);
 
-            $results[(string) $sqlFile] = [
+            // (string)キャストを削除し、$sqlFileは既にstring型であることを前提とする
+            $results[$sqlFile] = [
                 'issues' => $issues,
                 'explain_result' => $explainResult,
                 'ai_suggestions' => $aiPrompt,
@@ -117,11 +86,12 @@ final class SqlFileAnalyzer
         return $results;
     }
 
+    /** @param ExplainResult $explainResult */
     private function calculateCost(array $explainResult): float
     {
         $cost = $this->analyzer->calculateQueryCost($explainResult);
 
-        return (float) $cost['total_cost']; // If you intend it to be float
+        return (float) $cost['total_cost'];
     }
 
     private function readSqlFile(string $filename): string
@@ -141,8 +111,6 @@ final class SqlFileAnalyzer
 
     /**
      * @param array<string, mixed> $params
-     *
-     * @return ExplainResult
      *
      * @throws RuntimeException
      */
@@ -164,17 +132,17 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        /** @var array */
         $explainData = json_decode($explainJson, true);
         if (! is_array($explainData)) {
             throw new RuntimeException('Failed to decode EXPLAIN result');
         }
 
-        /** @var ExplainResult */
         return $explainData;
     }
 
     /**
-     * @return ShowWarnings
+     * @return list<array{Level: string, Code: int, Message: string}>
      *
      * @throws RuntimeException
      */
@@ -185,7 +153,6 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to execute SHOW WARNINGS');
         }
 
-        /** @var ShowWarnings */
         return $stmt->fetchAll(PDO::FETCH_ASSOC);
     }
 
@@ -224,20 +191,25 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
+    /**
+     * @param list<DetectedWarning> $issues
+     *
+     * @throws RuntimeException
+     */
     private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues): void
     {
-        $promptDir = $this->sqlDir . '/ai_prompts'; // または設定で指定されたパス
+        $promptDir = $this->sqlDir . '/ai_prompts';
         if (! is_dir($promptDir) && ! mkdir($promptDir, 0777, true)) {
             throw new RuntimeException("Failed to create directory: {$promptDir}");
         }
 
         $promptFile = $promptDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
-        $content = $prompt;
-        if (file_put_contents($promptFile, $content) === false) {
+        if (file_put_contents($promptFile, $prompt) === false) {
             throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
         }
     }
 
+    /** @param array<string, AnalysisResult> $results */
     public function generateSummaryReport(array $results): string
     {
         $statistics = new QueryStatisticsCalculator();
@@ -245,15 +217,5 @@ final class SqlFileAnalyzer
         $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
 
         return $reportGenerator->generate($results);
-    }
-
-    private function simplifyIssueMessage(string $message): string
-    {
-        return trim(str_replace([
-            'operation detected',
-            'required for grouping',
-            'detected',
-            '.',
-        ], '', $message));
     }
 }
