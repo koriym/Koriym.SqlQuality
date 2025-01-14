@@ -19,6 +19,16 @@ final class ExplainTreeVisualizer
         return $this->nodeToString($root);
     }
 
+    /**
+     * Converts a tree node into a formatted string representing the visualized tree.
+     *
+     * @param TreeNode         $node        The current tree node to process.
+     * @param int              $depth       The depth of the current node in the tree structure (default is 0).
+     * @param bool             $isLast      Whether the current node is the last child at this depth.
+     * @param array<int, bool> $parentPipes Tracks pipeline states for parent levels to manage tree alignment.
+     *
+     * @return string A string representing the visualized tree for the given node and its children.
+     */
     private function nodeToString(
         TreeNode $node,
         int $depth = 0,
