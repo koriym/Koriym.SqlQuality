@@ -163,24 +163,12 @@ namespace Koriym\SqlQuality;
  *    using_temporary_table?: bool,
  *    cost_info?: array{sort_cost?: float}
  *  }
- * @psalm-type AnalysisResult = array{
- *    issues: list<DetectedWarning>,
- *    explain_result: ExplainResult,
- *    ai_suggestions: string,
- *    cost: float
- *  }
  * @psalm-type QueryResult = array{
  *    cost: float,
  *    explain_result: array<array-key, mixed>,
  *    issues: list<string>
  *  }
  * @psalm-type QueryResults = array<string, QueryResult>
- * @psalm-type AnalysisResult = array{
- *    issues: list<DetectedWarning>,
- *    explain_result: ExplainResult,
- *    ai_suggestions: string,
- *    cost: float
- *  }
  * @psalm-type StatisticsResult = array{
  *    total_count: int,
  *    avg_cost: float,

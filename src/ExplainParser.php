@@ -8,7 +8,6 @@ use RuntimeException;
 
 use function array_filter;
 use function array_merge;
-use function implode;
 use function json_decode;
 use function sprintf;
 use function str_contains;
@@ -121,7 +120,7 @@ class ExplainParser
                 case 'index':
                     /** @var TreeNodeAttributes $attributes */
                     $attributes = [
-                        'key' => $tableInfo['key'],
+                        'key' => $tableInfo['key'] ?? null,
                         'rows' => (string) $tableInfo['rows_examined_per_scan'],
                         'filtered' => (string) $tableInfo['filtered'],
                     ];
@@ -161,7 +160,7 @@ class ExplainParser
                     /** @var TreeNodeAttributes $tableAttributes */
                     $tableAttributes = array_filter([
                         'table' => $tableInfo['table_name'],
-                        'possible_keys' => implode(', ', $tableInfo['possible_keys'] ?? []),
+                        'possible_keys' => $tableInfo['possible_keys'] ?? null,
                         'condition' => $tableInfo['attached_condition'] ?? null,
                     ]);
                     $children[] = new TreeNode(

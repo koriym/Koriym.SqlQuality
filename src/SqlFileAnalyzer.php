@@ -13,7 +13,6 @@ use function array_values;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
-use function is_array;
 use function is_bool;
 use function is_dir;
 use function is_null;
@@ -31,6 +30,7 @@ use const PATHINFO_FILENAME;
  * @psalm-import-type AnalysisResult from Types
  * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
+ * @psalm-import-type ShowWarning from Types
  */
 final class SqlFileAnalyzer
 {
@@ -137,7 +137,7 @@ final class SqlFileAnalyzer
     {
         $cost = $this->analyzer->calculateQueryCost($explainResult);
 
-        return (float) $cost['total_cost'];
+        return $cost['total_cost'];
     }
 
     private function readSqlFile(string $filename): string
@@ -168,27 +168,25 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to execute EXPLAIN query');
         }
 
+        /** @var array|false $result */
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (! $result) {
+        if ($result === false) {
             throw new RuntimeException('Failed to get EXPLAIN result');
         }
 
         $explainJson = $result['EXPLAIN'] ?? '';
-        if (empty($explainJson)) {
+        if ($explainJson === '') {
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
-        /** @var array */
+        /** @var array<array-key, mixed> $explainData */
         $explainData = json_decode($explainJson, true);
-        if (! is_array($explainData)) {
-            throw new RuntimeException('Failed to decode EXPLAIN result');
-        }
 
         return $explainData;
     }
 
     /**
-     * @return list<array{Level: string, Code: int, Message: string}>
+     * @return list<ShowWarning>
      *
      * @throws RuntimeException
      */
@@ -199,7 +197,10 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to execute SHOW WARNINGS');
         }
 
-        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+        /** @var list<ShowWarning> $warnings */
+        $warnings = $stmt->fetchAll(PDO::FETCH_ASSOC);
+
+        return $warnings;
     }
 
     /** @param array<string, mixed> $params */
@@ -255,7 +256,7 @@ final class SqlFileAnalyzer
     }
 
     /** @param array<string, AnalysisResult> $results */
-    public function generateSummaryReport(array $results, $outputDir): string
+    public function generateSummaryReport(array $results, string $outputDir): string
     {
         $statistics = new QueryStatisticsCalculator();
         $classifier = new StatisticalQueryLevelClassifier();
