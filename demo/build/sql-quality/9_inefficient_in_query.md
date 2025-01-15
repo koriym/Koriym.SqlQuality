@@ -72,4 +72,4 @@ Please focus on practical, high-impact improvements that can be implemented with
 
 ### EXPLAIN Results
 {"query_block":{"select_id":1,"cost_info":{"query_cost":"2974.20"},"ordering_operation":{"using_filesort":true,"cost_info":{"sort_cost":"2451.00"},"table":{"table_name":"posts","access_type":"ALL","rows_examined_per_scan":4902,"rows_produced_per_join":2451,"filtered":"50.00","cost_info":{"read_cost":"278.10","eval_cost":"245.10","prefix_cost":"523.20","data_read_per_join":"2M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` in ('draft','published','archived','deleted','pending'))"}}}}
-以上の分析を日本語でなるべく記述してください。
+以上の分析を日本語で記述してください。
