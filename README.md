@@ -90,7 +90,7 @@ The AI advisor supports multiple languages for its analysis output. You can spec
 
 ```php
 // Japanese output
-$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語でなるべく記述してください。');
+$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください。');
 
 // English output
 $aiAdvisor = new AIQueryAdvisor('Please provide the analysis in English');
