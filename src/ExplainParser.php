@@ -121,7 +121,7 @@ class ExplainParser
                 case 'index':
                     /** @var TreeNodeAttributes $attributes */
                     $attributes = [
-                        'key' => $tableInfo['key'],
+                        'key' => $tableInfo['key'] ?? null,
                         'rows' => (string) $tableInfo['rows_examined_per_scan'],
                         'filtered' => (string) $tableInfo['filtered'],
                     ];
@@ -159,6 +159,7 @@ class ExplainParser
                     /** @var TreeNodeAttributes $attributes */
                     $attributes = ['rows' => (string) $tableInfo['rows_examined_per_scan']];
                     /** @var TreeNodeAttributes $tableAttributes */
+                    /** @psalm-suppress PossiblyInvalidArgument */
                     $tableAttributes = array_filter([
                         'table' => $tableInfo['table_name'],
                         'possible_keys' => implode(', ', $tableInfo['possible_keys'] ?? []),

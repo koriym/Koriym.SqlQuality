@@ -53,7 +53,7 @@ final class TreeVisualizer
         if (! empty($node->attributes)) {
             $attrIndent = $indent . ($depth === 0 ? '' : ($isLast ? self::SPACE : self::PIPE));
             foreach ($node->attributes as $key => $value) {
-                if ($value !== '' && $value !== null) {
+                if ($value !== '') {
                     $lines[] = sprintf('%s%-15s %s', $attrIndent, $key, $value);
                 }
             }

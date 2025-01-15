@@ -144,7 +144,7 @@ TEMPLATE;
 
         /** @var array $queryBlock */
         $queryBlock = $explainResult['query_block'];
-        if (isset($queryBlock)) {
+        if ($queryBlock) {
             // テーブルスキャンのコスト
             if (isset($queryBlock['table']['cost_info'])) {
                 $tableCost = $queryBlock['table']['cost_info'];
@@ -198,7 +198,7 @@ TEMPLATE;
     /** @param array<string, SchemaInfo>|null $schemaInfo */
     private function formatSchemaInfo(array|null $schemaInfo): string
     {
-        if (empty($schemaInfo)) {
+        if ($schemaInfo === null || $schemaInfo === []) {
             return 'N/A';
         }
 
@@ -219,7 +219,7 @@ TEMPLATE;
 
         // キーワードの後にあるテーブル名を抽出
         // AS/ON/WHEREなどの後のテーブル名は除外
-        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches)) {
+        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches) !== false) {
             $tables = array_filter(array_merge($matches[1], $matches[2]));
 
             return array_values(array_unique($tables));

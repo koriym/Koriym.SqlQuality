@@ -58,7 +58,7 @@ final class ExplainTreeVisualizer
             }
 
             foreach ($node->attributes as $key => $value) {
-                if ($value !== '' && $value !== null) {
+                if ($value !== '') {
                     $lines[] = sprintf('%s%-15s %s', $attrIndent, $key, $value);
                 }
             }
