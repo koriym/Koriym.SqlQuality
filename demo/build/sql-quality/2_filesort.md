@@ -1,6 +1,6 @@
 # SQL Performance Analysis
 - **SQL File:** `2_filesort.sql`
-- **Cost:** 523.20
+- **Cost:** 498.15
 
 ## SQL
 ```sql
@@ -22,7 +22,7 @@ Sort (using filesort)
 +- Table scan
    +- Table
       table           posts
-      rows            4902
+      rows            4899
       filtered        10.00
       condition       (`test`.`posts`.`status` = 'published')
 ```
@@ -65,8 +65,8 @@ Based on the provided MySQL table schemas and EXPLAIN results, please provide:
 Please focus on practical, high-impact improvements that can be implemented with minimal risk.
 
 ### Schema
-{"posts":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"user_id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"title","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"content","DATA_TYPE":"text","COLUMN_TYPE":"text","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"view_count","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""}],"indexes":[{"INDEX_NAME":"idx_posts_user_id","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":995},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":4902}],"status":{"table_rows":4902,"data_length":540672,"index_length":147456,"auto_increment":null,"create_time":"2024-12-29 00:46:04","update_time":null}}}
+{"posts":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"user_id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"title","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"content","DATA_TYPE":"text","COLUMN_TYPE":"text","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"view_count","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""}],"indexes":[{"INDEX_NAME":"idx_posts_user_id","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":992},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":4899}],"status":{"table_rows":4899,"data_length":540672,"index_length":147456,"auto_increment":null,"create_time":"2025-01-16 08:25:57","update_time":"2025-01-16 08:25:59"}}}
 
 ### EXPLAIN Results
-{"query_block":{"select_id":1,"cost_info":{"query_cost":"523.20"},"ordering_operation":{"using_filesort":true,"table":{"table_name":"posts","access_type":"ALL","rows_examined_per_scan":4902,"rows_produced_per_join":490,"filtered":"10.00","cost_info":{"read_cost":"474.18","eval_cost":"49.02","prefix_cost":"523.20","data_read_per_join":"543K"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` = 'published')"}}}}
+{"query_block":{"select_id":1,"cost_info":{"query_cost":"498.15"},"ordering_operation":{"using_filesort":true,"table":{"table_name":"posts","access_type":"ALL","rows_examined_per_scan":4899,"rows_produced_per_join":489,"filtered":"10.00","cost_info":{"read_cost":"449.16","eval_cost":"48.99","prefix_cost":"498.15","data_read_per_join":"543K"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` = 'published')"}}}}
 以上の分析を日本語で記述してください。

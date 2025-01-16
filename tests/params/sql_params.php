@@ -22,4 +22,5 @@ return [
         'status5' => 'pending',
     ],
     '10_redundant_join.sql' => ['status' => 'active'],
+    '11_nested_loop.sql' => ['email' => 'example@example.com'],
 ];

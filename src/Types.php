@@ -41,7 +41,8 @@ namespace Koriym\SqlQuality;
  *   ordering_operation?: ExplainOperation,
  *   select_list_subqueries?: array<array{
  *     query_block: array{table: ExplainTable}
- *   }>
+ *   }>,
+ *   nested_loop?: ExplainOperation
  * }
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock

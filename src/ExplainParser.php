@@ -46,12 +46,20 @@ class ExplainParser
             return $this->parseNestedLoop($nestedLoop);
         }
 
-        // 3) 単一テーブルの場合
+        // 3) nested_loop が query_block 直下にある場合のチェック
+        if (isset($queryBlock['nested_loop'])) {
+            /** @var array<array{table: ExplainTable}> $nestedLoop */
+            $nestedLoop = $queryBlock['nested_loop'];
+
+            return $this->parseNestedLoop($nestedLoop);
+        }
+
+        // 4) 単一テーブルの場合
         if (isset($queryBlock['table'])) {
             // TableNode を一旦作る
             $tableNode = $this->parseSingleTable($queryBlock['table']);
 
-            // 4) select_list_subqueries があれば、ここでパースして子ノードとして追加する
+            // 5) select_list_subqueries があれば、ここでパースして子ノードとして追加する
             if (isset($queryBlock['select_list_subqueries'])) {
                 $subqueryNodes = $this->parseSelectListSubqueries($queryBlock['select_list_subqueries']);
                 // もとのテーブルノードを、新しい子ノードを付与した形で再生成
