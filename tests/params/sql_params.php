@@ -24,4 +24,6 @@ return [
     '10_redundant_join.sql' => ['status' => 'active'],
     '11_nested_loop.sql' => ['email' => 'example@example.com'],
     '12_select1.sql' => [],
+    '13_invalid.sql' => [],
+    '14_not_found.sql' => [],
 ];
