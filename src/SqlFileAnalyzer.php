@@ -10,6 +10,7 @@ use RuntimeException;
 use function array_keys;
 use function array_map;
 use function array_values;
+use function error_log;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -22,6 +23,7 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function printf;
+use function sprintf;
 
 use const PATHINFO_FILENAME;
 
@@ -106,7 +108,7 @@ final class SqlFileAnalyzer
                 $cost = $result['cost'];
                 printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
             } catch (RuntimeException $e) {
-                printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
+                error_log(sprintf('⚠️Skipped: %s: %s', $sqlFile, $e->getMessage()));
             }
         }
 
