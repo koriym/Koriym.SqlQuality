@@ -10,6 +10,7 @@ use RuntimeException;
 use function array_keys;
 use function array_map;
 use function array_values;
+use function error_log;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -21,6 +22,8 @@ use function json_decode;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
+use function printf;
+use function sprintf;
 
 use const PATHINFO_FILENAME;
 
@@ -99,34 +102,14 @@ final class SqlFileAnalyzer
     {
         $results = [];
         foreach ($sqlParams as $sqlFile => $params) {
-            $sql = $this->readSqlFile($sqlFile);
-            /** @var ExplainResult $explainResult */
-            $explainResult = $this->executeExplain($sql, $params);
-            /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
-            $warnings = $this->getWarnings();
-            /** @var list<DetectedWarning> $issues */
-            $issues = $this->analyzer->analyze($explainResult, $warnings);
-            /** @var array<string, SchemaInfo> $schemaInfo */
-            $schemaInfo = $this->getSchemaInfo($sql);
-            $cost = $this->calculateCost($explainResult);
-
-            $aiPrompt = $this->aiAdvisor->generatePrompt(
-                $sqlFile,
-                $sql,
-                $explainResult,
-                $issues,
-                $schemaInfo,
-            );
-
-            $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
-
-            // (string)キャストを削除し、$sqlFileは既にstring型であることを前提とする
-            $results[$sqlFile] = [
-                'issues' => $issues,
-                'explain_result' => $explainResult,
-                'ai_suggestions' => $aiPrompt,
-                'cost' => $cost,
-            ];
+            try {
+                $result = $this->analyze($sqlFile, $params, $outputDir, $results);
+                $results[$sqlFile] = $result;
+                $cost = $result['cost'];
+                printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
+            } catch (RuntimeException $e) {
+                error_log(sprintf('⚠️Skipped: %s: %s', $sqlFile, $e->getMessage()));
+            }
         }
 
         return $results;
@@ -263,5 +246,51 @@ final class SqlFileAnalyzer
         $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
 
         return $reportGenerator->generate($results);
+    }
+
+    /**
+     * @param array<string, mixed>          $params
+     * @param array<string, AnalysisResult> $results
+     *
+     * @return array{
+       issues: list<DetectedWarning>,
+       explain_result: ExplainResult,
+       ai_suggestions: string,
+       cost: float
+     }
+     */
+    public function analyze(
+        string $sqlFile,
+        array $params,
+        string $outputDir,
+        array $results
+    ): array {
+        $sql = $this->readSqlFile($sqlFile);
+        /** @var ExplainResult $explainResult */
+        $explainResult = $this->executeExplain($sql, $params);
+        /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
+        $warnings = $this->getWarnings();
+        /** @var list<DetectedWarning> $issues */
+        $issues = $this->analyzer->analyze($explainResult, $warnings);
+        /** @var array<string, SchemaInfo> $schemaInfo */
+        $schemaInfo = $this->getSchemaInfo($sql);
+        $cost = $this->calculateCost($explainResult);
+
+        $aiPrompt = $this->aiAdvisor->generatePrompt(
+            $sqlFile,
+            $sql,
+            $explainResult,
+            $issues,
+            $schemaInfo,
+        );
+
+        $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
+
+        return [
+            'issues' => $issues,
+            'explain_result' => $explainResult,
+            'ai_suggestions' => $aiPrompt,
+            'cost' => $cost,
+        ];
     }
 }
