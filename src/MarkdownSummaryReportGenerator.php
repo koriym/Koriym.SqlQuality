@@ -40,7 +40,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 
         $reportPath = $outputDir . '/' . $fileName;
         $queryResults = $this->statistics->getQueryResults();
-        error_log('Query results count: ' . count($queryResults));
+        error_log('Total analyzed files: ' . count($queryResults));
         $reportContent = $this->generate($queryResults);
 
         if (@file_put_contents($reportPath, $reportContent) === false) {
