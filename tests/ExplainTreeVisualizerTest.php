@@ -407,4 +407,103 @@ EXPECTED;
     {
         return str_replace(["\r\n", "\r"], "\n", trim($string));
     }
+
+    public function testUnionResult(): void
+    {
+        // UNION を含む EXPLAIN(JSON) の例
+        $json = <<<'JSON'
+{
+    "query_block": {
+        "union_result": {
+            "using_temporary_table": true,
+            "table_name": "<union1,2>",
+            "access_type": "ALL",
+            "query_specifications": [
+                {
+                    "dependent": false,
+                    "cacheable": true,
+                    "query_block": {
+                        "select_id": 1,
+                        "table": {
+                            "table_name": "top_category",
+                            "access_type": "ALL",
+                            "rows_examined_per_scan": 1,
+                            "filtered": "10.00",
+                            "attached_condition": "(`more`.`top_category`.`enable` = 1)"
+                        }
+                    }
+                },
+                {
+                    "dependent": false,
+                    "cacheable": true,
+                    "query_block": {
+                        "select_id": 2,
+                        "grouping_operation": {
+                            "using_temporary_table": true,
+                            "using_filesort": false,
+                            "nested_loop": [
+                                {
+                                    "table": {
+                                        "table_name": "categories",
+                                        "access_type": "ref",
+                                        "key": "slug",
+                                        "rows_examined_per_scan": 1,
+                                        "filtered": "10.00"
+                                    }
+                                },
+                                {
+                                    "table": {
+                                        "table_name": "contents",
+                                        "access_type": "ALL",
+                                        "rows_examined_per_scan": 88,
+                                        "filtered": "5.00"
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            ]
+        }
+    }
+}
+JSON;
+
+        // 期待されるツリー出力（インデントや属性表示はプロジェクト内の実装に合わせて調整してください）
+        $expected = <<<'EXPECTED'
+UNION
+table           <union1,2>
+using_temporary_table true
+access_type     ALL
++- Table scan
+|  +- Table
+|     table           top_category
+|     rows            1
+|     filtered        10.00
+|     condition       (`more`.`top_category`.`enable` = 1)
++- JOIN
+   +- Index lookup
+   |  key             slug
+   |  rows            1
+   |  filtered        10.00
+   |  +- Table
+   |     table           categories
+   +- Table scan
+      rows            88
+      +- Table
+         table           contents
+EXPECTED;
+
+        // 1) JSON をパースして TreeNode を生成
+        $tree = $this->parser->parse($json);
+
+        // 2) ツリーを文字列化
+        $result = $this->visualizer->toString($tree);
+
+        // 3) 改行コードなどを揃えて比較
+        $this->assertSame(
+            $this->normalizeLineEndings($expected),
+            $this->normalizeLineEndings($result)
+        );
+    }
 }
