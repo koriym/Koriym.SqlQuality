@@ -9,25 +9,50 @@ use RuntimeException;
 use function array_filter;
 use function array_merge;
 use function implode;
+use function is_array;
 use function json_decode;
+use function print_r;
 use function sprintf;
 use function str_contains;
+
+use const JSON_THROW_ON_ERROR;
 
 /**
  * @psalm-import-type ExplainResult from Types
  * @psalm-import-type ExplainOperation from Types
  * @psalm-import-type ExplainTable from Types
  * @psalm-import-type TreeNodeAttributes from Types
+ * @psalm-import-type QueryBlock from Types
  */
 class ExplainParser
 {
     public function parse(string $explainJson): TreeNode
     {
-        /** @var ExplainResult $data */
-        $data = json_decode($explainJson, true);
-        $queryBlock = $data['query_block'];
+        /** @var array{query_block: QueryBlock} $data */
+        $data = json_decode($explainJson, true, 512, JSON_THROW_ON_ERROR);
 
-        // 1) ordering_operation のチェック
+        return $this->parseQueryBlock($data['query_block']);
+    }
+
+    /** @param QueryBlock $queryBlock */
+    public function parseQueryBlock(array $queryBlock): TreeNode
+    {
+        if (isset($queryBlock['message'])) {
+            // 例: "no matching row in const table"
+            $msg = $queryBlock['message'];
+
+            return new TreeNode(
+                'Message',
+                ['info' => $msg]
+            );
+        }
+
+        // union_result
+        if (isset($queryBlock['union_result'])) {
+            return $this->parseUnionResult($queryBlock['union_result']);
+        }
+
+        // ordering_operation
         if (isset($queryBlock['ordering_operation'])) {
             /** @var ExplainOperation $orderingOp */
             $orderingOp = $queryBlock['ordering_operation'];
@@ -38,7 +63,7 @@ class ExplainParser
             return $this->parseOrderingOperation($orderingOp);
         }
 
-        // 2) grouping_operation のチェック
+        // grouping_operation
         if (isset($queryBlock['grouping_operation']['nested_loop'])) {
             /** @var array<array{table: ExplainTable}> $nestedLoop */
             $nestedLoop = $queryBlock['grouping_operation']['nested_loop'];
@@ -54,12 +79,12 @@ class ExplainParser
             return $this->parseNestedLoop($nestedLoop);
         }
 
-        // 4) 単一テーブルの場合
+        // table
         if (isset($queryBlock['table'])) {
             // TableNode を一旦作る
             $tableNode = $this->parseSingleTable($queryBlock['table']);
 
-            // 5) select_list_subqueries があれば、ここでパースして子ノードとして追加する
+            // select_list_subqueries があれば、ここでパースして子ノードとして追加する
             if (isset($queryBlock['select_list_subqueries'])) {
                 $subqueryNodes = $this->parseSelectListSubqueries($queryBlock['select_list_subqueries']);
                 // もとのテーブルノードを、新しい子ノードを付与した形で再生成
@@ -75,7 +100,39 @@ class ExplainParser
             return $tableNode;
         }
 
-        throw new RuntimeException('Unsupported EXPLAIN format');
+        throw new RuntimeException('Unsupported EXPLAIN query_block format:' . print_r($queryBlock, true));
+    }
+
+    private function parseUnionResult(array $unionResult): TreeNode
+    {
+        // UNION ノードの属性を詰める（あれば）
+        $attributes = [];
+        if (isset($unionResult['table_name'])) {
+            $attributes['table'] = $unionResult['table_name']; // "<union1,2>" など
+        }
+
+        if (isset($unionResult['using_temporary_table']) && $unionResult['using_temporary_table']) {
+            $attributes['using_temporary_table'] = 'true';
+        }
+
+        if (isset($unionResult['access_type'])) {
+            $attributes['access_type'] = $unionResult['access_type'];
+        }
+
+        // query_specifications があれば、それぞれ parseQueryBlock() で再帰的にパース
+        $children = [];
+        if (isset($unionResult['query_specifications']) && is_array($unionResult['query_specifications'])) {
+            foreach ($unionResult['query_specifications'] as $spec) {
+                // spec: { "dependent":false, "cacheable":true, "query_block": {...} }
+                if (isset($spec['query_block']) && is_array($spec['query_block'])) {
+                    // 再帰的に、各 query_block をパース
+                    $childNode = $this->parseQueryBlock($spec['query_block']);
+                    $children[] = $childNode;
+                }
+            }
+        }
+
+        return new TreeNode('UNION', $attributes, $children);
     }
 
     /**
