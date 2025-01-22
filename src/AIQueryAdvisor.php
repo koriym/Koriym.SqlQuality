@@ -60,6 +60,7 @@ final class AIQueryAdvisor
 
 ### EXPLAIN Results
 %s
+
 %s
 TEMPLATE;
 

@@ -175,6 +175,7 @@ namespace Koriym\SqlQuality;
  *    avg_cost: float,
  *    std_dev: float
  *  }
+ * @psalm-type QueryBlock = array<mixed>
  */
 final class Types
 {
