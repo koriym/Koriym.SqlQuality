@@ -246,7 +246,24 @@ final class SqlFileAnalyzer
         return $reportGenerator->generate($results);
     }
 
-    public function analyze(string $sqlFile, mixed $params, string $outputDir, array $results): array
+    /**
+     * @param string $sqlFile
+     * @param array<string, mixed> $params
+     * @param string $outputDir
+     * @param array<string, AnalysisResult> $results
+     * @return array{
+       issues: list<DetectedWarning>,
+       explain_result: ExplainResult,
+       ai_suggestions: string,
+       cost: float
+     }
+     */
+    public function analyze(
+        string $sqlFile,
+        array $params,
+        string $outputDir,
+        array $results
+    ): array
     {
         $sql = $this->readSqlFile($sqlFile);
         /** @var ExplainResult $explainResult */
@@ -269,7 +286,6 @@ final class SqlFileAnalyzer
 
         $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
 
-        // (string)キャストを削除し、$sqlFileは既にstring型であることを前提とする
         return [
             'issues' => $issues,
             'explain_result' => $explainResult,
