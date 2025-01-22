@@ -247,10 +247,9 @@ final class SqlFileAnalyzer
     }
 
     /**
-     * @param string $sqlFile
-     * @param array<string, mixed> $params
-     * @param string $outputDir
+     * @param array<string, mixed>          $params
      * @param array<string, AnalysisResult> $results
+     *
      * @return array{
        issues: list<DetectedWarning>,
        explain_result: ExplainResult,
@@ -263,8 +262,7 @@ final class SqlFileAnalyzer
         array $params,
         string $outputDir,
         array $results
-    ): array
-    {
+    ): array {
         $sql = $this->readSqlFile($sqlFile);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
