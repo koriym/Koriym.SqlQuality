@@ -14,6 +14,8 @@ use function error_log;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
+use function implode;
+use function is_array;
 use function is_bool;
 use function is_dir;
 use function is_null;
@@ -200,6 +202,7 @@ final class SqlFileAnalyzer
                     is_null($value) => 'NULL',
                     is_bool($value) => $value ? '1' : '0',
                     is_string($value) => $this->pdo->quote($value),
+                    is_array($value) => implode(',', array_map(fn ($v) => $this->pdo->quote($v), $value)),
                     default => (string) $value
                 };
             },

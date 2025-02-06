@@ -26,4 +26,5 @@ return [
     '12_select1.sql' => [],
     '13_invalid.sql' => [],
     '14_not_found.sql' => [],
+    '15_listed_parameters.sql' => ['listed_params' => ['User 1', 'User 10']],
 ];
