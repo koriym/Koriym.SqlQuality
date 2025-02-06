@@ -10,7 +10,6 @@ use RuntimeException;
 use function array_keys;
 use function array_map;
 use function array_values;
-use function error_log;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -21,11 +20,11 @@ use function is_dir;
 use function is_null;
 use function is_string;
 use function json_decode;
+use function microtime;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function printf;
-use function sprintf;
 
 use const PATHINFO_FILENAME;
 
@@ -110,7 +109,7 @@ final class SqlFileAnalyzer
                 $cost = $result['cost'];
                 printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
             } catch (RuntimeException $e) {
-                error_log(sprintf('⚠️Skipped: %s: %s', $sqlFile, $e->getMessage()));
+                printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
             }
         }
 
@@ -256,11 +255,12 @@ final class SqlFileAnalyzer
      * @param array<string, AnalysisResult> $results
      *
      * @return array{
-       issues: list<DetectedWarning>,
-       explain_result: ExplainResult,
-       ai_suggestions: string,
-       cost: float
-     }
+           issues: list<DetectedWarning>,
+           explain_result: ExplainResult,
+           ai_suggestions: string,
+           cost: float,
+           execution_time: float
+       }
      */
     public function analyze(
         string $sqlFile,
@@ -269,6 +269,15 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
+
+        // ★ 実際のクエリ実行時間を計測（副作用のない SELECT クエリであることを前提）
+        $startTime = microtime(true);
+        $stmt = $this->pdo->query($sql);
+        // 結果は利用しないため fetchAll() で十分（※必要に応じて LIMIT を付加するなどの工夫も検討）
+        $stmt->fetchAll();
+        $endTime = microtime(true);
+        $executionTime = $endTime - $startTime; // 単位は秒
+
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
@@ -294,6 +303,7 @@ final class SqlFileAnalyzer
             'explain_result' => $explainResult,
             'ai_suggestions' => $aiPrompt,
             'cost' => $cost,
+            'execution_time' => $executionTime,
         ];
     }
 }

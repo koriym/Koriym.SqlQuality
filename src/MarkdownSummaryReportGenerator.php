@@ -68,9 +68,10 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 
             $escapedFilename = str_replace('_', '\_', $filename);
             $rows[] = sprintf(
-                '| %s | %.2f | %s | %s | [Details](%s.md) |',
+                '| %s | %.2f | %.2f | %s | %s | [Details](%s.md) |',
                 $escapedFilename,
                 $result['cost'],
+                $result['execution_time'] * 1000,
                 $level,
                 implode(', ', $issueTypes) ?: '-',
                 pathinfo($filename, PATHINFO_FILENAME),
@@ -90,8 +91,8 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 # SQL Analysis Summary
 
 ## Query Analysis List
-| SQL File | Cost | Level | Issues | Report |
-|----------|------|-------|---------|---------|
+| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |
+|----------|------|----------------|-------|--------|--------|
 {$this->formatRows($rows)}
 
 ## Project Statistics
