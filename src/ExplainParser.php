@@ -100,6 +100,16 @@ class ExplainParser
             return $tableNode;
         }
 
+        if (isset($queryBlock['duplicates_removal'])) {
+            $tableNode = $this->parseSingleTable($queryBlock['duplicates_removal']['table']);
+
+            return new TreeNode(
+                'Remove duplicates',
+                [],
+                [$tableNode],
+            );
+        }
+
         throw new RuntimeException('Unsupported EXPLAIN query_block format:' . print_r($queryBlock, true));
     }
 

@@ -29,4 +29,5 @@ return [
     '15_listed_parameters.sql' => ['listed_params' => ['User 1', 'User 10']],
     '16_listed_num_parameters.sql' => ['listed_params' => [100, 200, 300]],
     '17_empty_list.sql' => ['empty_list' => []],
+    '18_select_distinct.sql' => ['user_ids' => [371, 963], 'comment_ids' => [1, 2, 555, 999]],
 ];
