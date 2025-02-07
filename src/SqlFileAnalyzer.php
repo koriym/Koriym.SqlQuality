@@ -204,6 +204,10 @@ final class SqlFileAnalyzer
 
         $values = array_map(
             function (mixed $value): string {
+                if (empty($value)) {
+                    throw new RuntimeException('Empty list given');
+                }
+
                 return match (true) {
                     is_null($value) => 'NULL',
                     is_bool($value) => $value ? '1' : '0',

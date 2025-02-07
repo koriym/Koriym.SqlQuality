@@ -28,4 +28,5 @@ return [
     '14_not_found.sql' => [],
     '15_listed_parameters.sql' => ['listed_params' => ['User 1', 'User 10']],
     '16_listed_num_parameters.sql' => ['listed_params' => [100, 200, 300]],
+    '17_empty_list.sql' => ['empty_list' => []],
 ];
