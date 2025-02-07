@@ -308,15 +308,18 @@ final class SqlFileAnalyzer
     public function getExecutedTime(string $sql, array $params): float
     {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+        // warm up the cache
+        $this->pdo->query($interpolatedSql);
+        $this->pdo->query($interpolatedSql);
+        $stmt = $this->pdo->query($interpolatedSql);
+        if ($stmt === false) {
+            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+        }
         $trialCount = 10;
         $executionTimes = [];
         for ($i = 0; $i < $trialCount; $i++) {
             $startTime = microtime(true);
             $stmt = $this->pdo->query($interpolatedSql);
-            if ($stmt === false) {
-                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
-            }
-
             // Fetch all results to ensure:
             // 1. The query is fully executed
             // 2. The result set is fully retrieved
