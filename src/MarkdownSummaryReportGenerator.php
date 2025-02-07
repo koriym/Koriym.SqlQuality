@@ -71,7 +71,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
                 '| %s | %.2f | %.2f | %s | %s | [Details](%s.md) |',
                 $escapedFilename,
                 $result['cost'],
-                $result['execution_time'] * 1000,
+                $result['execution_time'] * 1000, // SECONDS_TO_MILLISECONDS
                 $level,
                 implode(', ', $issueTypes) ?: '-',
                 pathinfo($filename, PATHINFO_FILENAME),

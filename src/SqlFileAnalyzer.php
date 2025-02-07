@@ -317,7 +317,12 @@ final class SqlFileAnalyzer
                 throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
             }
 
-            $stmt->fetchAll();// If you don't need the results, get them all (so that the cache is ready).
+            // Fetch all results to ensure:
+            // 1. The query is fully executed
+            // 2. The result set is fully retrieved
+            // 3. The database cache is properly warmed up
+            // This helps in getting consistent execution times across trials
+            $stmt->fetchAll();
             $endTime = microtime(true);
             $executionTimes[] = $endTime - $startTime;
         }
