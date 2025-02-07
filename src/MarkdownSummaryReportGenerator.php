@@ -96,7 +96,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 {$this->formatRows($rows)}
 
 ## Project Statistics
-- Total SQLs analyzed: {$stats['total_count']}
+- Total SQL queries analyzed: {$stats['total_count']}
 - Average query cost: {$this->formatFloat($stats['avg_cost'])}
 - Standard deviation: {$this->formatFloat($stats['std_dev'])}
 EOF;

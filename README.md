@@ -79,7 +79,7 @@ Example:
 | 3_function_on_indexed_column.sql | 523.20 | Medium (μ ± σ) | FullTableScan | [Details](3_function_on_indexed_column.md) |
 
 ## Project Statistics
-- Total SQLs analyzed: 10
+- Total SQL queries analyzed: 10
 - Average query cost: 724.19
 - Standard deviation: 795.91
 ```
