@@ -274,7 +274,7 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
-        $executionTime = $this->getExcutedTime($sql, $params);
+        $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
@@ -305,7 +305,7 @@ final class SqlFileAnalyzer
     }
 
     /** @param array<string, mixed> $params */
-    public function getExcutedTime(string $sql, array $params): float
+    public function getExecutedTime(string $sql, array $params): float
     {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         $trialCount = 10;
