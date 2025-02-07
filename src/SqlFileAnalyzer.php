@@ -9,7 +9,11 @@ use RuntimeException;
 
 use function array_keys;
 use function array_map;
+use function array_pop;
+use function array_shift;
+use function array_sum;
 use function array_values;
+use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -25,6 +29,7 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function printf;
+use function sort;
 
 use const PATHINFO_FILENAME;
 
@@ -269,15 +274,25 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
+        $interpolatedSql = $this->interpolateQuery($sql, $params);
+        $trialCount = 10;
+        $executionTimes = [];
+        for ($i = 0; $i < $trialCount; $i++) {
+            $startTime = microtime(true);
+            $stmt = $this->pdo->query($interpolatedSql);
+            if ($stmt === false) {
+                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            }
 
-        // ★ 実際のクエリ実行時間を計測（副作用のない SELECT クエリであることを前提）
-        $startTime = microtime(true);
-        $stmt = $this->pdo->query($sql);
-        // 結果は利用しないため fetchAll() で十分（※必要に応じて LIMIT を付加するなどの工夫も検討）
-        $stmt->fetchAll();
-        $endTime = microtime(true);
-        $executionTime = $endTime - $startTime; // 単位は秒
+            $stmt->fetchAll();// If you don't need the results, get them all (so that the cache is ready).
+            $endTime = microtime(true);
+            $executionTimes[] = $endTime - $startTime;
+        }
 
+        sort($executionTimes);
+        array_shift($executionTimes); // Remove the minimum value
+        array_pop($executionTimes);   // Remove the maximum value
+        $executionTime = array_sum($executionTimes) / count($executionTimes);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
