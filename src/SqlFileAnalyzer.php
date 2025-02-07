@@ -274,25 +274,7 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
-        $interpolatedSql = $this->interpolateQuery($sql, $params);
-        $trialCount = 10;
-        $executionTimes = [];
-        for ($i = 0; $i < $trialCount; $i++) {
-            $startTime = microtime(true);
-            $stmt = $this->pdo->query($interpolatedSql);
-            if ($stmt === false) {
-                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
-            }
-
-            $stmt->fetchAll();// If you don't need the results, get them all (so that the cache is ready).
-            $endTime = microtime(true);
-            $executionTimes[] = $endTime - $startTime;
-        }
-
-        sort($executionTimes);
-        array_shift($executionTimes); // Remove the minimum value
-        array_pop($executionTimes);   // Remove the maximum value
-        $executionTime = array_sum($executionTimes) / count($executionTimes);
+        $executionTime = $this->getExcutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
@@ -320,5 +302,30 @@ final class SqlFileAnalyzer
             'cost' => $cost,
             'execution_time' => $executionTime,
         ];
+    }
+
+    /** @param array<string, mixed> $params */
+    public function getExcutedTime(string $sql, array $params): float
+    {
+        $interpolatedSql = $this->interpolateQuery($sql, $params);
+        $trialCount = 10;
+        $executionTimes = [];
+        for ($i = 0; $i < $trialCount; $i++) {
+            $startTime = microtime(true);
+            $stmt = $this->pdo->query($interpolatedSql);
+            if ($stmt === false) {
+                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            }
+
+            $stmt->fetchAll();// If you don't need the results, get them all (so that the cache is ready).
+            $endTime = microtime(true);
+            $executionTimes[] = $endTime - $startTime;
+        }
+
+        sort($executionTimes);
+        array_shift($executionTimes); // Remove the minimum value
+        array_pop($executionTimes);   // Remove the maximum value
+
+        return array_sum($executionTimes) / count($executionTimes);
     }
 }
