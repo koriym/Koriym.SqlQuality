@@ -111,7 +111,8 @@ namespace Koriym\SqlQuality;
  *   issues: list<DetectedWarning>,
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
- *   cost: float
+ *   cost: float,
+ *   execution_time: float
  * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,

@@ -9,8 +9,11 @@ use RuntimeException;
 
 use function array_keys;
 use function array_map;
+use function array_pop;
+use function array_shift;
+use function array_sum;
 use function array_values;
-use function error_log;
+use function count;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
@@ -21,11 +24,12 @@ use function is_dir;
 use function is_null;
 use function is_string;
 use function json_decode;
+use function microtime;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function printf;
-use function sprintf;
+use function sort;
 
 use const PATHINFO_FILENAME;
 
@@ -39,6 +43,8 @@ use const PATHINFO_FILENAME;
  */
 final class SqlFileAnalyzer
 {
+    private const TRIAL_COUNT = 10;
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly ExplainAnalyzer $analyzer,
@@ -110,7 +116,7 @@ final class SqlFileAnalyzer
                 $cost = $result['cost'];
                 printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
             } catch (RuntimeException $e) {
-                error_log(sprintf('⚠️Skipped: %s: %s', $sqlFile, $e->getMessage()));
+                printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
             }
         }
 
@@ -256,11 +262,12 @@ final class SqlFileAnalyzer
      * @param array<string, AnalysisResult> $results
      *
      * @return array{
-       issues: list<DetectedWarning>,
-       explain_result: ExplainResult,
-       ai_suggestions: string,
-       cost: float
-     }
+           issues: list<DetectedWarning>,
+           explain_result: ExplainResult,
+           ai_suggestions: string,
+           cost: float,
+           execution_time: float
+       }
      */
     public function analyze(
         string $sqlFile,
@@ -269,6 +276,7 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
+        $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
@@ -294,6 +302,39 @@ final class SqlFileAnalyzer
             'explain_result' => $explainResult,
             'ai_suggestions' => $aiPrompt,
             'cost' => $cost,
+            'execution_time' => $executionTime,
         ];
+    }
+
+    /** @param array<string, mixed> $params */
+    public function getExecutedTime(string $sql, array $params): float
+    {
+        $interpolatedSql = $this->interpolateQuery($sql, $params);
+        // warm up the cache
+        $this->pdo->query($interpolatedSql);
+        $stmt = $this->pdo->query($interpolatedSql);
+        if ($stmt === false) {
+            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+        }
+
+        $executionTimes = [];
+        for ($i = 0; $i < self::TRIAL_COUNT; $i++) {
+            $startTime = microtime(true);
+            $stmt = $this->pdo->query($interpolatedSql);
+            // Fetch all results to ensure:
+            // 1. The query is fully executed
+            // 2. The result set is fully retrieved
+            // 3. The database cache is properly warmed up
+            // This helps in getting consistent execution times across trials
+            $stmt->fetchAll();
+            $endTime = microtime(true);
+            $executionTimes[] = $endTime - $startTime;
+        }
+
+        sort($executionTimes);
+        array_shift($executionTimes); // Remove the minimum value
+        array_pop($executionTimes);   // Remove the maximum value
+
+        return array_sum($executionTimes) / count($executionTimes);
     }
 }
