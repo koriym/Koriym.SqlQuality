@@ -1,6 +1,6 @@
 # SQL Performance Analysis
 - **SQL File:** `15_listed_parameters.sql`
-- **Cost:** 107.00
+- **Cost:** 101.75
 
 ## SQL
 ```sql
@@ -61,9 +61,9 @@ Based on the provided MySQL table schemas and EXPLAIN results, please provide:
 Please focus on practical, high-impact improvements that can be implemented with minimal risk.
 
 ### Schema
-{"users":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"name","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"email","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"updated_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""}],"indexes":[{"INDEX_NAME":"idx_users_id","COLUMN_NAME":"id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":1000},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":1000}],"status":{"table_rows":1000,"data_length":114688,"index_length":16384,"auto_increment":null,"create_time":"2025-02-05 16:28:43","update_time":null}}}
+{"users":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"name","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"email","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"updated_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""}],"indexes":[{"INDEX_NAME":"idx_users_id","COLUMN_NAME":"id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":1000},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":1000}],"status":{"table_rows":1000,"data_length":114688,"index_length":16384,"auto_increment":null,"create_time":"2025-02-07 08:57:29","update_time":"2025-02-07 08:57:29"}}}
 
 ### EXPLAIN Results
-{"query_block":{"select_id":1,"cost_info":{"query_cost":"107.00"},"table":{"table_name":"users","access_type":"ALL","rows_examined_per_scan":1000,"rows_produced_per_join":200,"filtered":"20.00","cost_info":{"read_cost":"87.00","eval_cost":"20.00","prefix_cost":"107.00","data_read_per_join":"418K"},"used_columns":["id","name","email","status","created_at","updated_at"],"attached_condition":"(`sqtest`.`users`.`name` in ('User 1','User 10'))"}}}
+{"query_block":{"select_id":1,"cost_info":{"query_cost":"101.75"},"table":{"table_name":"users","access_type":"ALL","rows_examined_per_scan":1000,"rows_produced_per_join":200,"filtered":"20.00","cost_info":{"read_cost":"81.75","eval_cost":"20.00","prefix_cost":"101.75","data_read_per_join":"418K"},"used_columns":["id","name","email","status","created_at","updated_at"],"attached_condition":"(`test`.`users`.`name` in ('User 1','User 10'))"}}}
 
 以上の分析を日本語で記述してください。
