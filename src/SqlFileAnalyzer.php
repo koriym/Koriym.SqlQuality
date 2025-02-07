@@ -43,6 +43,8 @@ use const PATHINFO_FILENAME;
  */
 final class SqlFileAnalyzer
 {
+    private const TRIAL_COUNT = 10;
+
     public function __construct(
         private readonly PDO $pdo,
         private readonly ExplainAnalyzer $analyzer,
@@ -310,14 +312,13 @@ final class SqlFileAnalyzer
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         // warm up the cache
         $this->pdo->query($interpolatedSql);
-        $this->pdo->query($interpolatedSql);
         $stmt = $this->pdo->query($interpolatedSql);
         if ($stmt === false) {
             throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
         }
-        $trialCount = 10;
+
         $executionTimes = [];
-        for ($i = 0; $i < $trialCount; $i++) {
+        for ($i = 0; $i < self::TRIAL_COUNT; $i++) {
             $startTime = microtime(true);
             $stmt = $this->pdo->query($interpolatedSql);
             // Fetch all results to ensure:
