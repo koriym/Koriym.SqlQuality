@@ -4,8 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
-use RuntimeException;
 
 use function array_keys;
 use function array_map;
