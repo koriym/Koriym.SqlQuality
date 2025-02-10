@@ -3,21 +3,23 @@
 ## Query Analysis List
 | SQL File | Cost | Exec Time (ms) | Level | Issues | Report |
 |----------|------|----------------|-------|--------|--------|
-| 1\_full\_table\_scan.sql | 498.45 | 3.12 | Medium (μ ± σ) | FullTableScan | [Details](1_full_table_scan.md) |
-| 2\_filesort.sql | 498.45 | 2.30 | Medium (μ ± σ) | FullTableScan, IneffectiveSort | [Details](2_filesort.md) |
-| 3\_function\_on\_indexed\_column.sql | 498.45 | 1.44 | Medium (μ ± σ) | FullTableScan | [Details](3_function_on_indexed_column.md) |
-| 4\_no\_index\_on\_join.sql | 730.90 | 9.21 | Medium (μ ± σ) | - | [Details](4_no_index_on_join.md) |
-| 5\_multiple\_wildcard\_like.sql | 498.45 | 2.21 | Medium (μ ± σ) | FullTableScan | [Details](5_multiple_wildcard_like.md) |
-| 6\_implicit\_type\_conversion.sql | 202.50 | 0.72 | Medium (μ ± σ) | FullTableScan | [Details](6_implicit_type_conversion.md) |
-| 7\_temporary\_table\_grouping.sql | 202.50 | 0.51 | Medium (μ ± σ) | IneffectiveSort, TemporaryTableGrouping | [Details](7_temporary_table_grouping.md) |
-| 8\_suboptimal\_or\_condition.sql | 498.45 | 3.44 | Medium (μ ± σ) | FullTableScan | [Details](8_suboptimal_or_condition.md) |
-| 9\_inefficient\_in\_query.sql | 2949.45 | 5.90 | Very High (> μ + 2σ) | FullTableScan, IneffectiveSort | [Details](9_inefficient_in_query.md) |
-| 10\_redundant\_join.sql | 101.75 | 2.84 | Medium (μ ± σ) | FullTableScan | [Details](10_redundant_join.md) |
-| 11\_nested\_loop.sql | 273.66 | 0.28 | Medium (μ ± σ) | FullTableScan | [Details](11_nested_loop.md) |
-| 12\_select1.sql | 0.00 | 0.06 | Medium (μ ± σ) | - | [Details](12_select1.md) |
-| 15\_listed\_parameters.sql | 101.75 | 0.29 | Medium (μ ± σ) | FullTableScan | [Details](15_listed_parameters.md) |
+| 1\_full\_table\_scan.sql | 503.75 | 8.02 | Medium (μ ± σ) | FullTableScan | [Details](1_full_table_scan.md) |
+| 2\_filesort.sql | 503.75 | 6.11 | Medium (μ ± σ) | FullTableScan, IneffectiveSort | [Details](2_filesort.md) |
+| 3\_function\_on\_indexed\_column.sql | 503.75 | 2.96 | Medium (μ ± σ) | FullTableScan | [Details](3_function_on_indexed_column.md) |
+| 4\_no\_index\_on\_join.sql | 742.64 | 22.09 | Medium (μ ± σ) | - | [Details](4_no_index_on_join.md) |
+| 5\_multiple\_wildcard\_like.sql | 503.75 | 5.19 | Medium (μ ± σ) | FullTableScan | [Details](5_multiple_wildcard_like.md) |
+| 6\_implicit\_type\_conversion.sql | 202.50 | 1.70 | Medium (μ ± σ) | FullTableScan | [Details](6_implicit_type_conversion.md) |
+| 7\_temporary\_table\_grouping.sql | 202.50 | 1.14 | Medium (μ ± σ) | IneffectiveSort, TemporaryTableGrouping | [Details](7_temporary_table_grouping.md) |
+| 8\_suboptimal\_or\_condition.sql | 503.75 | 7.77 | Medium (μ ± σ) | FullTableScan | [Details](8_suboptimal_or_condition.md) |
+| 9\_inefficient\_in\_query.sql | 2981.25 | 18.24 | Very High (> μ + 2σ) | FullTableScan, IneffectiveSort | [Details](9_inefficient_in_query.md) |
+| 10\_redundant\_join.sql | 101.75 | 7.64 | Medium (μ ± σ) | FullTableScan | [Details](10_redundant_join.md) |
+| 11\_nested\_loop.sql | 276.05 | 0.35 | Medium (μ ± σ) | FullTableScan | [Details](11_nested_loop.md) |
+| 12\_select1.sql | 0.00 | 0.08 | Medium (μ ± σ) | - | [Details](12_select1.md) |
+| 15\_listed\_parameters.sql | 101.75 | 0.53 | Medium (μ ± σ) | FullTableScan | [Details](15_listed_parameters.md) |
+| 16\_listed\_num\_parameters.sql | 11.11 | 0.22 | Medium (μ ± σ) | - | [Details](16_listed_num_parameters.md) |
+| 18\_select\_distinct.sql | 1.86 | 0.16 | Medium (μ ± σ) | - | [Details](18_select_distinct.md) |
 
 ## Project Statistics
-- Total SQL queries analyzed: 13
-- Average query cost: 542.67
-- Standard deviation: 724.56
+- Total SQL queries analyzed: 15
+- Average query cost: 476.01
+- Standard deviation: 706.56

@@ -204,11 +204,15 @@ final class SqlFileAnalyzer
 
         $values = array_map(
             function (mixed $value): string {
+                if (is_array($value) && count($value) === 0) {
+                    throw new RuntimeException('Empty list given');
+                }
+
                 return match (true) {
                     is_null($value) => 'NULL',
                     is_bool($value) => $value ? '1' : '0',
                     is_string($value) => $this->pdo->quote($value),
-                    is_array($value) => implode(',', array_map(fn ($v) => $this->pdo->quote($v), $value)),
+                    is_array($value) => implode(',', array_map(fn ($v) => is_string($v) ? $this->pdo->quote($v) : (string) $v, $value)),
                     default => (string) $value
                 };
             },
