@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use RuntimeException;
+use Koriym\SqlQuality\Exception\RuntimeException;
 
 use function array_filter;
 use function array_merge;
