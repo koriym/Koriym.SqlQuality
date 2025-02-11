@@ -120,10 +120,12 @@ namespace Koriym\SqlQuality;
  *   cost: float,
  *   execution_time: float,
  *   optimizer_comparison: array{
- *       with_optimizer: array<array-key, mixed>,
- *       without_optimizer: array<array-key, mixed>,
- *           cost_percent: float,
- *           time_percent: float
+ *      with_optimizer: array<array-key, mixed>,
+ *      without_optimizer: array<array-key, mixed>,
+ *      difference: array{
+ *          cost_percent: float,
+ *          time_percent: float
+ *      }
  *   }
  * }
  * @psalm-type QueryStatisticsResult = array{
@@ -179,7 +181,7 @@ namespace Koriym\SqlQuality;
  *  }
  * @psalm-type QueryResult = array{
  *    cost: float,
- *    explain_result: array<array-key, mixed>,
+ *    explain_result: ExplainResult
  *    issues: list<string>
  *  }
  * @psalm-type QueryResults = array<string, QueryResult>

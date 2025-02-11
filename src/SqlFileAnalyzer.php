@@ -304,7 +304,14 @@ final class SqlFileAnalyzer
         ];
     }
 
-    /** @return array<array-key, mixed> */
+    /** @return array{
+     *     issues: list<DetectedWarning>,
+     *     explain_result: ExplainResult,
+     *     ai_suggestions: string,
+     *     cost: float,
+     *     execution_time: float
+     * }
+     */
     private function analyzeWithSettings(
         string $sql,
         array $params,
