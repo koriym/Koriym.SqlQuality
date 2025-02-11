@@ -31,7 +31,7 @@ return [
         'min_amount' => 1,
         'max_amount' => 1000,
     ],
-    '17_excessive_derived_tables.sql'=> [],
+    '17_excessive_derived_tables.sql' => [],
     '18_ineffective_union.sql'      => [],
     '19_unnecessary_distinct.sql'   => ['user_id' => 1],
     '20_multi_table_update.sql'     => [],
