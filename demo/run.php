@@ -18,7 +18,8 @@ $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
     dirname(__DIR__) . '/tests/sql',
-    new AIQueryAdvisor('以上の分析を日本語で記述してください。') // 'Please describe the above analysis in YOURLANGUAGE'.
+    new AIQueryAdvisor('以上の分析を日本語で記述してください。'), // 'Please describe the above analysis in YOURLANGUAGE'.
+    new OptimizerSettings($pdo)
 );
 // Output to build/sql-quality
 $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
