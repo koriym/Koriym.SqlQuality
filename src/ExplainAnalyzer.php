@@ -140,6 +140,14 @@ final class ExplainAnalyzer
             ];
         }
 
+        if ((new IneffectiveUnionDetector())->detect($explainResult)) {
+            $detectedWarnings[] = [
+                'type' => 'IneffectiveUnion',
+                'message' => self::DEFAULT_MESSAGES['IneffectiveUnion'],
+                'documentation' => $this->getDocumentationUrl('IneffectiveUnion'),
+            ];
+        }
+
         foreach ($this->warnings as $warningType => $warning) {
             if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
                 $detectedWarnings[] = [
