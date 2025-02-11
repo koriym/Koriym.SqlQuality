@@ -50,6 +50,7 @@ final class SqlFileAnalyzer
         private readonly ExplainAnalyzer $analyzer,
         private readonly string $sqlDir,
         private readonly AIQueryAdvisor $aiAdvisor,
+        private readonly OptimizerSettings $optimizerSettings,
     ) {
     }
 
@@ -261,13 +262,7 @@ final class SqlFileAnalyzer
      * @param array<string, mixed>          $params
      * @param array<string, AnalysisResult> $results
      *
-     * @return array{
-           issues: list<DetectedWarning>,
-           explain_result: ExplainResult,
-           ai_suggestions: string,
-           cost: float,
-           execution_time: float
-       }
+     * @return AnalysisResult
      */
     public function analyze(
         string $sqlFile,
@@ -276,6 +271,42 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
+
+        // デフォルト（オプティマイザーあり）の分析を実行
+        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+
+        // オプティマイザーを無効化して分析
+        $savedSettings = $this->optimizerSettings->saveCurrentSettings();
+        $this->optimizerSettings->disableAll();
+        $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        $this->optimizerSettings->restore($savedSettings);
+
+        // 両方の結果を含めて返す
+        $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
+        if ($noOptimizerAnalysisCost === 0) {
+            $noOptimizerAnalysisCost = 1;
+        }
+
+        return [
+            ...$defaultAnalysis,
+            'optimizer_comparison' => [
+                'with_optimizer' => $defaultAnalysis,
+                'without_optimizer' => $noOptimizerAnalysis,
+                'difference' => [
+                    'cost_percent' => ($defaultAnalysis['cost'] - $noOptimizerAnalysis['cost']) / $noOptimizerAnalysis['cost'] * 100,
+                    'time_percent' => ($defaultAnalysis['execution_time'] - $noOptimizerAnalysis['execution_time']) / $noOptimizerAnalysis['execution_time'] * 100,
+                ],
+            ],
+        ];
+    }
+
+    /** @return array<array-key, mixed> */
+    private function analyzeWithSettings(
+        string $sql,
+        array $params,
+        string $sqlFile,
+        string $outputDir
+    ): array {
         $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);
