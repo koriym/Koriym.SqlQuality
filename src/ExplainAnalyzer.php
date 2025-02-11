@@ -132,6 +132,13 @@ final class ExplainAnalyzer
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
+        if ((new ExcessiveDerivedTablesDetector())->detect($explainResult)) {
+            $detectedWarnings[] = [
+                'type' => 'ExcessiveDerivedTables',
+                'message' => self::DEFAULT_MESSAGES['ExcessiveDerivedTables'],
+                'documentation' => $this->getDocumentationUrl('ExcessiveDerivedTables'),
+            ];
+        }
 
         foreach ($this->warnings as $warningType => $warning) {
             if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
