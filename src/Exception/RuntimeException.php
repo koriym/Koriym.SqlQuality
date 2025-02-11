@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Koriym\SqlQaulity\Exception;
+namespace Koriym\SqlQuality\Exception;
 
 class RuntimeException extends \RuntimeException
 {

@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use RuntimeException;
+use Koriym\SqlQuality\Exception\RuntimeException;
 
 use function abs;
 use function array_column;

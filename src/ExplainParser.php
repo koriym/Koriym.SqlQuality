@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use RuntimeException;
+use Koriym\SqlQuality\Exception\RuntimeException;
 
 use function array_filter;
 use function array_merge;
@@ -98,6 +98,16 @@ class ExplainParser
             }
 
             return $tableNode;
+        }
+
+        if (isset($queryBlock['duplicates_removal'])) {
+            $tableNode = $this->parseSingleTable($queryBlock['duplicates_removal']['table']);
+
+            return new TreeNode(
+                'Remove duplicates',
+                [],
+                [$tableNode],
+            );
         }
 
         throw new RuntimeException('Unsupported EXPLAIN query_block format:' . print_r($queryBlock, true));
