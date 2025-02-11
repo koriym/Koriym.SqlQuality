@@ -25,16 +25,20 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
-        'FullTableScan'             => 'Full table scan detected.',
-        'IneffectiveJoin'           => 'Ineffective join detected.',
+        'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
-        'IneffectiveLikePattern'    => 'Ineffective LIKE pattern detected.',
-        'ImplicitTypeConversion'    => 'Implicit type conversion detected.',
-        'IneffectiveSort'           => 'Ineffective sort operation detected.',
-        'TemporaryTableGrouping'    => 'Temporary table required for grouping.',
-        // 追加のissue
+        'FullTableScan'            => 'Full table scan detected.',
+        'ImplicitTypeConversion'   => 'Implicit type conversion detected.',
+        'IneffectiveJoin'          => 'Ineffective join detected.',
+        'IneffectiveLikePattern'   => 'Ineffective LIKE pattern detected.',
+        'IneffectiveRangeScan'     => 'Ineffective range scan detected. The range condition covers too many rows.',
+        'IneffectiveSort'          => 'Ineffective sort operation detected.',
+        'IneffectiveUnion'         => 'Ineffective UNION usage detected; temporary table may be used.',
+        'LowCardinalityIndex'      => 'Index on low cardinality column detected; this may cause inefficient scans.',
+        'MultiTableUpdate'         => 'Multi-table update detected; this may lead to heavy table locking.',
+        'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
+        'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected on already unique columns.',
     ];
-
     /** @var array<WarningType, Warning> */
     private array $warnings;
 
@@ -42,16 +46,10 @@ final class ExplainAnalyzer
     public function __construct(array $messages = self::DEFAULT_MESSAGES)
     {
         $this->warnings = [
-            'FullTableScan' => [
-                'message' => $messages['FullTableScan'],
+            'ExcessiveDerivedTables' => [
+                'message' => $messages['ExcessiveDerivedTables'],
                 'pattern' => [
-                    'explain' => ['access_type' => 'ALL'],
-                ],
-            ],
-            'IneffectiveJoin' => [
-                'message' => $messages['IneffectiveJoin'],
-                'pattern' => [
-                    'explain' => ['using_join_buffer' => true],
+                    'explain' => ['derived_table_count' => 'high'],
                 ],
             ],
             'FunctionInvalidatesIndex' => [
@@ -60,10 +58,10 @@ final class ExplainAnalyzer
                     'explain' => ['attached_condition' => 'function_call'],
                 ],
             ],
-            'IneffectiveLikePattern' => [
-                'message' => $messages['IneffectiveLikePattern'],
+            'FullTableScan' => [
+                'message' => $messages['FullTableScan'],
                 'pattern' => [
-                    'explain' => ['attached_condition' => 'like_scan'],
+                    'explain' => ['access_type' => 'ALL'],
                 ],
             ],
             'ImplicitTypeConversion' => [
@@ -75,16 +73,61 @@ final class ExplainAnalyzer
                     ],
                 ],
             ],
+            'IneffectiveJoin' => [
+                'message' => $messages['IneffectiveJoin'],
+                'pattern' => [
+                    'explain' => ['using_join_buffer' => true],
+                ],
+            ],
+            'IneffectiveLikePattern' => [
+                'message' => $messages['IneffectiveLikePattern'],
+                'pattern' => [
+                    'explain' => ['attached_condition' => 'like_scan'],
+                ],
+            ],
+            'IneffectiveRangeScan' => [
+                'message' => $messages['IneffectiveRangeScan'],
+                'pattern' => [
+                    'explain' => ['rows_examined_per_scan' => 'high'],
+                ],
+            ],
             'IneffectiveSort' => [
                 'message' => $messages['IneffectiveSort'],
                 'pattern' => [
                     'explain' => ['using_filesort' => true],
                 ],
             ],
+            'IneffectiveUnion' => [
+                'message' => $messages['IneffectiveUnion'],
+                'pattern' => [
+                    'explain' => ['union_result' => 'Using temporary'],
+                ],
+            ],
+            'LowCardinalityIndex' => [
+                'message' => $messages['LowCardinalityIndex'],
+                'pattern' => [
+                    'explain' => ['cardinality' => 'low'],
+                ],
+            ],
+            'MultiTableUpdate' => [
+                'message' => $messages['MultiTableUpdate'],
+                'pattern' => [
+                    'explain' => ['update_operation' => 'multi_table'],
+                ],
+            ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
                 'pattern' => [
                     'explain' => ['using_temporary_table' => true],
+                ],
+            ],
+            'UnnecessaryDistinct' => [
+                'message' => $messages['UnnecessaryDistinct'],
+                'pattern' => [
+                    'explain' => [
+                        'distinct' => true,
+                        'unique_rows' => true,
+                    ],
                 ],
             ],
         ];
