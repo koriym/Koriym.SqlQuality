@@ -61,7 +61,13 @@ namespace Koriym\SqlQuality;
  *   IneffectiveLikePattern: string,
  *   ImplicitTypeConversion: string,
  *   IneffectiveSort: string,
- *   TemporaryTableGrouping: string
+ *   TemporaryTableGrouping: string,
+ *   IneffectiveRangeScan: string,
+ *   ExcessiveDerivedTables: string,
+ *   IneffectiveUnion: string,
+ *   UnnecessaryDistinct: string,
+ *   MultiTableUpdate: string,
+ *   LowCardinalityIndex: string
  * }
  * @psalm-type WarningPattern = array{
  *   explain?: array<string, mixed>,
@@ -112,7 +118,13 @@ namespace Koriym\SqlQuality;
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
  *   cost: float,
- *   execution_time: float
+ *   execution_time: float,
+ *   optimizer_comparison: array{
+ *       with_optimizer: array<array-key, mixed>,
+ *       without_optimizer: array<array-key, mixed>,
+ *           cost_percent: float,
+ *           time_percent: float
+ *   }
  * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,

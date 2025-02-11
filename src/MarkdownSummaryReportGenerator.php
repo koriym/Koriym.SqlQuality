@@ -6,8 +6,8 @@ namespace Koriym\SqlQuality;
 
 use RuntimeException;
 
+use function abs;
 use function array_column;
-use function count;
 use function error_log;
 use function file_put_contents;
 use function implode;
@@ -20,12 +20,11 @@ use function str_replace;
 
 use const PATHINFO_FILENAME;
 
-/**
- * @psalm-import-type AnalysisResult from Types
- * @psalm-import-type StatisticsResult from Types
- */
+/** @psalm-import-type AnalysisResult from Types */
 class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 {
+    private const SIGNIFICANT_COST_IMPACT = 20.0; // 20% difference in cost
+
     public function __construct(
         private readonly QueryStatisticsInterface $statistics,
         private readonly QueryLevelClassifierInterface $classifier,
@@ -40,7 +39,6 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 
         $reportPath = $outputDir . '/' . $fileName;
         $queryResults = $this->statistics->getQueryResults();
-        error_log('Total analyzed files: ' . count($queryResults));
         $reportContent = $this->generate($queryResults);
 
         if (@file_put_contents($reportPath, $reportContent) === false) {
@@ -53,59 +51,213 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
     /** @param array<string, AnalysisResult> $queryResults */
     public function generate(array $queryResults): string
     {
-        /** @var StatisticsResult $stats */
         $stats = $this->statistics->calculate($queryResults);
+
+        return $this->formatReport(
+            $this->generateMainAnalysis($queryResults, $stats),
+            $this->generateSignificantImpact($queryResults),
+            $stats
+        );
+    }
+
+    private function generateMainAnalysis(array $queryResults, array $stats): string
+    {
         $rows = [];
-
         foreach ($queryResults as $filename => $result) {
-            /** @var list<string> $issueTypes */
-            $issueTypes = array_column($result['issues'], 'type');
-            $level = $this->classifier->classify(
-                $result['cost'],
-                $stats['avg_cost'],
-                $stats['std_dev'],
-            );
+            $optimizer = $result['optimizer_comparison'] ?? null;
+            if (! $optimizer) {
+                continue;
+            }
 
-            $escapedFilename = str_replace('_', '\_', $filename);
+            $withOpt = $optimizer['with_optimizer'];
+            $baseIssues = $optimizer['without_optimizer']['issues'] ?? [];
+            $baseName = pathinfo($filename, PATHINFO_FILENAME);
+
             $rows[] = sprintf(
                 '| %s | %.2f | %.2f | %s | %s | [Details](%s.md) |',
-                $escapedFilename,
+                $filename,
                 $result['cost'],
-                $result['execution_time'] * 1000, // SECONDS_TO_MILLISECONDS
-                $level,
-                implode(', ', $issueTypes) ?: '-',
-                pathinfo($filename, PATHINFO_FILENAME),
+                $withOpt['execution_time'] * 1000,  // Convert to milliseconds
+                $this->classifier->classify($result['cost'], $stats['avg_cost'], $stats['std_dev']),
+                $this->formatIssues($baseIssues),
+                $baseName
             );
         }
 
-        return $this->formatReport($rows, $stats);
-    }
-
-    /**
-     * @param list<string>     $rows
-     * @param StatisticsResult $stats
-     */
-    private function formatReport(array $rows, array $stats): string
-    {
-        return <<<EOF
-# SQL Analysis Summary
-
-## Query Analysis List
-| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |
-|----------|------|----------------|-------|--------|--------|
-{$this->formatRows($rows)}
-
-## Project Statistics
-- Total SQL queries analyzed: {$stats['total_count']}
-- Average query cost: {$this->formatFloat($stats['avg_cost'])}
-- Standard deviation: {$this->formatFloat($stats['std_dev'])}
-EOF;
-    }
-
-    /** @param list<string> $rows */
-    private function formatRows(array $rows): string
-    {
         return implode("\n", $rows);
+    }
+
+    private function generateSignificantImpact(array $queryResults): string
+    {
+        $rows = [];
+        foreach ($queryResults as $filename => $result) {
+            $optimizer = $result['optimizer_comparison'] ?? null;
+            if (! $optimizer || abs($optimizer['difference']['cost_percent']) < self::SIGNIFICANT_COST_IMPACT) {
+                continue;
+            }
+
+            $withOpt = $optimizer['with_optimizer'];
+            $withoutOpt = $optimizer['without_optimizer'];
+            $baseIssues = $withoutOpt['issues'] ?? [];
+
+            $rows[] = sprintf(
+                '| %s | %s | %s | %.1f%% | %s |',
+                $filename,
+                $this->extractAccessPattern($withoutOpt['explain_result']),
+                $this->extractAccessPattern($withOpt['explain_result']),
+                $optimizer['difference']['cost_percent'],
+                $this->formatIssues($baseIssues),
+                //                $this->analyzePlanChanges($withoutOpt['explain_result'], $withOpt['explain_result'])
+            );
+        }
+
+        return empty($rows) ? '*No queries with optimizer impact*' : implode("\n", $rows);
+    }
+
+    private function extractAccessPattern(array $explain): string
+    {
+        // Nested loop joins
+        if (isset($explain['query_block']['nested_loop'])) {
+            $patterns = [];
+            foreach ($explain['query_block']['nested_loop'] as $loop) {
+                $table = $loop['table'] ?? [];
+                if (! empty($table)) {
+                    $patterns[] = $this->formatTableAccess($table);
+                }
+            }
+
+            return implode(' → ', $patterns);
+        }
+
+        // Handle single table with ordering operation
+        if (isset($explain['query_block']['ordering_operation']['table'])) {
+            return $this->formatTableAccess($explain['query_block']['ordering_operation']['table']);
+        }
+
+        // Handle single table direct access
+        if (isset($explain['query_block']['table'])) {
+            return $this->formatTableAccess($explain['query_block']['table']);
+        }
+
+        return 'Unknown';
+    }
+
+    private function formatTableAccess(array $table): string
+    {
+        $parts = [];
+
+        // Access type
+        $parts[] = $table['access_type'] ?? 'Unknown';
+
+        // Index information
+        if (! empty($table['key']) && $table['key'] !== '<auto_key0>') {
+            $parts[] = 'using ' . $table['key'];
+        }
+
+        // Rows examined
+        if (! empty($table['rows_examined_per_scan'])) {
+            $parts[] = $table['rows_examined_per_scan'] . ' rows';
+        }
+
+        // Filtered percentage if not 100% or if it's in the optimized version
+        if (isset($table['filtered']) && ($table['filtered'] !== 100.00 || isset($table['using_index']))) {
+            $parts[] = sprintf('%.1f%%', $table['filtered']);
+        }
+
+        return implode(', ', $parts);
+    }
+
+    private function analyzePlanChanges(array $withoutOpt, array $withOptResult): string
+    {
+        $changes = [];
+
+        // Filtering efficiency
+        $beforeFiltered = $this->extractFiltered($withoutOpt);
+        $afterFiltered = $this->extractFiltered($withOptResult);
+        if (abs($afterFiltered - $beforeFiltered) > 1.0) {
+            $changes[] = sprintf('Filtering: %.1f%% → %.1f%%', $beforeFiltered, $afterFiltered);
+        }
+
+        // Cost breakdown changes
+        $beforeCost = $this->extractCostBreakdown($withoutOpt);
+        $afterCost = $this->extractCostBreakdown($withOptResult);
+        if ($beforeCost && $afterCost) {
+            $changes[] = sprintf(
+                'Cost(R/E): %.1f/%.1f → %.1f/%.1f',
+                $beforeCost['read'],
+                $beforeCost['eval'],
+                $afterCost['read'],
+                $afterCost['eval']
+            );
+        }
+
+        return empty($changes) ? '-' : implode(', ', $changes);
+    }
+
+    private function extractFiltered(array $explain): float
+    {
+        if (isset($explain['query_block']['table']['filtered'])) {
+            return (float) $explain['query_block']['table']['filtered'];
+        }
+
+        if (isset($explain['query_block']['ordering_operation']['table']['filtered'])) {
+            return (float) $explain['query_block']['ordering_operation']['table']['filtered'];
+        }
+
+        return 100.0;
+    }
+
+    private function extractCostBreakdown(array $explain): ?array
+    {
+        $costInfo = null;
+        if (isset($explain['query_block']['table']['cost_info'])) {
+            $costInfo = $explain['query_block']['table']['cost_info'];
+        } elseif (isset($explain['query_block']['ordering_operation']['table']['cost_info'])) {
+            $costInfo = $explain['query_block']['ordering_operation']['table']['cost_info'];
+        }
+
+        if (! $costInfo) {
+            return null;
+        }
+
+        return [
+            'read' => (float) ($costInfo['read_cost'] ?? 0),
+            'eval' => (float) ($costInfo['eval_cost'] ?? 0),
+        ];
+    }
+
+    private function formatCostImpact(float $impact): string
+    {
+        if (abs($impact) < self::SIGNIFICANT_COST_IMPACT) {
+            return '-';
+        }
+
+        return sprintf('%+.1f%%', $impact);
+    }
+
+    /** @param array<array<string, string>> $issues */
+    private function formatIssues(array $issues): string
+    {
+        return empty($issues) ? '-' : implode(', ', array_column($issues, 'type'));
+    }
+
+    private function formatReport(string $mainAnalysis, string $optimizerImpact, array $stats): string
+    {
+        $escpaedOptimizerImpact = str_replace('_', '\_', $optimizerImpact);
+
+        return "# SQL Analysis Summary\n\n"
+            . "## Query Analysis\n\n"
+            . "| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |\n"
+            . "|----------|------|----------------|-------|---------|--------|\n"
+            . $mainAnalysis . "\n\n"
+            . "## Queries with Optimizer Impact\n\n"
+            . "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
+            . "|----------|-------------|------------------|-------------|--------------|\n"
+            . $escpaedOptimizerImpact . "\n\n"
+            . "## Statistics\n\n"
+            . "- Total queries analyzed: {$stats['total_count']}\n"
+            . "- Average query cost: {$this->formatFloat($stats['avg_cost'])}\n"
+            . "- Standard deviation: {$this->formatFloat($stats['std_dev'])}\n\n";
     }
 
     private function formatFloat(float $value): string
