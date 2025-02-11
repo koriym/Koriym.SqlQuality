@@ -39,11 +39,6 @@ final class ExplainAnalyzer
         'UnnecessaryDistinct'       => 'Unnecessary DISTINCT detected on already unique columns.',
         'MultiTableUpdate'          => 'Multi-table update detected; this may lead to heavy table locking.',
         'LowCardinalityIndex'       => 'Index on low cardinality column detected; this may cause inefficient scans.',
-        'ExcessiveDerivedTables' => 'Excessive use of derived tables detected.',
-        'IneffectiveUnion' => 'Ineffective UNION usage detected.',
-        'UnnecessaryDistinct' => 'Unnecessary DISTINCT detected.',
-        'MultiTableUpdate' => 'Multi-table update detected.',
-        'LowCardinalityIndex' => 'Index on low cardinality column detected.',
     ];
 
     /** @var array<WarningType, Warning> */
@@ -207,7 +202,7 @@ final class ExplainAnalyzer
     {
         // デフォルトのコスト構造
         $cost = [
-            'total_cost' => 0.0,
+            'total_cost' => 1.0,
             'details' => [
                 'rows_examined' => 0,
                 'temporary_tables' => false,
