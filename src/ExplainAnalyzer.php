@@ -25,13 +25,25 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
-        'FullTableScan' => 'Full table scan detected.',
-        'IneffectiveJoin' => 'Ineffective join detected.',
-        'FunctionInvalidatesIndex' => 'Function invalidates index.',
-        'IneffectiveLikePattern' => 'Ineffective LIKE pattern detected.',
-        'ImplicitTypeConversion' => 'Implicit type conversion detected.',
-        'IneffectiveSort' => 'Ineffective sort operation detected.',
-        'TemporaryTableGrouping' => 'Temporary table required for grouping.',
+        'FullTableScan'             => 'Full table scan detected.',
+        'IneffectiveJoin'           => 'Ineffective join detected.',
+        'FunctionInvalidatesIndex'  => 'Function invalidates index.',
+        'IneffectiveLikePattern'    => 'Ineffective LIKE pattern detected.',
+        'ImplicitTypeConversion'    => 'Implicit type conversion detected.',
+        'IneffectiveSort'           => 'Ineffective sort operation detected.',
+        'TemporaryTableGrouping'    => 'Temporary table required for grouping.',
+        // 追加のissue
+        'IneffectiveRangeScan'      => 'Ineffective range scan detected. The range condition covers too many rows.',
+        'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
+        'IneffectiveUnion'          => 'Ineffective UNION usage detected; temporary table may be used.',
+        'UnnecessaryDistinct'       => 'Unnecessary DISTINCT detected on already unique columns.',
+        'MultiTableUpdate'          => 'Multi-table update detected; this may lead to heavy table locking.',
+        'LowCardinalityIndex'       => 'Index on low cardinality column detected; this may cause inefficient scans.',
+        'ExcessiveDerivedTables' => 'Excessive use of derived tables detected.',
+        'IneffectiveUnion' => 'Ineffective UNION usage detected.',
+        'UnnecessaryDistinct' => 'Unnecessary DISTINCT detected.',
+        'MultiTableUpdate' => 'Multi-table update detected.',
+        'LowCardinalityIndex' => 'Index on low cardinality column detected.',
     ];
 
     /** @var array<WarningType, Warning> */
