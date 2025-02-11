@@ -47,12 +47,6 @@ final class ExplainAnalyzer
     {
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
-            'ExcessiveDerivedTables' => [
-                'message' => $messages['ExcessiveDerivedTables'],
-                'pattern' => [
-                    'explain' => ['derived_table_count' => 'high'],
-                ],
-            ],
             'FunctionInvalidatesIndex' => [
                 'message' => $messages['FunctionInvalidatesIndex'],
                 'pattern' => [
