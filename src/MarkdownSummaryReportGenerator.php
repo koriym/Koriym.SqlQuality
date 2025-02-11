@@ -243,7 +243,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 
     private function formatReport(string $mainAnalysis, string $optimizerImpact, array $stats): string
     {
-        $ourput = "# SQL Analysis Summary\n\n"
+        $output = "# SQL Analysis Summary\n\n"
             . "## Query Analysis\n\n"
             . "| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |\n"
             . "|----------|------|----------------|-------|---------|--------|\n"
@@ -257,7 +257,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             . "- Average query cost: {$this->formatFloat($stats['avg_cost'])}\n"
             . "- Standard deviation: {$this->formatFloat($stats['std_dev'])}\n\n";
 
-        return str_replace('_', '\_', $ourput);
+        return str_replace('_', '\_', $output);
     }
 
     private function formatFloat(float $value): string
