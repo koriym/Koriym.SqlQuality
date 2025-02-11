@@ -74,14 +74,4 @@ final class OptimizerSettings
         $optionString = implode(',', $options);
         $this->pdo->exec("SET optimizer_switch = '$optionString'");
     }
-
-    public function disableSpecificOptions(): void
-    {
-        $options = array_map(
-            static fn (string $option) => "{$option}=off",
-            self::OPTIMIZER_OPTIONS
-        );
-        $optionString = implode(',', $options);
-        $this->pdo->exec("SET optimizer_switch = '$optionString'");
-    }
 }
