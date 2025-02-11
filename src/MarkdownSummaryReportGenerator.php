@@ -243,7 +243,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 
     private function formatReport(string $mainAnalysis, string $optimizerImpact, array $stats): string
     {
-        $escpaedOptimizerImpact = str_replace('_', '\_', $optimizerImpact);
+        $escapedOptimizerImpact = str_replace('_', '\_', $optimizerImpact);
 
         return "# SQL Analysis Summary\n\n"
             . "## Query Analysis\n\n"
@@ -253,7 +253,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             . "## Queries with Optimizer Impact\n\n"
             . "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
             . "|----------|-------------|------------------|-------------|--------------|\n"
-            . $escpaedOptimizerImpact . "\n\n"
+            . $escapedOptimizerImpact . "\n\n"
             . "## Statistics\n\n"
             . "- Total queries analyzed: {$stats['total_count']}\n"
             . "- Average query cost: {$this->formatFloat($stats['avg_cost'])}\n"
