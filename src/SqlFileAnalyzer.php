@@ -116,7 +116,7 @@ final class SqlFileAnalyzer
                 $results[$sqlFile] = $result;
                 $cost = $result['cost'];
                 printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
-            } catch (RuntimeException $e) {
+            } catch (\RuntimeException $e) {
                 printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
             }
         }
