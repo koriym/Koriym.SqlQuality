@@ -53,24 +53,37 @@ namespace Koriym\SqlQuality;
  *   Message: string
  * }
  * @psalm-type ShowWarnings = list<ShowWarning>
- * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
+ * @psalm-type WarningType =
+ * 'ExcessiveDerivedTables'
+ * | 'FunctionInvalidatesIndex'
+ * | 'FullTableScan'
+ * | 'ImplicitTypeConversion'
+ * | 'IneffectiveJoin'
+ * | 'IneffectiveLikePattern'
+ * | 'IneffectiveRangeScan'
+ * | 'IneffectiveSort'
+ * | 'IneffectiveUnion'
+ * | 'LowCardinalityIndex'
+ * | 'MultiTableUpdate'
+ * | 'TemporaryTableGrouping'
+ * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
- *   FullTableScan: string,
- *   IneffectiveJoin: string,
- *   FunctionInvalidatesIndex: string,
- *   IneffectiveLikePattern: string,
- *   ImplicitTypeConversion: string,
- *   IneffectiveSort: string,
- *   TemporaryTableGrouping: string,
- *   IneffectiveRangeScan: string,
  *   ExcessiveDerivedTables: string,
+ *   FunctionInvalidatesIndex: string,
+ *   FullTableScan: string,
+ *   ImplicitTypeConversion: string,
+ *   IneffectiveJoin: string,
+ *   IneffectiveLikePattern: string,
+ *   IneffectiveRangeScan: string,
+ *   IneffectiveSort: string,
  *   IneffectiveUnion: string,
- *   UnnecessaryDistinct: string,
+ *   LowCardinalityIndex: string,
  *   MultiTableUpdate: string,
- *   LowCardinalityIndex: string
+ *   TemporaryTableGrouping: string,
+ *   UnnecessaryDistinct: string
  * }
  * @psalm-type WarningPattern = array{
- *   explain?: array<string, mixed>,
+ *   explain?: array<string, bool|string>,
  *   warnings?: list<string>
  * }
  * @psalm-type Warning = array{
