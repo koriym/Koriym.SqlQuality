@@ -111,7 +111,13 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             );
         }
 
-        return empty($rows) ? '*No queries with optimizer impact*' : implode("\n", $rows);
+        if (empty($rows)) {
+            return '*No queries with optimizer impact*';
+        }
+
+        return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
+        . "|----------|-------------|------------------|-------------|--------------|\n"
+        . implode("\n", $rows);
     }
 
     private function extractAccessPattern(array $explain): string
@@ -249,8 +255,6 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             . "|----------|------|----------------|-------|---------|--------|\n"
             . $mainAnalysis . "\n\n"
             . "## Queries with Optimizer Impact\n\n"
-            . "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
-            . "|----------|-------------|------------------|-------------|--------------|\n"
             . $optimizerImpact . "\n\n"
             . "## Statistics\n\n"
             . "- Total queries analyzed: {$stats['total_count']}\n"
