@@ -33,25 +33,6 @@ final class ExplainAnalyzer
         'IneffectiveSort'           => 'Ineffective sort operation detected.',
         'TemporaryTableGrouping'    => 'Temporary table required for grouping.',
         // 追加のissue
- public function __construct(array $messages = self::DEFAULT_MESSAGES)
- {
-     $this->warnings = [
-         // ... existing patterns ...
-         'IneffectiveRangeScan' => [
-             'message' => $messages['IneffectiveRangeScan'],
-             'pattern' => [
-                 'explain' => ['rows_examined_per_scan' => 'high'],
-             ],
-         ],
-         'ExcessiveDerivedTables' => [
-             'message' => $messages['ExcessiveDerivedTables'],
-             'pattern' => [
-                 'explain' => ['derived_table_count' => 'high'],
-             ],
-         ],
-         // ... add patterns for other new warnings ...
-     ];
- }
     ];
 
     /** @var array<WarningType, Warning> */
