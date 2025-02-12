@@ -8,6 +8,8 @@ use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
 use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
 use Koriym\SqlQuality\Detector\IneffectiveJoinDetector;
+use Koriym\SqlQuality\Detector\IneffectiveLikePatternDetector;
+use Koriym\SqlQuality\Detector\IneffectiveRangeScanDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
@@ -78,9 +80,7 @@ final class ExplainAnalyzer
             ],
             'IneffectiveLikePattern' => [
                 'message' => $messages['IneffectiveLikePattern'],
-                'pattern' => [
-                    'explain' => ['attached_condition' => 'like_scan'],
-                ],
+                'detector' => new IneffectiveLikePatternDetector(),
             ],
             'IneffectiveRangeScan' => [
                 'message' => $messages['IneffectiveRangeScan'],
