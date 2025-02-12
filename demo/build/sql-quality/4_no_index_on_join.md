@@ -14,6 +14,7 @@ GROUP BY p.id;
 ```
 
 ## Detected Issues
+- Ineffective join detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveJoin)
 - Temporary table required for grouping. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
 
 ## Explain Tree

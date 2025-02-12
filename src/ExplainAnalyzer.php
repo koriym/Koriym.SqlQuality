@@ -7,6 +7,7 @@ namespace Koriym\SqlQuality;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
 use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
+use Koriym\SqlQuality\Detector\IneffectiveJoinDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
@@ -73,9 +74,7 @@ final class ExplainAnalyzer
             ],
             'IneffectiveJoin' => [
                 'message' => $messages['IneffectiveJoin'],
-                'pattern' => [
-                    'explain' => ['using_join_buffer' => true],
-                ],
+                'detector' => new IneffectiveJoinDetector(),
             ],
             'IneffectiveLikePattern' => [
                 'message' => $messages['IneffectiveLikePattern'],
