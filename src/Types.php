@@ -42,7 +42,8 @@ namespace Koriym\SqlQuality;
  *   select_list_subqueries?: array<array{
  *     query_block: array{table: ExplainTable}
  *   }>,
- *   nested_loop?: ExplainOperation
+ *   nested_loop?: ExplainOperation,
+ *   union_result?: array<mixed>
  * }
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock
@@ -89,7 +90,7 @@ namespace Koriym\SqlQuality;
  * @psalm-type Warning = array{
  *   message: string,
  *   pattern: WarningPattern,
- *   ?detector: class-string
+ *   detector?: Detector\DetectorInterface
  * }
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,

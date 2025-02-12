@@ -9,5 +9,6 @@ use Koriym\SqlQuality\Types;
 /** @psalm-import-type ExplainResult from Types */
 interface DetectorInterface
 {
+    /** @param ExplainResult $explainResult */
     public function detect(array $explainResult): bool;
 }

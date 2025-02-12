@@ -9,6 +9,7 @@ use function preg_match;
 
 final class FunctionInvalidatesIndexDetector implements DetectorInterface
 {
+    /** {@inheritDoc} */
     public function detect(array $explainResult): bool
     {
         if (! isset($explainResult['query_block']['table'])) {

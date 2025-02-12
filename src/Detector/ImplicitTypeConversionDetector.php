@@ -10,6 +10,8 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
 {
     /**
      * attached_condition に数値型と文字列型の比較が含まれているかを検出
+     *
+     * {@inheritDoc}
      */
     public function detect(array $explainResult): bool
     {

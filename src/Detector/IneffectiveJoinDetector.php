@@ -8,9 +8,10 @@ use function in_array;
 
 class IneffectiveJoinDetector implements DetectorInterface
 {
-    public function detect(array $explain): bool
+    /** {@inheritDoc} */
+    public function detect(array $explainResult): bool
     {
-        return $this->hasIneffectiveJoin($explain);
+        return $this->hasIneffectiveJoin($explainResult);
     }
 
     private function hasIneffectiveJoin(array $explain): bool

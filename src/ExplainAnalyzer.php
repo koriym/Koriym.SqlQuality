@@ -324,20 +324,4 @@ final class ExplainAnalyzer
 
         return $output;
     }
-
-    /**
-     * @param Warning               $warning
-     * @param ExplainResult         $explainResult
-     * @param WarningType           $warningType
-     * @param list<DetectedWarning> $detectedWarnings
-     *
-     * @return list<DetectedWarning>
-     */
-    public function detectByDetector(array $warning, array $explainResult, string $warningType, array $detectedWarnings): array
-    {
-        if ($warning['detector']->detect($explainResult)) {
-        }
-
-        return $detectedWarnings;
-    }
 }

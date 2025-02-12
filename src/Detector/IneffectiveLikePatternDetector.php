@@ -12,15 +12,15 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
     /**
      * 非効率なLIKEパターンを検出します
      *
-     * @param array<string, mixed> $explain EXPLAINの結果
+     * {@inheritDoc}
      */
-    public function detect(array $explain): bool
+    public function detect(array $explainResult): bool
     {
         // 非効率なLIKEパターンの数をカウント
         $ineffectiveLikeCount = 0;
 
         // クエリブロックをトラバースしてLIKEパターンをチェック
-        $this->traverseQueryBlock($explain, $ineffectiveLikeCount);
+        $this->traverseQueryBlock($explainResult, $ineffectiveLikeCount);
 
         // 1つでも非効率なLIKEパターンがあれば真を返す
         return $ineffectiveLikeCount > 0;

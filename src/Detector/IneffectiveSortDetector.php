@@ -19,11 +19,11 @@ final class IneffectiveSortDetector implements DetectorInterface
     /**
      * 非効率なソート操作を検出します
      *
-     * @param array<string, mixed> $explain EXPLAINの結果
+     * {@inheritDoc}
      */
-    public function detect(array $explain): bool
+    public function detect(array $explainResult): bool
     {
-        return $this->traverseQueryBlock($explain);
+        return $this->traverseQueryBlock($explainResult);
     }
 
     /**

@@ -10,17 +10,18 @@ use function preg_match;
 use function str_contains;
 use function substr_count;
 
+/** @pas */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
     /**
      * 非効率的な範囲スキャンを検出します
      *
-     * @param array<string, mixed> $explain EXPLAINの結果
+     * {@inheritDoc}
      */
-    public function detect(array $explain): bool
+    public function detect(array $explainResult): bool
     {
         $ineffectiveScans = 0;
-        $this->traverseQueryBlock($explain, $ineffectiveScans);
+        $this->traverseQueryBlock($explainResult, $ineffectiveScans);
 
         return $ineffectiveScans > 0;
     }

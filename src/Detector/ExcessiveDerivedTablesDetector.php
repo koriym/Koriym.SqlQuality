@@ -11,15 +11,15 @@ final class ExcessiveDerivedTablesDetector implements DetectorInterface
     /**
      * 派生テーブルの過剰使用を検出します
      *
-     * @param array<string, mixed> $explain EXPLAINの結果
+     * {@inheritDoc}
      */
-    public function detect(array $explain): bool
+    public function detect(array $explainResult): bool
     {
         // 一時テーブルのカウント
         $tempTableCount = 0;
 
         // クエリブロックをトラバースして一時テーブルをチェック
-        $this->traverseQueryBlock($explain, $tempTableCount);
+        $this->traverseQueryBlock($explainResult, $tempTableCount);
 
         // 3つ以上の一時テーブルを過剰使用とみなす
         return $tempTableCount >= 3;
