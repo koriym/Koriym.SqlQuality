@@ -53,14 +53,15 @@ final class AIQueryAdvisor
 ```
 %s
 ```
+## Analysis Detail
 
 ### Schema
 %s
 
-### EXPLAIN Results
+### EXPLAIN JSON
 %s
 
-## AI Prompt
+## Analysis Instructions
 %s
 
 %s
@@ -95,9 +96,9 @@ TEMPLATE;
             $sql,
             $this->formatIssues($issues),
             $this->generateExplainTree($explainResult),
-            self::AI_PROMPT_TEMPLATE,
             $this->formatSchemaInfo($schemaInfo),
             $this->formatExplainResult($explainResult),
+            self::AI_PROMPT_TEMPLATE,
             $this->instruction,
         );
     }
