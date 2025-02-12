@@ -115,9 +115,8 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             return '*No queries with optimizer impact*';
         }
 
-        return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
-        . "|----------|-------------|------------------|-------------|--------------|\n"
-        . implode("\n", $rows);
+        return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |\n"
+        . '|----------|-------------|------------------|-------------|--------------|--------------|' . implode("\n", $rows);
     }
 
     private function extractAccessPattern(array $explain): string
