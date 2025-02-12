@@ -11,8 +11,8 @@ SELECT * FROM users WHERE users.name IN (:listed_params);
 ```
 
 ## Detected Issues
-- Full table scan detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
-- Ineffective range scan detected. The range condition covers too many rows. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveRangeScan)
+- フルテーブルスキャンが検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
+- 非効率的な範囲スキャンが検出されました。範囲条件が多すぎる行をカバーしています。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveRangeScan)
 
 ## Explain Tree
 ```

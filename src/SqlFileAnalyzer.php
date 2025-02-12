@@ -44,14 +44,16 @@ use const PATHINFO_FILENAME;
 final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
+    private readonly OptimizerSettingsInterface $optimizerSettings;
 
     public function __construct(
         private readonly PDO $pdo,
         private readonly ExplainAnalyzer $analyzer,
         private readonly string $sqlDir,
         private readonly AIQueryAdvisor $aiAdvisor,
-        private readonly OptimizerSettings $optimizerSettings,
+        OptimizerSettingsInterface|null $optimizerSettings
     ) {
+        $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
     }
 
     /**

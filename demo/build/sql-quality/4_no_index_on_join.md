@@ -14,8 +14,8 @@ GROUP BY p.id;
 ```
 
 ## Detected Issues
-- Ineffective join detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveJoin)
-- Temporary table required for grouping. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
+- 非効率的な結合が検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveJoin)
+- グループ化のために一時テーブルが必要です。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
 
 ## Explain Tree
 ```

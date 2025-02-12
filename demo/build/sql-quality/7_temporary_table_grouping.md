@@ -14,8 +14,7 @@ ORDER BY order_count DESC;
 ```
 
 ## Detected Issues
-- Ineffective sort operation detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveSort)
-- Temporary table required for grouping. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
+- グループ化のために一時テーブルが必要です。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
 
 ## Explain Tree
 ```

@@ -11,7 +11,7 @@ use function assert;
 use function implode;
 use function is_array;
 
-final class OptimizerSettings
+final class OptimizerSettings implements OptimizerSettingsInterface
 {
     private const OPTIMIZER_OPTIONS = [
         'index_merge',

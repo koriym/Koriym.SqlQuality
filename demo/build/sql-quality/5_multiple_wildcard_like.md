@@ -12,8 +12,8 @@ WHERE title LIKE :search_word
 ```
 
 ## Detected Issues
-- Full table scan detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
-- Ineffective LIKE pattern detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveLikePattern)
+- フルテーブルスキャンが検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
+- 非効率的なLIKEパターンが検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveLikePattern)
 
 ## Explain Tree
 ```

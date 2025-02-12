@@ -12,8 +12,9 @@ WHERE reference_code = 12345;
 ```
 
 ## Detected Issues
-- Full table scan detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
-- Implicit type conversion detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/ImplicitTypeConversion)
+- フルテーブルスキャンが検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
+- 暗黙的な型変換が検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/ImplicitTypeConversion)
+- 非効率的な範囲スキャンが検出されました。範囲条件が多すぎる行をカバーしています。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/IneffectiveRangeScan)
 
 ## Explain Tree
 ```

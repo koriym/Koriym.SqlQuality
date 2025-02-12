@@ -11,8 +11,8 @@ WHERE DATE(created_at) = :target_date;
 ```
 
 ## Detected Issues
-- Function invalidates index. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FunctionInvalidatesIndex)
-- Full table scan detected. [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
+- 関数の使用によりインデックスが無効化されています。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FunctionInvalidatesIndex)
+- フルテーブルスキャンが検出されました。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan)
 
 ## Explain Tree
 ```
