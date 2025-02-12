@@ -42,7 +42,8 @@ namespace Koriym\SqlQuality;
  *   select_list_subqueries?: array<array{
  *     query_block: array{table: ExplainTable}
  *   }>,
- *   nested_loop?: ExplainOperation
+ *   nested_loop?: ExplainOperation,
+ *   union_result?: array<mixed>
  * }
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock
@@ -53,23 +54,43 @@ namespace Koriym\SqlQuality;
  *   Message: string
  * }
  * @psalm-type ShowWarnings = list<ShowWarning>
- * @psalm-type WarningType = 'FullTableScan'|'IneffectiveJoin'|'FunctionInvalidatesIndex'|'IneffectiveLikePattern'|'ImplicitTypeConversion'|'IneffectiveSort'|'TemporaryTableGrouping'
+ * @psalm-type WarningType =
+ * 'ExcessiveDerivedTables'
+ * | 'FunctionInvalidatesIndex'
+ * | 'FullTableScan'
+ * | 'ImplicitTypeConversion'
+ * | 'IneffectiveJoin'
+ * | 'IneffectiveLikePattern'
+ * | 'IneffectiveRangeScan'
+ * | 'IneffectiveSort'
+ * | 'IneffectiveUnion'
+ * | 'LowCardinalityIndex'
+ * | 'MultiTableUpdate'
+ * | 'TemporaryTableGrouping'
+ * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
- *   FullTableScan: string,
- *   IneffectiveJoin: string,
+ *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
- *   IneffectiveLikePattern: string,
+ *   FullTableScan: string,
  *   ImplicitTypeConversion: string,
+ *   IneffectiveJoin: string,
+ *   IneffectiveLikePattern: string,
+ *   IneffectiveRangeScan: string,
  *   IneffectiveSort: string,
- *   TemporaryTableGrouping: string
+ *   IneffectiveUnion: string,
+ *   LowCardinalityIndex: string,
+ *   MultiTableUpdate: string,
+ *   TemporaryTableGrouping: string,
+ *   UnnecessaryDistinct: string
  * }
  * @psalm-type WarningPattern = array{
- *   explain?: array<string, mixed>,
+ *   explain?: array<string, bool|string>,
  *   warnings?: list<string>
  * }
  * @psalm-type Warning = array{
  *   message: string,
- *   pattern: WarningPattern
+ *   pattern: WarningPattern,
+ *   detector?: Detector\DetectorInterface
  * }
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,
@@ -112,7 +133,15 @@ namespace Koriym\SqlQuality;
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
  *   cost: float,
- *   execution_time: float
+ *   execution_time: float,
+ *   optimizer_comparison: array{
+ *      with_optimizer: array<array-key, mixed>,
+ *      without_optimizer: array<array-key, mixed>,
+ *      difference: array{
+ *          cost_percent: float,
+ *          time_percent: float
+ *      }
+ *   }
  * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,
@@ -167,7 +196,7 @@ namespace Koriym\SqlQuality;
  *  }
  * @psalm-type QueryResult = array{
  *    cost: float,
- *    explain_result: array<array-key, mixed>,
+ *    explain_result: ExplainResult
  *    issues: list<string>
  *  }
  * @psalm-type QueryResults = array<string, QueryResult>

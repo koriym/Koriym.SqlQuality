@@ -4,6 +4,16 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
+use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
+use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
+use Koriym\SqlQuality\Detector\IneffectiveJoinDetector;
+use Koriym\SqlQuality\Detector\IneffectiveLikePatternDetector;
+use Koriym\SqlQuality\Detector\IneffectiveRangeScanDetector;
+use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
+use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
+use Koriym\SqlQuality\Exception\LogicException;
+
 use function is_array;
 use function sprintf;
 use function str_contains;
@@ -25,65 +35,91 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
-        'FullTableScan' => 'Full table scan detected.',
-        'IneffectiveJoin' => 'Ineffective join detected.',
-        'FunctionInvalidatesIndex' => 'Function invalidates index.',
-        'IneffectiveLikePattern' => 'Ineffective LIKE pattern detected.',
-        'ImplicitTypeConversion' => 'Implicit type conversion detected.',
-        'IneffectiveSort' => 'Ineffective sort operation detected.',
-        'TemporaryTableGrouping' => 'Temporary table required for grouping.',
+        'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
+        'FunctionInvalidatesIndex'  => 'Function invalidates index.',
+        'FullTableScan'            => 'Full table scan detected.',
+        'ImplicitTypeConversion'   => 'Implicit type conversion detected.',
+        'IneffectiveJoin'          => 'Ineffective join detected.',
+        'IneffectiveLikePattern'   => 'Ineffective LIKE pattern detected.',
+        'IneffectiveRangeScan'     => 'Ineffective range scan detected. The range condition covers too many rows.',
+        'IneffectiveSort'          => 'Ineffective sort operation detected.',
+        'IneffectiveUnion'         => 'Ineffective UNION usage detected; temporary table may be used.',
+        'LowCardinalityIndex'      => 'Index on low cardinality column detected; this may cause inefficient scans.',
+        'MultiTableUpdate'         => 'Multi-table update detected; this may lead to heavy table locking.',
+        'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
+        'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected on already unique columns.',
     ];
-
     /** @var array<WarningType, Warning> */
     private array $warnings;
 
     /** @param WarningMessages $messages */
     public function __construct(array $messages = self::DEFAULT_MESSAGES)
     {
+        /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
+            'ExcessiveDerivedTables' => [
+                'detector' => new ExcessiveDerivedTablesDetector(),
+                'message' => $messages['ExcessiveDerivedTables'],
+            ],
+            'FunctionInvalidatesIndex' => [
+                'detector' => new FunctionInvalidatesIndexDetector(),
+                'message' => $messages['FunctionInvalidatesIndex'],
+            ],
             'FullTableScan' => [
                 'message' => $messages['FullTableScan'],
                 'pattern' => [
                     'explain' => ['access_type' => 'ALL'],
                 ],
             ],
+            'ImplicitTypeConversion' => [
+                'message' => $messages['ImplicitTypeConversion'],
+                'detector' => new ImplicitTypeConversionDetector(),
+            ],
             'IneffectiveJoin' => [
                 'message' => $messages['IneffectiveJoin'],
-                'pattern' => [
-                    'explain' => ['using_join_buffer' => true],
-                ],
-            ],
-            'FunctionInvalidatesIndex' => [
-                'message' => $messages['FunctionInvalidatesIndex'],
-                'pattern' => [
-                    'explain' => ['attached_condition' => 'function_call'],
-                ],
+                'detector' => new IneffectiveJoinDetector(),
             ],
             'IneffectiveLikePattern' => [
                 'message' => $messages['IneffectiveLikePattern'],
-                'pattern' => [
-                    'explain' => ['attached_condition' => 'like_scan'],
-                ],
+                'detector' => new IneffectiveLikePatternDetector(),
             ],
-            'ImplicitTypeConversion' => [
-                'message' => $messages['ImplicitTypeConversion'],
-                'pattern' => [
-                    'warnings' => [
-                        'Converting column',
-                        'Implicit conversion',
-                    ],
-                ],
+            'IneffectiveRangeScan' => [
+                'message' => $messages['IneffectiveRangeScan'],
+                'detector' => new IneffectiveRangeScanDetector(),
             ],
             'IneffectiveSort' => [
                 'message' => $messages['IneffectiveSort'],
+                'detector' => new IneffectiveSortDetector(),
+            ],
+            'IneffectiveUnion' => [
+                'message' => $messages['IneffectiveUnion'],
+                'detector' => new IneffectiveUnionDetector(),
+            ],
+            'LowCardinalityIndex' => [
+                'message' => $messages['LowCardinalityIndex'],
                 'pattern' => [
-                    'explain' => ['using_filesort' => true],
+                    'explain' => ['cardinality' => 'low'],
+                ],
+            ],
+            'MultiTableUpdate' => [
+                'message' => $messages['MultiTableUpdate'],
+                'pattern' => [
+                    'explain' => ['update_operation' => 'multi_table'],
                 ],
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
                 'pattern' => [
                     'explain' => ['using_temporary_table' => true],
+                ],
+            ],
+            'UnnecessaryDistinct' => [
+                'message' => $messages['UnnecessaryDistinct'],
+                'pattern' => [
+                    'explain' => [
+                        'distinct' => true,
+                        'unique_rows' => true,
+                    ],
                 ],
             ],
         ];
@@ -93,15 +129,24 @@ final class ExplainAnalyzer
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
-
         foreach ($this->warnings as $warningType => $warning) {
-            if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
-                $detectedWarnings[] = [
-                    'type' => $warningType,
-                    'message' => $warning['message'],
-                    'documentation' => $this->getDocumentationUrl($warningType),
-                ];
+            if (isset($warning['detector'])) {
+                if ($warning['detector']->detect($explainResult)) {
+                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                }
+
+                continue;
             }
+
+            if (isset($warning['pattern'])) {
+                if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
+                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                }
+
+                continue;
+            }
+
+            throw new LogicException('Invalid warning configuration:' . $warningType);
         }
 
         return $detectedWarnings;
@@ -195,7 +240,7 @@ final class ExplainAnalyzer
     {
         // デフォルトのコスト構造
         $cost = [
-            'total_cost' => 0.0,
+            'total_cost' => 1.0,
             'details' => [
                 'rows_examined' => 0,
                 'temporary_tables' => false,

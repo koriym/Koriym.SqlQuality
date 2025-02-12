@@ -44,13 +44,16 @@ use const PATHINFO_FILENAME;
 final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
+    private readonly OptimizerSettingsInterface $optimizerSettings;
 
     public function __construct(
         private readonly PDO $pdo,
         private readonly ExplainAnalyzer $analyzer,
         private readonly string $sqlDir,
         private readonly AIQueryAdvisor $aiAdvisor,
+        OptimizerSettingsInterface|null $optimizerSettings
     ) {
+        $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
     }
 
     /**
@@ -115,7 +118,7 @@ final class SqlFileAnalyzer
                 $results[$sqlFile] = $result;
                 $cost = $result['cost'];
                 printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
-            } catch (RuntimeException $e) {
+            } catch (\RuntimeException $e) {
                 printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
             }
         }
@@ -265,13 +268,7 @@ final class SqlFileAnalyzer
      * @param array<string, mixed>          $params
      * @param array<string, AnalysisResult> $results
      *
-     * @return array{
-           issues: list<DetectedWarning>,
-           explain_result: ExplainResult,
-           ai_suggestions: string,
-           cost: float,
-           execution_time: float
-       }
+     * @return AnalysisResult
      */
     public function analyze(
         string $sqlFile,
@@ -280,6 +277,49 @@ final class SqlFileAnalyzer
         array $results
     ): array {
         $sql = $this->readSqlFile($sqlFile);
+
+        // デフォルト（オプティマイザーあり）の分析を実行
+        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+
+        // オプティマイザーを無効化して分析
+        $savedSettings = $this->optimizerSettings->saveCurrentSettings();
+        $this->optimizerSettings->disableAll();
+        $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        $this->optimizerSettings->restore($savedSettings);
+
+        // 両方の結果を含めて返す
+        $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
+        if ($noOptimizerAnalysisCost === 0) {
+            $noOptimizerAnalysisCost = 1;
+        }
+
+        return [
+            ...$defaultAnalysis,
+            'optimizer_comparison' => [
+                'with_optimizer' => $defaultAnalysis,
+                'without_optimizer' => $noOptimizerAnalysis,
+                'difference' => [
+                    'cost_percent' => ($defaultAnalysis['cost'] - $noOptimizerAnalysis['cost']) / $noOptimizerAnalysis['cost'] * 100,
+                    'time_percent' => ($defaultAnalysis['execution_time'] - $noOptimizerAnalysis['execution_time']) / $noOptimizerAnalysis['execution_time'] * 100,
+                ],
+            ],
+        ];
+    }
+
+    /** @return array{
+     *     issues: list<DetectedWarning>,
+     *     explain_result: ExplainResult,
+     *     ai_suggestions: string,
+     *     cost: float,
+     *     execution_time: float
+     * }
+     */
+    private function analyzeWithSettings(
+        string $sql,
+        array $params,
+        string $sqlFile,
+        string $outputDir
+    ): array {
         $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
         $explainResult = $this->executeExplain($sql, $params);

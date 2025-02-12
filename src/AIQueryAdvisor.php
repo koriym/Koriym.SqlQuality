@@ -12,7 +12,9 @@ use function array_map;
 use function array_merge;
 use function array_unique;
 use function array_values;
+use function assert;
 use function implode;
+use function is_string;
 use function json_encode;
 use function max;
 use function preg_match;
@@ -217,7 +219,7 @@ TEMPLATE;
     {
         // SQLコメントを削除
         $sql = preg_replace('/--.*$/m', '', $sql);
-
+        assert(is_string($sql));
         // キーワードの後にあるテーブル名を抽出
         // AS/ON/WHEREなどの後のテーブル名は除外
         if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches) !== false) {
