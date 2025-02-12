@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use function count;
 use function is_array;
+use function preg_match;
 use function str_contains;
+use function substr_count;
 
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
@@ -25,17 +28,21 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して非効率的な範囲スキャンをチェックします
      *
-     * @param array<string, mixed> $node 現在のノード
-     * @param int $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
+     * @param array<string, mixed> $node             現在のノード
+     * @param int                  $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
      */
     private function traverseQueryBlock(array $node, int &$ineffectiveScans): void
     {
-        // 範囲スキャンの条件チェック
-        if ($this->isIneffectiveRangeScan($node)) {
-            $ineffectiveScans++;
+        // テーブルアクセスの検証
+        if (isset($node['table'])) {
+            if ($this->isIneffectiveTableAccess($node['table'])) {
+                $ineffectiveScans++;
+
+                return;
+            }
         }
 
-        // 再帰的に子ノードを探索
+        // 子ノードの再帰的な探索
         foreach ($node as $value) {
             if (is_array($value)) {
                 $this->traverseQueryBlock($value, $ineffectiveScans);
@@ -44,33 +51,63 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     }
 
     /**
-     * 非効率的な範囲スキャンの条件をチェックします
+     * テーブルアクセスが非効率的かどうかを判定します
      *
-     * @param array<string, mixed> $node
+     * @param array<string, mixed> $table テーブルアクセス情報
      */
-    private function isIneffectiveRangeScan(array $node): bool
+    private function isIneffectiveTableAccess(array $table): bool
     {
-        // ORを使用した範囲スキャン
-        if (isset($node['Extra']) && str_contains($node['Extra'], 'Using OR')) {
+        // フルテーブルスキャンでIN句を使用している場合
+        if (
+            isset($table['access_type']) &&
+            $table['access_type'] === 'ALL' &&
+            isset($table['attached_condition']) &&
+            str_contains($table['attached_condition'], ' in (')
+        ) {
             return true;
         }
 
-        // INクエリで大量の値を使用
-        if (isset($node['rows']) && $node['rows'] > 1000 && isset($node['type']) && $node['type'] === 'range') {
+        // 非効率的な範囲スキャン条件のチェック
+        if (isset($table['type']) && $table['type'] === 'range') {
+            // 大量の行数を処理する範囲スキャン
+            if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
+                return true;
+            }
+
+            // 複数のインデックス候補がある場合
+            if (isset($table['possible_keys']) && is_array($table['possible_keys']) && count($table['possible_keys']) > 1) {
+                return true;
+            }
+        }
+
+        // ORを使用した条件
+        if (isset($table['attached_condition']) && str_contains($table['attached_condition'], ' OR ')) {
             return true;
         }
 
-        // Range checked for each record
-        if (isset($node['Extra']) && str_contains($node['Extra'], 'Range checked for each record')) {
+        // インデックスマージが必要な場合
+        if (isset($table['access_type']) && $table['access_type'] === 'index_merge') {
             return true;
         }
 
-        // 複数のインデックスを使用する範囲スキャン
-        if (isset($node['possible_keys']) && isset($node['key']) &&
-            $node['type'] === 'range' && count($node['possible_keys']) > 1) {
-            return true;
+        // 選択性の低いインデックススキャン
+        return isset($table['filtered']) &&
+            isset($table['rows_examined_per_scan']) &&
+            $table['filtered'] < 20.00 &&
+            $table['rows_examined_per_scan'] > 100;
+    }
+
+    /**
+     * IN句の値の数をカウントします
+     *
+     * @param string $condition WHERE句の条件
+     */
+    private function countInClauseValues(string $condition): int
+    {
+        if (preg_match('/in\s*\((.*?)\)/i', $condition, $matches)) {
+            return substr_count($matches[1], ',') + 1;
         }
 
-        return false;
+        return 0;
     }
 }
