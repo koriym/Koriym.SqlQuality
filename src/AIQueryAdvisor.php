@@ -101,7 +101,7 @@ TEMPLATE;
             $this->generateExplainTree($explainResult),
             $this->formatSchemaInfo($schemaInfo),
             $this->formatExplainResult($explainResult),
-            $this->formatExplainAnalyzde($explainResult),
+            $this->formatExplainAnalyze($explainResult),
             self::AI_PROMPT_TEMPLATE,
             $this->instruction,
         );
@@ -187,7 +187,7 @@ TEMPLATE;
     }
 
     /** @param ExplainResult $explainResult */
-    private function formatExplainAnalyzde(array $explainResult): string
+    private function formatExplainAnalyze(array $explainResult): string
     {
         return json_encode($explainResult['analyze_result'], JSON_THROW_ON_ERROR);
     }

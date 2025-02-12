@@ -47,7 +47,7 @@ namespace Koriym\SqlQuality;
  * }
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock,
- *   analyze_result: string
+ *   analyze_result: array<string, mixed>
  * }
  * @psalm-type ShowWarning = array{
  *   Level: string,
