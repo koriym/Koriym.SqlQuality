@@ -61,6 +61,9 @@ final class AIQueryAdvisor
 ### EXPLAIN JSON
 %s
 
+### EXPLAIN ANALYZE
+%s
+
 ## Analysis Instructions
 %s
 
@@ -98,6 +101,7 @@ TEMPLATE;
             $this->generateExplainTree($explainResult),
             $this->formatSchemaInfo($schemaInfo),
             $this->formatExplainResult($explainResult),
+            $this->formatExplainAnalyzde($explainResult),
             self::AI_PROMPT_TEMPLATE,
             $this->instruction,
         );
@@ -180,6 +184,12 @@ TEMPLATE;
     private function formatExplainResult(array $explainResult): string
     {
         return json_encode($explainResult, JSON_THROW_ON_ERROR);
+    }
+
+    /** @param ExplainResult $explainResult */
+    private function formatExplainAnalyzde(array $explainResult): string
+    {
+        return json_encode($explainResult['analyze_result'], JSON_THROW_ON_ERROR);
     }
 
     /** @return list<string> */

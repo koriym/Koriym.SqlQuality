@@ -157,6 +157,8 @@ final class SqlFileAnalyzer
     private function executeExplain(string $sql, array $params): array
     {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+
+        // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
             throw new RuntimeException('Failed to execute EXPLAIN query');
@@ -173,8 +175,23 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        // EXPLAIN ANALYZE を実行
+        $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
+        if ($analyzeStmt === false) {
+            throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
+        }
+
+        /** @var array|false $analyzeResult */
+        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_ASSOC);
+        if ($analyzeResult === false) {
+            throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
+        }
+
         /** @var array<array-key, mixed> $explainData */
         $explainData = json_decode($explainJson, true);
+
+        // EXPLAIN ANALYZE の結果を追加
+        $explainData['analyze_result'] = $analyzeResult;
 
         return $explainData;
     }
