@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
+use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
@@ -68,12 +69,7 @@ final class ExplainAnalyzer
             ],
             'ImplicitTypeConversion' => [
                 'message' => $messages['ImplicitTypeConversion'],
-                'pattern' => [
-                    'warnings' => [
-                        'Converting column',
-                        'Implicit conversion',
-                    ],
-                ],
+                'detector' => new ImplicitTypeConversionDetector(),
             ],
             'IneffectiveJoin' => [
                 'message' => $messages['IneffectiveJoin'],
