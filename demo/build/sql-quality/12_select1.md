@@ -18,15 +18,16 @@ SELECT 1;
 Message
 info            No tables used
 ```
+## Analysis Detail
 
 ### Schema
-Create a SQL performance analysis report for this query. Begin with a table of key metrics showing current values and their impact. Then describe the detected issues, focusing on the root causes. Follow with specific improvement recommendations, including SQL examples and their expected impact. End with implementation priorities and any important considerations. Keep the analysis focused on actionable insights that will lead to significant performance gains.
-
-
-### EXPLAIN Results
 N/A
 
-## AI Prompt
+### EXPLAIN JSON
 {"query_block":{"select_id":1,"message":"No tables used"}}
+
+## Analysis Instructions
+Create a SQL performance analysis report for this query. Begin with a table of key metrics showing current values and their impact. Then describe the detected issues, focusing on the root causes. Follow with specific improvement recommendations, including SQL examples and their expected impact. End with implementation priorities and any important considerations. Keep the analysis focused on actionable insights that will lead to significant performance gains.
+
 
 以上の分析を日本語で記述してください。
