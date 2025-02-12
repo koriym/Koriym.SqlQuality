@@ -101,13 +101,13 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             $baseIssues = $withoutOpt['issues'] ?? [];
 
             $rows[] = sprintf(
-                '| %s | %s | %s | %.1f%% | %s |',
+                '| %s | %s | %s | %.1f%% | %s | %s |',
                 $filename,
                 $this->extractAccessPattern($withoutOpt['explain_result']),
                 $this->extractAccessPattern($withOpt['explain_result']),
                 $optimizer['difference']['cost_percent'],
                 $this->formatIssues($baseIssues),
-                //                $this->analyzePlanChanges($withoutOpt['explain_result'], $withOpt['explain_result'])
+                $this->analyzePlanChanges($withoutOpt['explain_result'], $withOpt['explain_result'])
             );
         }
 
