@@ -18,48 +18,16 @@ SELECT 1;
 Message
 info            No tables used
 ```
-
-## AI Prompt
-Based on the provided MySQL table schemas and EXPLAIN results, please provide:
-
-1. Brief Assessment
-   - Summarize key performance bottlenecks identified in the EXPLAIN output
-   - Highlight any concerning access patterns (table scans, suboptimal joins)
-   - Note any missing or underutilized indexes
-
-2. Specific Optimization Recommendations
-   a) Index Improvements
-      - New indexes to create (with exact column combinations)
-      - Existing indexes to modify or remove
-      - Coverage analysis for frequently accessed columns
-   b) Query Optimization
-      - Join order and method improvements
-      - Subquery optimization opportunities
-      - Filtering and sorting efficiency
-   c) Schema Enhancements (if applicable)
-      - Table structure improvements
-      - Partitioning considerations
-      - Data type optimizations
-
-3. Implementation Details
-   For each recommendation:
-     - Exact SQL statements for implementation
-     - Estimated impact on query performance
-     - Potential risks or trade-offs
-     - Implementation priority (High/Medium/Low)
-
-4. Additional Considerations
-   - Impact on existing indexes and storage requirements
-   - Effects on write performance
-   - Maintenance requirements
-   - Backup/restore implications
-
-Please focus on practical, high-impact improvements that can be implemented with minimal risk.
+## Analysis Detail
 
 ### Schema
 N/A
 
-### EXPLAIN Results
+### EXPLAIN JSON
 {"query_block":{"select_id":1,"message":"No tables used"}}
+
+## Analysis Instructions
+Create a SQL performance analysis report for this query. Begin with a table of key metrics showing current values and their impact. Then describe the detected issues, focusing on the root causes. Follow with specific improvement recommendations, including SQL examples and their expected impact. End with implementation priorities and any important considerations. Keep the analysis focused on actionable insights that will lead to significant performance gains.
+
 
 以上の分析を日本語で記述してください。

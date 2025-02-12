@@ -101,13 +101,13 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             $baseIssues = $withoutOpt['issues'] ?? [];
 
             $rows[] = sprintf(
-                '| %s | %s | %s | %.1f%% | %s |',
+                '| %s | %s | %s | %.1f%% | %s | %s |',
                 $filename,
                 $this->extractAccessPattern($withoutOpt['explain_result']),
                 $this->extractAccessPattern($withOpt['explain_result']),
                 $optimizer['difference']['cost_percent'],
                 $this->formatIssues($baseIssues),
-                //                $this->analyzePlanChanges($withoutOpt['explain_result'], $withOpt['explain_result'])
+                $this->analyzePlanChanges($withoutOpt['explain_result'], $withOpt['explain_result'])
             );
         }
 
@@ -115,9 +115,8 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             return '*No queries with optimizer impact*';
         }
 
-        return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues |\n"
-        . "|----------|-------------|------------------|-------------|--------------|\n"
-        . implode("\n", $rows);
+        return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |\n"
+        . '|----------|-------------|------------------|-------------|--------------|--------------|' . implode("\n", $rows);
     }
 
     private function extractAccessPattern(array $explain): string
