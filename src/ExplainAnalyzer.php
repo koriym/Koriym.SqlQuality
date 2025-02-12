@@ -10,6 +10,7 @@ use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
 use Koriym\SqlQuality\Detector\IneffectiveJoinDetector;
 use Koriym\SqlQuality\Detector\IneffectiveLikePatternDetector;
 use Koriym\SqlQuality\Detector\IneffectiveRangeScanDetector;
+use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
@@ -88,9 +89,7 @@ final class ExplainAnalyzer
             ],
             'IneffectiveSort' => [
                 'message' => $messages['IneffectiveSort'],
-                'pattern' => [
-                    'explain' => ['using_filesort' => true],
-                ],
+                'detector' => new IneffectiveSortDetector(),
             ],
             'IneffectiveUnion' => [
                 'message' => $messages['IneffectiveUnion'],
