@@ -84,9 +84,7 @@ final class ExplainAnalyzer
             ],
             'IneffectiveRangeScan' => [
                 'message' => $messages['IneffectiveRangeScan'],
-                'pattern' => [
-                    'explain' => ['rows_examined_per_scan' => 'high'],
-                ],
+                'detector' => new IneffectiveRangeScanDetector(),
             ],
             'IneffectiveSort' => [
                 'message' => $messages['IneffectiveSort'],
