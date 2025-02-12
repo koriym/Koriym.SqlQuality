@@ -4,6 +4,11 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
+use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
+use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
+use Koriym\SqlQuality\Exception\LogicException;
+
 use function is_array;
 use function sprintf;
 use function str_contains;
@@ -49,9 +54,6 @@ final class ExplainAnalyzer
         $this->warnings = [
             'FunctionInvalidatesIndex' => [
                 'message' => $messages['FunctionInvalidatesIndex'],
-                'pattern' => [
-                    'explain' => ['attached_condition' => 'function_call'],
-                ],
             ],
             'FullTableScan' => [
                 'message' => $messages['FullTableScan'],
@@ -132,30 +134,24 @@ final class ExplainAnalyzer
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
-        if ((new ExcessiveDerivedTablesDetector())->detect($explainResult)) {
-            $detectedWarnings[] = [
-                'type' => 'ExcessiveDerivedTables',
-                'message' => self::DEFAULT_MESSAGES['ExcessiveDerivedTables'],
-                'documentation' => $this->getDocumentationUrl('ExcessiveDerivedTables'),
-            ];
-        }
-
-        if ((new IneffectiveUnionDetector())->detect($explainResult)) {
-            $detectedWarnings[] = [
-                'type' => 'IneffectiveUnion',
-                'message' => self::DEFAULT_MESSAGES['IneffectiveUnion'],
-                'documentation' => $this->getDocumentationUrl('IneffectiveUnion'),
-            ];
-        }
-
         foreach ($this->warnings as $warningType => $warning) {
-            if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
-                $detectedWarnings[] = [
-                    'type' => $warningType,
-                    'message' => $warning['message'],
-                    'documentation' => $this->getDocumentationUrl($warningType),
-                ];
+            if (isset($warning['detector'])) {
+                if ($warning['detector']->detect($explainResult)) {
+                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                }
+
+                continue;
             }
+
+            if (isset($warning['pattern'])) {
+                if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
+                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                }
+
+                continue;
+            }
+
+            throw new LogicException('Invalid warning configuration:' . $warningType);
         }
 
         return $detectedWarnings;
@@ -332,5 +328,21 @@ final class ExplainAnalyzer
         }
 
         return $output;
+    }
+
+    /**
+     * @param Warning               $warning
+     * @param ExplainResult         $explainResult
+     * @param WarningType           $warningType
+     * @param list<DetectedWarning> $detectedWarnings
+     *
+     * @return list<DetectedWarning>
+     */
+    public function detectByDetector(array $warning, array $explainResult, string $warningType, array $detectedWarnings): array
+    {
+        if ($warning['detector']->detect($explainResult)) {
+        }
+
+        return $detectedWarnings;
     }
 }

@@ -88,7 +88,8 @@ namespace Koriym\SqlQuality;
  * }
  * @psalm-type Warning = array{
  *   message: string,
- *   pattern: WarningPattern
+ *   pattern: WarningPattern,
+ *   ?detector: class-string
  * }
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,
