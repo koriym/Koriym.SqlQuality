@@ -52,7 +52,12 @@ final class ExplainAnalyzer
     {
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
+            'ExcessiveDerivedTables' => [
+                'detector' => new ExcessiveDerivedTablesDetector(),
+                'message' => $messages['ExcessiveDerivedTables'],
+            ],
             'FunctionInvalidatesIndex' => [
+                'detector' => new FunctionInvalidatesIndexDetector(),
                 'message' => $messages['FunctionInvalidatesIndex'],
             ],
             'FullTableScan' => [
@@ -96,9 +101,7 @@ final class ExplainAnalyzer
             ],
             'IneffectiveUnion' => [
                 'message' => $messages['IneffectiveUnion'],
-                'pattern' => [
-                    'explain' => ['union_result' => 'Using temporary'],
-                ],
+                'detector' => new IneffectiveUnionDetector(),
             ],
             'LowCardinalityIndex' => [
                 'message' => $messages['LowCardinalityIndex'],

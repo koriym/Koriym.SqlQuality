@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace Koriym\SqlQuality;
+namespace Koriym\SqlQuality\Detector;
 
 use function is_array;
 
-final class ExcessiveDerivedTablesDetector
+final class ExcessiveDerivedTablesDetector implements DetectorInterface
 {
     /**
      * 派生テーブルの過剰使用を検出します

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace Koriym\SqlQuality;
+namespace Koriym\SqlQuality\Detector;
 
-final class IneffectiveUnionDetector
+final class IneffectiveUnionDetector implements DetectorInterface
 {
     /**
      * 非効率なUNIONの使用を検出します
