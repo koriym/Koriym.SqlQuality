@@ -45,13 +45,13 @@ Table scan
 {"select_id":1,"cost_info":{"query_cost":"85.25"},"table":{"table_name":"u","access_type":"ref","possible_keys":["idx_users_status_created"],"key":"idx_users_status_created","used_key_parts":["status"],"key_length":"83","ref":["const"],"rows_examined_per_scan":800,"rows_produced_per_join":800,"filtered":"100.00","cost_info":{"read_cost":"5.25","eval_cost":"80.00","prefix_cost":"85.25","data_read_per_join":"1M"},"used_columns":["id","name","email","status","created_at","updated_at"]},"select_list_subqueries":[{"dependent":true,"cacheable":false,"query_block":{"select_id":3,"cost_info":{"query_cost":"1.28"},"table":{"table_name":"comments","access_type":"ref","possible_keys":["user_id"],"key":"user_id","used_key_parts":["user_id"],"key_length":"5","ref":["test.u.id"],"rows_examined_per_scan":10,"rows_produced_per_join":10,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"0.25","eval_cost":"1.03","prefix_cost":"1.28","data_read_per_join":"1K"},"used_columns":["user_id"]}}},{"dependent":true,"cacheable":false,"query_block":{"select_id":2,"cost_info":{"query_cost":"0.48"},"table":{"table_name":"orders","access_type":"ref","possible_keys":["idx_orders_user_id","idx_orders_user_status"],"key":"idx_orders_user_id","used_key_parts":["user_id"],"key_length":"5","ref":["test.u.id"],"rows_examined_per_scan":2,"rows_produced_per_join":2,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"0.25","eval_cost":"0.23","prefix_cost":"0.48","data_read_per_join":"705"},"used_columns":["user_id"]}}}]}
 
 ### EXPLAIN ANALYZE
--> Index lookup on u using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.024..0.343 rows=800 loops=1)
+-> Index lookup on u using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.0276..0.321 rows=800 loops=1)
 -> Select #2 (subquery in projection; dependent)
-    -> Aggregate: count(0)  (cost=0.714 rows=1) (actual time=942e-6..957e-6 rows=1 loops=800)
-        -> Covering index lookup on orders using idx_orders_user_id (user_id=u.id)  (cost=0.482 rows=2.32) (actual time=661e-6..828e-6 rows=2.01 loops=800)
+    -> Aggregate: count(0)  (cost=0.714 rows=1) (actual time=905e-6..919e-6 rows=1 loops=800)
+        -> Covering index lookup on orders using idx_orders_user_id (user_id=u.id)  (cost=0.482 rows=2.32) (actual time=637e-6..788e-6 rows=2.01 loops=800)
 -> Select #3 (subquery in projection; dependent)
-    -> Aggregate: count(0)  (cost=2.31 rows=1) (actual time=0.00151..0.00153 rows=1 loops=800)
-        -> Covering index lookup on comments using user_id (user_id=u.id)  (cost=1.28 rows=10.3) (actual time=799e-6..0.00125 rows=9.99 loops=800)
+    -> Aggregate: count(0)  (cost=2.31 rows=1) (actual time=0.00144..0.00146 rows=1 loops=800)
+        -> Covering index lookup on comments using user_id (user_id=u.id)  (cost=1.28 rows=10.3) (actual time=763e-6..0.00119 rows=9.99 loops=800)
 
 ### SHOW WARNINGS
 [{"Level":"Note","Code":1276,"Message":"Field or reference 'test.u.id' of SELECT #2 was resolved in SELECT #1"},{"Level":"Note","Code":1276,"Message":"Field or reference 'test.u.id' of SELECT #3 was resolved in SELECT #1"}]

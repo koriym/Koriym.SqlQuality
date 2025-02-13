@@ -34,8 +34,8 @@ Table scan
 {"select_id":1,"cost_info":{"query_cost":"202.50"},"table":{"table_name":"orders","access_type":"ALL","rows_examined_per_scan":2000,"rows_produced_per_join":200,"filtered":"10.00","cost_info":{"read_cost":"182.50","eval_cost":"20.00","prefix_cost":"202.50","data_read_per_join":"59K"},"used_columns":["id","user_id","total_amount","status","created_at","reference_code"],"attached_condition":"(`test`.`orders`.`reference_code` = 12345)"}}
 
 ### EXPLAIN ANALYZE
--> Filter: (orders.reference_code = 12345)  (cost=202 rows=200) (actual time=0.636..0.636 rows=0 loops=1)
-    -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0227..0.337 rows=2000 loops=1)
+-> Filter: (orders.reference_code = 12345)  (cost=202 rows=200) (actual time=0.574..0.574 rows=0 loops=1)
+    -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0221..0.317 rows=2000 loops=1)
 
 ### SHOW WARNINGS
 [{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000001'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000002'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000003'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000004'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000005'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000006'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000007'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000008'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000009'"},{"Level":"Warning","Code":1292,"Message":"Truncated incorrect DOUBLE value: 'REF000010'"}]

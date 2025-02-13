@@ -33,8 +33,8 @@ Table scan
 {"select_id":1,"cost_info":{"query_cost":"497.95"},"table":{"table_name":"posts","access_type":"ALL","rows_examined_per_scan":4897,"rows_produced_per_join":1027,"filtered":"20.99","cost_info":{"read_cost":"395.18","eval_cost":"102.77","prefix_cost":"497.95","data_read_per_join":"1M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"((`test`.`posts`.`title` like '%keyword%') or (`test`.`posts`.`content` like '%keyword%'))"}}
 
 ### EXPLAIN ANALYZE
--> Filter: ((posts.title like '%keyword%') or (posts.content like '%keyword%'))  (cost=498 rows=1028) (actual time=1.88..1.88 rows=0 loops=1)
-    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00233..1.03 rows=5000 loops=1)
+-> Filter: ((posts.title like '%keyword%') or (posts.content like '%keyword%'))  (cost=498 rows=1028) (actual time=1.85..1.85 rows=0 loops=1)
+    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00133..1.03 rows=5000 loops=1)
 
 ### SHOW WARNINGS
 N/A

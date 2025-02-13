@@ -35,8 +35,8 @@ Table scan
 {"select_id":1,"cost_info":{"query_cost":"497.95"},"table":{"table_name":"posts","access_type":"ALL","possible_keys":["idx_posts_user_id","idx_posts_status_created","idx_posts_user_status"],"rows_examined_per_scan":4897,"rows_produced_per_join":1635,"filtered":"33.40","cost_info":{"read_cost":"334.39","eval_cost":"163.56","prefix_cost":"497.95","data_read_per_join":"1M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"((`test`.`posts`.`user_id` = 1) or (`test`.`posts`.`status` = 'published'))"}}
 
 ### EXPLAIN ANALYZE
--> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=498 rows=1636) (actual time=0.0035..1.52 rows=4500 loops=1)
-    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00242..1.08 rows=5000 loops=1)
+-> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=498 rows=1636) (actual time=0.00217..1.51 rows=4500 loops=1)
+    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00137..1.09 rows=5000 loops=1)
 
 ### SHOW WARNINGS
 N/A

@@ -32,8 +32,8 @@ Table scan
 {"select_id":1,"cost_info":{"query_cost":"101.75"},"table":{"table_name":"users","access_type":"ALL","rows_examined_per_scan":1000,"rows_produced_per_join":200,"filtered":"20.00","cost_info":{"read_cost":"81.75","eval_cost":"20.00","prefix_cost":"101.75","data_read_per_join":"418K"},"used_columns":["id","name","email","status","created_at","updated_at"],"attached_condition":"(`test`.`users`.`name` in ('User 1','User 10'))"}}
 
 ### EXPLAIN ANALYZE
--> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.00858..0.234 rows=2 loops=1)
-    -> Table scan on users  (cost=102 rows=1000) (actual time=0.00838..0.187 rows=1000 loops=1)
+-> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.0106..0.246 rows=2 loops=1)
+    -> Table scan on users  (cost=102 rows=1000) (actual time=0.0103..0.199 rows=1000 loops=1)
 
 ### SHOW WARNINGS
 N/A

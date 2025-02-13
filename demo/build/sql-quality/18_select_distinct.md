@@ -37,9 +37,9 @@ Remove duplicates
 {"select_id":1,"cost_info":{"query_cost":"1.86"},"duplicates_removal":{"using_filesort":false,"table":{"table_name":"comments","access_type":"range","possible_keys":["PRIMARY","user_id"],"key":"user_id","used_key_parts":["user_id","id"],"key_length":"9","rows_examined_per_scan":8,"rows_produced_per_join":8,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"1.06","eval_cost":"0.80","prefix_cost":"1.86","data_read_per_join":"896"},"used_columns":["id","user_id"],"attached_condition":"((`test`.`comments`.`user_id` in (371,963)) and (`test`.`comments`.`id` in (1,2,555,999)))"}}}
 
 ### EXPLAIN ANALYZE
--> Group (no aggregates)  (cost=2.66 rows=2.83) (actual time=0.00542..0.00542 rows=0 loops=1)
-    -> Filter: ((comments.user_id in (371,963)) and (comments.id in (1,2,555,999)))  (cost=1.86 rows=8) (actual time=0.00529..0.00529 rows=0 loops=1)
-        -> Covering index range scan on comments using user_id over (user_id = 371 AND id = 1) OR (user_id = 371 AND id = 2) OR (6 more)  (cost=1.86 rows=8) (actual time=0.005..0.005 rows=0 loops=1)
+-> Group (no aggregates)  (cost=2.66 rows=2.83) (actual time=0.00567..0.00567 rows=0 loops=1)
+    -> Filter: ((comments.user_id in (371,963)) and (comments.id in (1,2,555,999)))  (cost=1.86 rows=8) (actual time=0.00558..0.00558 rows=0 loops=1)
+        -> Covering index range scan on comments using user_id over (user_id = 371 AND id = 1) OR (user_id = 371 AND id = 2) OR (6 more)  (cost=1.86 rows=8) (actual time=0.00529..0.00529 rows=0 loops=1)
 
 ### SHOW WARNINGS
 N/A

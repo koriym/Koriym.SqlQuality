@@ -39,9 +39,9 @@ sort_cost       2950.00
 {"select_id":1,"cost_info":{"query_cost":"3447.95"},"ordering_operation":{"using_filesort":true,"cost_info":{"sort_cost":"2950.00"},"table":{"table_name":"posts","access_type":"ALL","possible_keys":["idx_posts_status_created"],"rows_examined_per_scan":4897,"rows_produced_per_join":2949,"filtered":"60.24","cost_info":{"read_cost":"202.95","eval_cost":"295.00","prefix_cost":"497.95","data_read_per_join":"3M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` in ('draft','published','archived','deleted','pending'))"}}}
 
 ### EXPLAIN ANALYZE
--> Sort: posts.created_at  (cost=498 rows=4897) (actual time=3.17..3.57 rows=5000 loops=1)
-    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=498 rows=4897) (actual time=0.00317..1.88 rows=5000 loops=1)
-        -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00262..1.09 rows=5000 loops=1)
+-> Sort: posts.created_at  (cost=498 rows=4897) (actual time=2.98..3.39 rows=5000 loops=1)
+    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=498 rows=4897) (actual time=0.002..1.82 rows=5000 loops=1)
+        -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00138..1.08 rows=5000 loops=1)
 
 ### SHOW WARNINGS
 N/A

@@ -33,8 +33,8 @@ Sort
 {"select_id":1,"cost_info":{"query_cost":"269.55"},"ordering_operation":{"using_filesort":false,"table":{"table_name":"posts","access_type":"ref","possible_keys":["idx_posts_status_created"],"key":"idx_posts_status_created","used_key_parts":["status"],"key_length":"83","ref":["const"],"rows_examined_per_scan":2448,"rows_produced_per_join":2448,"filtered":"100.00","backward_index_scan":true,"cost_info":{"read_cost":"24.75","eval_cost":"244.80","prefix_cost":"269.55","data_read_per_join":"2M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"]}}}
 
 ### EXPLAIN ANALYZE
--> Limit: 10 row(s)  (cost=270 rows=10) (actual time=0.00429..0.00937 rows=10 loops=1)
-    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=270 rows=2448) (actual time=0.00396..0.00862 rows=10 loops=1)
+-> Limit: 10 row(s)  (cost=270 rows=10) (actual time=0.003..0.00726 rows=10 loops=1)
+    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=270 rows=2448) (actual time=0.00275..0.00667 rows=10 loops=1)
 
 ### SHOW WARNINGS
 N/A

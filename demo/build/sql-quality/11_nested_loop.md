@@ -43,9 +43,9 @@ JOIN
 {"select_id":1,"cost_info":{"query_cost":"274.18"},"nested_loop":[{"table":{"table_name":"users","access_type":"ALL","possible_keys":["PRIMARY","idx_users_id"],"rows_examined_per_scan":1000,"rows_produced_per_join":100,"filtered":"10.00","cost_info":{"read_cost":"91.75","eval_cost":"10.00","prefix_cost":"101.75","data_read_per_join":"209K"},"used_columns":["id","email"],"attached_condition":"(`test`.`users`.`email` = 'example@example.com')"}},{"table":{"table_name":"posts","access_type":"ref","possible_keys":["idx_posts_user_id","idx_posts_user_status"],"key":"idx_posts_user_id","used_key_parts":["user_id"],"key_length":"5","ref":["test.users.id"],"rows_examined_per_scan":4,"rows_produced_per_join":492,"filtered":"100.00","cost_info":{"read_cost":"123.16","eval_cost":"49.27","prefix_cost":"274.18","data_read_per_join":"546K"},"used_columns":["id","user_id","title","content"]}}]}
 
 ### EXPLAIN ANALYZE
--> Nested loop inner join  (cost=274 rows=493) (actual time=0.147..0.147 rows=0 loops=1)
-    -> Filter: (users.email = 'example@example.com')  (cost=102 rows=100) (actual time=0.147..0.147 rows=0 loops=1)
-        -> Table scan on users  (cost=102 rows=1000) (actual time=0.00563..0.123 rows=1000 loops=1)
+-> Nested loop inner join  (cost=274 rows=493) (actual time=0.129..0.129 rows=0 loops=1)
+    -> Filter: (users.email = 'example@example.com')  (cost=102 rows=100) (actual time=0.129..0.129 rows=0 loops=1)
+        -> Table scan on users  (cost=102 rows=1000) (actual time=0.00504..0.108 rows=1000 loops=1)
     -> Index lookup on posts using idx_posts_user_id (user_id=users.id)  (cost=1.24 rows=4.93) (never executed)
 
 ### SHOW WARNINGS

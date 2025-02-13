@@ -42,11 +42,11 @@ JOIN
 {"select_id":1,"cost_info":{"query_cost":"1462.81"},"grouping_operation":{"using_temporary_table":true,"using_filesort":false,"nested_loop":[{"table":{"table_name":"p","access_type":"ref","possible_keys":["PRIMARY","idx_posts_user_id","idx_posts_status_created","idx_posts_user_status"],"key":"idx_posts_status_created","used_key_parts":["status"],"key_length":"83","ref":["const"],"rows_examined_per_scan":2448,"rows_produced_per_join":2448,"filtered":"100.00","cost_info":{"read_cost":"24.75","eval_cost":"244.80","prefix_cost":"269.55","data_read_per_join":"2M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"]}},{"table":{"table_name":"c","access_type":"ref","possible_keys":["idx_comments_post_id","idx_comments_post_created"],"key":"idx_comments_post_id","used_key_parts":["post_id"],"key_length":"5","ref":["test.p.id"],"rows_examined_per_scan":2,"rows_produced_per_join":5803,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"612.92","eval_cost":"580.34","prefix_cost":"1462.81","data_read_per_join":"634K"},"used_columns":["id","post_id"]}}]}}
 
 ### EXPLAIN ANALYZE
--> Table scan on <temporary>  (actual time=10.9..11.2 rows=4500 loops=1)
-    -> Aggregate using temporary table  (actual time=10.9..10.9 rows=4500 loops=1)
-        -> Nested loop left join  (cost=1463 rows=5803) (actual time=0.00621..6.2 rows=9571 loops=1)
-            -> Index lookup on p using idx_posts_status_created (status='published')  (cost=270 rows=2448) (actual time=0.00437..2.17 rows=4500 loops=1)
-            -> Covering index lookup on c using idx_comments_post_id (post_id=p.id)  (cost=0.25 rows=2.37) (actual time=617e-6..783e-6 rows=1.99 loops=4500)
+-> Table scan on <temporary>  (actual time=10.4..10.7 rows=4500 loops=1)
+    -> Aggregate using temporary table  (actual time=10.4..10.4 rows=4500 loops=1)
+        -> Nested loop left join  (cost=1463 rows=5803) (actual time=0.00583..5.88 rows=9571 loops=1)
+            -> Index lookup on p using idx_posts_status_created (status='published')  (cost=270 rows=2448) (actual time=0.00383..2 rows=4500 loops=1)
+            -> Covering index lookup on c using idx_comments_post_id (post_id=p.id)  (cost=0.25 rows=2.37) (actual time=591e-6..753e-6 rows=1.99 loops=4500)
 
 ### SHOW WARNINGS
 N/A

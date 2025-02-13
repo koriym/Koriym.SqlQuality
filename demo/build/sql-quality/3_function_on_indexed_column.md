@@ -33,7 +33,7 @@ Table scan
 
 ### EXPLAIN ANALYZE
 -> Filter: (cast(posts.created_at as date) = '2024-01-01')  (cost=498 rows=4897) (actual time=1.19..1.19 rows=0 loops=1)
-    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00163..1.05 rows=5000 loops=1)
+    -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00133..1.06 rows=5000 loops=1)
 
 ### SHOW WARNINGS
 N/A

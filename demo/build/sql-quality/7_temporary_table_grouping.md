@@ -31,10 +31,10 @@ using_filesort  true
 {"select_id":1,"cost_info":{"query_cost":"202.50"},"ordering_operation":{"using_temporary_table":true,"using_filesort":true,"grouping_operation":{"using_filesort":false,"table":{"table_name":"orders","access_type":"index","possible_keys":["idx_orders_user_id","idx_orders_user_status"],"key":"idx_orders_user_id","used_key_parts":["user_id"],"key_length":"5","rows_examined_per_scan":2000,"rows_produced_per_join":2000,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"2.50","eval_cost":"200.00","prefix_cost":"202.50","data_read_per_join":"593K"},"used_columns":["id","user_id"]}}}}
 
 ### EXPLAIN ANALYZE
--> Sort: order_count DESC  (actual time=0.356..0.376 rows=862 loops=1)
-    -> Stream results  (cost=402 rows=862) (actual time=0.0224..0.269 rows=862 loops=1)
-        -> Group aggregate: count(0)  (cost=402 rows=862) (actual time=0.0222..0.229 rows=862 loops=1)
-            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.0217..0.157 rows=2000 loops=1)
+-> Sort: order_count DESC  (actual time=0.318..0.332 rows=862 loops=1)
+    -> Stream results  (cost=402 rows=862) (actual time=0.0226..0.246 rows=862 loops=1)
+        -> Group aggregate: count(0)  (cost=402 rows=862) (actual time=0.0223..0.21 rows=862 loops=1)
+            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.022..0.152 rows=2000 loops=1)
 
 ### SHOW WARNINGS
 N/A
