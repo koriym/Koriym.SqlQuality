@@ -65,8 +65,7 @@ final class AIQueryAdvisor
 
 ### EXPLAIN ANALYZE
 %s
-
-### SHOW WARNIGNS
+### SHOW WARNINGS
 %s
 
 ## Analysis Instructions
