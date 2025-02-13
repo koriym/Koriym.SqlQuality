@@ -152,6 +152,8 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
+     * @return array{0: ExplainResult, 1:string}
+     *
      * @throws RuntimeException
      */
     private function executeExplain(string $sql, array $params): array
@@ -175,6 +177,8 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        $explainJsonData = json_decode($explainJson, true);
+
         // EXPLAIN ANALYZE を実行
         $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
         if ($analyzeStmt === false) {
@@ -182,18 +186,12 @@ final class SqlFileAnalyzer
         }
 
         /** @var array|false $analyzeResult */
-        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_ASSOC);
-        if ($analyzeResult === false) {
+        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_NUM);
+        if ($analyzeResult === false || ! isset($analyzeResult[0])) {
             throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
         }
 
-        /** @var array<array-key, mixed> $explainData */
-        $explainData = json_decode($explainJson, true);
-
-        // EXPLAIN ANALYZE の結果を追加
-        $explainData['analyze_result'] = $analyzeResult;
-
-        return $explainData;
+        return [$explainJsonData, $analyzeResult[0]];
     }
 
     /**
@@ -339,7 +337,7 @@ final class SqlFileAnalyzer
     ): array {
         $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
-        $explainResult = $this->executeExplain($sql, $params);
+        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
         $warnings = $this->getWarnings();
         /** @var list<DetectedWarning> $issues */
@@ -352,6 +350,7 @@ final class SqlFileAnalyzer
             $sqlFile,
             $sql,
             $explainResult,
+            $explainAnalyze,
             $issues,
             $schemaInfo,
         );

@@ -89,6 +89,7 @@ TEMPLATE;
         string $sqlFile,
         string $sql,
         array $explainResult,
+        string $explainAnalyze,
         array $issues,
         array|null $schemaInfo = null,
     ): string {
@@ -101,7 +102,7 @@ TEMPLATE;
             $this->generateExplainTree($explainResult),
             $this->formatSchemaInfo($schemaInfo),
             $this->formatExplainResult($explainResult),
-            $this->formatExplainAnalyze($explainResult),
+            $explainAnalyze,
             self::AI_PROMPT_TEMPLATE,
             $this->instruction,
         );
@@ -183,7 +184,7 @@ TEMPLATE;
     /** @param ExplainResult $explainResult */
     private function formatExplainResult(array $explainResult): string
     {
-        return json_encode($explainResult, JSON_THROW_ON_ERROR);
+        return json_encode($explainResult['query_block'], JSON_THROW_ON_ERROR);
     }
 
     /** @param ExplainResult $explainResult */
