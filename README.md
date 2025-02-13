@@ -86,7 +86,7 @@ Example:
 
 ### 2. Queries with Optimizer Impact
 
-Shows the impact of query optimizer by comparing execution with and without optimization:
+The MySQL query optimizer is a crucial component that automatically optimizes query execution plans. This tool analyzes the differences in execution plans and performance with and without the optimizer.
 
 | Column | Description |
 |--------|-------------|
@@ -106,39 +106,13 @@ Optimized Access: ref, using idx_posts_user_id, 4 rows, 100.0%
 Cost Impact: -44.9%
 ```
 
-- Base Access (optimizer disabled):
-    - Access Method: Full table scan (ALL)
-    - Rows examined: 4,897
-    - Scan percentage: 100% of the table was scanned
-
-- Optimized Access (optimizer enabled):
-    - Access Method: Index lookup (ref)
-    - Using index: idx_posts_user_id
-    - Rows examined: Only 4 rows
-    - Scan percentage: 100% of the necessary rows were accessed
-
-The negative Cost Impact (-44.9%) indicates significant performance improvement through optimizer intervention.
+In this example, without the optimizer, the query performs a full table scan processing 4,897 rows. With the optimizer enabled, it uses an index to access only 4 rows. The cost reduction of -44.9% indicates a significant improvement through optimizer intervention.
 
 ### Understanding Optimizer Impact
 
-A high optimizer impact (large cost reduction) may indicate potential underlying issues that should be addressed, even if current performance appears acceptable:
+A significant cost reduction by the optimizer may indicate potential issues, even if current performance is acceptable. Queries that heavily depend on the optimizer may risk unstable performance as data volume grows or statistics change.
 
-1. Structural Query Issues
-- Requires significant query rewriting by the optimizer
-- More efficient query patterns may be possible
-- Indicates opportunities for index design improvements
-
-2. Future Risks
-- Issues may become apparent as data volume increases
-- Execution plans may become unstable with changes in statistics
-- Potential bottlenecks during high system load
-
-3. Recommended Actions
-- Review queries with high optimizer impact even if current performance is acceptable
-- Consider preventive improvements to reduce optimizer dependency
-- Evaluate index design and query patterns for long-term stability
-
-Queries showing significant optimizer impact should be considered for optimization, even when current performance meets requirements. This proactive approach helps prevent future performance issues and ensures more stable query execution.
+Therefore, queries with high optimizer impact should be reviewed for index design and query pattern improvements. This is an important step in preventing future performance issues and ensuring more stable query execution.
 
 ## Project Statistics
 
