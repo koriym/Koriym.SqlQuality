@@ -24,7 +24,13 @@ info            No tables used
 N/A
 
 ### EXPLAIN JSON
-{"query_block":{"select_id":1,"message":"No tables used"}}
+{"select_id":1,"message":"No tables used"}
+
+### EXPLAIN ANALYZE
+-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=42e-6..84e-6 rows=1 loops=1)
+
+### SHOW WARNINGS
+N/A
 
 ## Analysis Instructions
 Create a SQL performance analysis report for this query. Begin with a table of key metrics showing current values and their impact. Then describe the detected issues, focusing on the root causes. Follow with specific improvement recommendations, including SQL examples and their expected impact. End with implementation priorities and any important considerations. Keep the analysis focused on actionable insights that will lead to significant performance gains.

@@ -10,6 +10,7 @@ use PDO;
 use function array_filter;
 use function array_map;
 use function array_merge;
+use function array_slice;
 use function array_unique;
 use function array_values;
 use function assert;
@@ -31,6 +32,7 @@ use const JSON_THROW_ON_ERROR;
  * @psalm-import-type SchemaIndex from Types
  * @psalm-import-type TableStatus from Types
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ShowWarning from Types
  */
 final class AIQueryAdvisor
 {
@@ -61,6 +63,11 @@ final class AIQueryAdvisor
 ### EXPLAIN JSON
 %s
 
+### EXPLAIN ANALYZE
+%s
+### SHOW WARNINGS
+%s
+
 ## Analysis Instructions
 %s
 
@@ -80,12 +87,15 @@ TEMPLATE;
     /**
      * @param ExplainResult                  $explainResult
      * @param list<DetectedWarning>          $issues
+     * @param list<ShowWarning>              $warnings      Warnings from SHOW WARNINGS
      * @param array<string, SchemaInfo>|null $schemaInfo
      */
     public function generatePrompt(
         string $sqlFile,
         string $sql,
         array $explainResult,
+        string $explainAnalyze,
+        array $warnings,
         array $issues,
         array|null $schemaInfo = null,
     ): string {
@@ -98,6 +108,8 @@ TEMPLATE;
             $this->generateExplainTree($explainResult),
             $this->formatSchemaInfo($schemaInfo),
             $this->formatExplainResult($explainResult),
+            $explainAnalyze,
+            $this->formatWarnings($warnings),
             self::AI_PROMPT_TEMPLATE,
             $this->instruction,
         );
@@ -179,7 +191,20 @@ TEMPLATE;
     /** @param ExplainResult $explainResult */
     private function formatExplainResult(array $explainResult): string
     {
-        return json_encode($explainResult, JSON_THROW_ON_ERROR);
+        return json_encode($explainResult['query_block'], JSON_THROW_ON_ERROR);
+    }
+
+    /** @param list<ShowWarning> $warnings */
+    private function formatWarnings(array $warnings): string
+    {
+        if (empty($warnings)) {
+            return 'N/A';
+        }
+
+        // 最大10件に制限
+        $limitedWarnings = array_slice($warnings, 0, 10);
+
+        return json_encode($limitedWarnings, JSON_THROW_ON_ERROR);
     }
 
     /** @return list<string> */

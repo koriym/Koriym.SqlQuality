@@ -152,11 +152,15 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
+     * @return array{0: ExplainResult, 1:string}
+     *
      * @throws RuntimeException
      */
     private function executeExplain(string $sql, array $params): array
     {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+
+        // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
             throw new RuntimeException('Failed to execute EXPLAIN query');
@@ -173,10 +177,21 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
-        /** @var array<array-key, mixed> $explainData */
-        $explainData = json_decode($explainJson, true);
+        $explainJsonData = json_decode($explainJson, true);
 
-        return $explainData;
+        // EXPLAIN ANALYZE を実行
+        $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
+        if ($analyzeStmt === false) {
+            throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
+        }
+
+        /** @var array|false $analyzeResult */
+        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_NUM);
+        if ($analyzeResult === false || ! isset($analyzeResult[0])) {
+            throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
+        }
+
+        return [$explainJsonData, $analyzeResult[0]];
     }
 
     /**
@@ -322,7 +337,7 @@ final class SqlFileAnalyzer
     ): array {
         $executionTime = $this->getExecutedTime($sql, $params);
         /** @var ExplainResult $explainResult */
-        $explainResult = $this->executeExplain($sql, $params);
+        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
         $warnings = $this->getWarnings();
         /** @var list<DetectedWarning> $issues */
@@ -335,6 +350,8 @@ final class SqlFileAnalyzer
             $sqlFile,
             $sql,
             $explainResult,
+            $explainAnalyze,
+            $warnings,
             $issues,
             $schemaInfo,
         );
