@@ -62,7 +62,7 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 
 例：
 
-* [SQL分析サマリー](demo/build/sql-quality/summary_report.md)
+* [SQL Analysis Summary](demo/build/sql-quality/summary_report.md)
 
 アナライザーは指定された出力ディレクトリ（例：`build/sql-quality`）に2種類の分析レポートを生成します。
 
