@@ -1,4 +1,5 @@
 # Koriym.SqlQuality
+
 [![Continuous Integration](https://github.com/koriym/Koriym.SqlQuality/actions/workflows/continuous-integration.yml/badge.svg)](https://github.com/koriym/Koriym.SqlQuality/actions/workflows/continuous-integration.yml)
 [![Coding Standards](https://github.com/koriym/Koriym.SqlQuality/actions/workflows/coding-standards.yml/badge.svg)](https://github.com/koriym/Koriym.SqlQuality/actions/workflows/coding-standards.yml)
 
@@ -39,7 +40,7 @@ $pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
     PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
 ]);
 
-$sqlParams = require dirname(__DIR__) . '/tests/params/sql_params.php';
+$sqlParams = require 'path/to/sql_params.php';
 
 //return [
 //    '1_full_table_scan.sql' => ['min_views' => 1000],
@@ -49,7 +50,7 @@ $sqlParams = require dirname(__DIR__) . '/tests/params/sql_params.php';
 $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
-    dirname(__DIR__) . '/tests/sql',
+    'path/to/sql_dir',
     new AIQueryAdvisor('以上の分析を日本語で記述してください。')
 );
 
@@ -57,32 +58,53 @@ $analyzer = new SqlFileAnalyzer(
 $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```
 
-## Output Format
+## Analysis Reports
 
-The analyzer generates a **summary report** and **detailed reports** for each SQL file in the specified output directory (e.g., `build/sql-quality`).
+The analyzer generates two types of analysis reports in the specified output directory (e.g., `build/sql-quality`).
 
-### 1. **Summary Report (`summary_report.md`)**
-The summary report provides an overview of all analyzed SQL files, including their cost, severity level, and detected issues.
+### 1. Query Analysis List
 
-Example:
+Shows the overall analysis of each SQL query:
 
-* [SQL Analysis Summary](demo/build/sql-quality/summary_report.md)
+| Column | Description |
+|--------|-------------|
+| SQL File | Name of the SQL file |
+| Cost | Estimated query cost |
+| Level | Performance level based on statistical analysis (μ = mean, σ = standard deviation) |
+| Issues | Detected performance issues |
+| Report | Link to detailed analysis |
 
-```markdown
-# SQL Analysis Summary
+### 2. Queries with Optimizer Impact
 
-## Query Analysis List
-| SQL File | Cost | Level | Issues | Report |
-|----------|------|-------|---------|---------|
-| 1_full_table_scan.sql | 523.20 | Medium (μ ± σ) | FullTableScan | [Details](1_full_table_scan.md) |
-| 2_filesort.sql | 523.20 | Medium (μ ± σ) | FullTableScan, IneffectiveSort | [Details](2_filesort.md) |
-| 3_function_on_indexed_column.sql | 523.20 | Medium (μ ± σ) | FullTableScan | [Details](3_function_on_indexed_column.md) |
+Shows the impact of query optimizer by comparing execution with and without optimization:
+
+| Column | Description |
+|--------|-------------|
+| SQL File | Name of the SQL file |
+| Base Access | Access method, row count, and scan percentage with optimizer disabled |
+| Optimized Access | Access method, row count, and scan percentage with optimizer enabled |
+| Cost Impact | Cost reduction percentage by optimizer (negative values indicate improvement) |
+| Base Issues | Issues detected when optimizer is disabled |
+| Plan Changes | Detailed execution plan changes (filtering ratio, cost changes, etc.) |
+
+#### Example Interpretation
+
+For optimizer impact analysis:
+
+ALL, 4897 rows, 100.0% → ref, using idx_posts_user_id, 4 rows, 100.0%
+
+- Without optimizer: Full table scan (ALL) accessing 4,897 rows
+- With optimizer: Index scan (ref) using idx_posts_user_id, accessing only 4 rows
+
+A negative Cost Impact (e.g., -44.9%) indicates significant performance improvement potential through proper indexing or query restructuring.
 
 ## Project Statistics
-- Total SQL queries analyzed: 10
-- Average query cost: 724.19
-- Standard deviation: 795.91
-```
+
+The summary report also includes overall project statistics:
+
+- Total SQL queries analyzed
+- Average query cost
+- Standard deviation of costs
 
 ## Multilingual Support
 
@@ -102,7 +124,7 @@ $analyzer = new ExplainAnalyzer([
 ]);
 
 // Combined with AI Advisor for complete Japanese output
-$sqlAnalyzer = new SqlFileAnalyzer(
+$sqlAnalyizer = new SqlFileAnalyzer(
     $pdo,
     $analyzer,
     $sqlDirectory,
