@@ -36,4 +36,8 @@ return [
     '19_unnecessary_distinct.sql' => ['user_id' => 1],
     '20_multi_table_update.sql' => [],
     '21_low_cardinality_index.sql' => ['status' => 'active'],
+    '24_grouping_operation.sql' => [
+        'post_ids' => [375, 376, 377, 388, 389, 390],
+        'target_count' => 2,
+    ],
 ];
