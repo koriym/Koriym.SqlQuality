@@ -116,7 +116,8 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
         }
 
         return "| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |\n"
-        . '|----------|-------------|------------------|-------------|--------------|--------------|' . implode("\n", $rows);
+            . '|:----------|:------------|:----------------|:------------|:------------|:-------------|\n'
+            . implode("\n", $rows);
     }
 
     private function extractAccessPattern(array $explain): string
