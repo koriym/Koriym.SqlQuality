@@ -71,6 +71,16 @@ class ExplainParser
             return $this->parseNestedLoop($nestedLoop);
         }
 
+        if (isset($queryBlock['grouping_operation']['table'])) {
+            $tableNode = $this->parseSingleTable($queryBlock['grouping_operation']['table']);
+
+            return new TreeNode(
+                'Grouping Operation',
+                [],
+                [$tableNode],
+            );
+        }
+
         // 3) nested_loop が query_block 直下にある場合のチェック
         if (isset($queryBlock['nested_loop'])) {
             /** @var array<array{table: ExplainTable}> $nestedLoop */
