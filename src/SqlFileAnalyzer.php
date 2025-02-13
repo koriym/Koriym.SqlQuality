@@ -351,6 +351,7 @@ final class SqlFileAnalyzer
             $sql,
             $explainResult,
             $explainAnalyze,
+            $warnings,
             $issues,
             $schemaInfo,
         );
