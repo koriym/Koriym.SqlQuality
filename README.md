@@ -60,6 +60,10 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 
 ## Analysis Reports
 
+Example:
+
+* [SQL Analysis Summary](demo/build/sql-quality/summary_report.md)
+
 The analyzer generates two types of analysis reports in the specified output directory (e.g., `build/sql-quality`).
 
 ### 1. Query Analysis List
@@ -73,6 +77,12 @@ Shows the overall analysis of each SQL query:
 | Level | Performance level based on statistical analysis (μ = mean, σ = standard deviation) |
 | Issues | Detected performance issues |
 | Report | Link to detailed analysis |
+
+Example:
+
+| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |
+|----------|------|----------------|-------|---------|--------|
+| 1\_full\_table\_scan.sql | 497.95 | 5.92 | Medium (μ ± σ) | FullTableScan | [Details](1\_full\_table\_scan.md) |
 
 ### 2. Queries with Optimizer Impact
 
@@ -88,6 +98,10 @@ Shows the impact of query optimizer by comparing execution with and without opti
 | Plan Changes | Detailed execution plan changes (filtering ratio, cost changes, etc.) |
 
 #### Example Interpretation
+
+| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |
+|:----------|:------------|:----------------|:------------|:------------|:-------------|
+| 11\_nested\_loop.sql | ALL, 4897 rows, 100.0% | ALL, 1000 rows, 10.0% → ref, using idx\_posts\_user\_id, 4 rows, 100.0% | -44.9% | FullTableScan | - |
 
 For optimizer impact analysis:
 
