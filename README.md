@@ -44,7 +44,7 @@ $sqlParams = require 'path/to/sql_params.php';
 
 //return [
 //    '1_full_table_scan.sql' => ['min_views' => 1000],
-//    '2_filesort.sql' => ['status' => 'published','limit' => 10]
+//    '2_filesort.sql' => ['status' => 'published', 'limit' => 10]
 //];
 
 $analyzer = new SqlFileAnalyzer(
@@ -99,18 +99,46 @@ Shows the impact of query optimizer by comparing execution with and without opti
 
 #### Example Interpretation
 
-| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |
-|:----------|:------------|:----------------|:------------|:------------|:-------------|
-| 11\_nested\_loop.sql | ALL, 4897 rows, 100.0% | ALL, 1000 rows, 10.0% → ref, using idx\_posts\_user\_id, 4 rows, 100.0% | -44.9% | FullTableScan | - |
+In this example:
+```
+Base Access: ALL, 4897 rows, 100.0%
+Optimized Access: ref, using idx_posts_user_id, 4 rows, 100.0%
+Cost Impact: -44.9%
+```
 
-For optimizer impact analysis:
+- Base Access (optimizer disabled):
+    - Access Method: Full table scan (ALL)
+    - Rows examined: 4,897
+    - Scan percentage: 100% of the table was scanned
 
-ALL, 4897 rows, 100.0% → ref, using idx_posts_user_id, 4 rows, 100.0%
+- Optimized Access (optimizer enabled):
+    - Access Method: Index lookup (ref)
+    - Using index: idx_posts_user_id
+    - Rows examined: Only 4 rows
+    - Scan percentage: 100% of the necessary rows were accessed
 
-- Without optimizer: Full table scan (ALL) accessing 4,897 rows
-- With optimizer: Index scan (ref) using idx_posts_user_id, accessing only 4 rows
+The negative Cost Impact (-44.9%) indicates significant performance improvement through optimizer intervention.
 
-A negative Cost Impact (e.g., -44.9%) indicates significant performance improvement potential through proper indexing or query restructuring.
+### Understanding Optimizer Impact
+
+A high optimizer impact (large cost reduction) may indicate potential underlying issues that should be addressed, even if current performance appears acceptable:
+
+1. Structural Query Issues
+- Requires significant query rewriting by the optimizer
+- More efficient query patterns may be possible
+- Indicates opportunities for index design improvements
+
+2. Future Risks
+- Issues may become apparent as data volume increases
+- Execution plans may become unstable with changes in statistics
+- Potential bottlenecks during high system load
+
+3. Recommended Actions
+- Review queries with high optimizer impact even if current performance is acceptable
+- Consider preventive improvements to reduce optimizer dependency
+- Evaluate index design and query patterns for long-term stability
+
+Queries showing significant optimizer impact should be considered for optimization, even when current performance meets requirements. This proactive approach helps prevent future performance issues and ensures more stable query execution.
 
 ## Project Statistics
 
@@ -138,7 +166,7 @@ $analyzer = new ExplainAnalyzer([
 ]);
 
 // Combined with AI Advisor for complete Japanese output
-$sqlAnalyizer = new SqlFileAnalyzer(
+$analyzer = new SqlFileAnalyzer(
     $pdo,
     $analyzer,
     $sqlDirectory,
