@@ -51,7 +51,8 @@ $analyzer = new SqlFileAnalyzer(
     $pdo,
     new ExplainAnalyzer(),
     'path/to/sql_dir',
-    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
+    new AIQueryAdvisor('以上の分析を日本語で記述してください。'),
+    null,
 );
 
 // Output to build/sql-quality
@@ -142,7 +143,8 @@ $sqlAnalyizer = new SqlFileAnalyzer(
     $pdo,
     $analyzer,
     $sqlDirectory,
-    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
+    new AIQueryAdvisor('以上の分析を日本語で記述してください。'),
+    null,
 );
 ```
 
