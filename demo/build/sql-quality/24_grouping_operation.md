@@ -4,7 +4,7 @@
 
 ## SQL
 ```sql
--- 19_grouping_operation.sql
+-- 24_grouping_operation.sql
 SELECT
   post_id
 FROM
@@ -42,7 +42,7 @@ Grouping Operation
 ### EXPLAIN ANALYZE
 -> Filter: (count(0) = 2)  (actual time=0.019..0.019 rows=0 loops=1)
     -> Group aggregate: count(0)  (actual time=0.009..0.018 rows=6 loops=1)
-        -> Filter: (comments.post_id in (375,376,377,388,389,390))  (cost=1.86 rows=8) (actual time=0.006..0.016 rows=8 loops=1)
+        -> Filter: (comments.post_id in (375,376,377,388,389,390))  (cost=1.86 rows=8) (actual time=0.006..0.015 rows=8 loops=1)
             -> Index range scan on comments using idx_comments_post_id  (cost=1.86 rows=8) (actual time=0.005..0.014 rows=8 loops=1)
 
 ### SHOW WARNINGS

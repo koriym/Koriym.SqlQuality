@@ -1,4 +1,4 @@
--- 19_grouping_operation.sql
+-- 24_grouping_operation.sql
 SELECT
   post_id
 FROM
