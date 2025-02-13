@@ -88,7 +88,7 @@ Example:
 
 ### 2. Queries with Optimizer Impact
 
-The MySQL query optimizer is a crucial component that automatically optimizes query execution plans. This tool analyzes the differences in execution plans and performance with and without the optimizer.
+The MySQL Query Optimizer is a crucial component that automatically optimizes query execution plans. Even when SQL and index design are not optimal, the optimizer attempts to improve performance at runtime.
 
 | Column | Description |
 |--------|-------------|
@@ -101,20 +101,17 @@ The MySQL query optimizer is a crucial component that automatically optimizes qu
 
 #### Example Interpretation
 
-In this example:
-```
-Base Access: ALL, 4897 rows, 100.0%
-Optimized Access: ref, using idx_posts_user_id, 4 rows, 100.0%
-Cost Impact: -44.9%
-```
+Let's look at this example:
+
+| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |
+|:----------|:------------|:----------------|:------------|:------------|:-------------|
+| 11\_nested\_loop.sql | ALL, 4897 rows, 100.0% | ALL, 1000 rows, 10.0% → ref, using idx\_posts\_user\_id, 4 rows, 100.0% | -44.9% | FullTableScan | - |
 
 In this example, without the optimizer, the query performs a full table scan processing 4,897 rows. With the optimizer enabled, it uses an index to access only 4 rows. The cost reduction of -44.9% indicates a significant improvement through optimizer intervention.
 
 ### Understanding Optimizer Impact
 
-A significant cost reduction by the optimizer may indicate potential issues, even if current performance is acceptable. Queries that heavily depend on the optimizer may risk unstable performance as data volume grows or statistics change.
-
-Therefore, queries with high optimizer impact should be reviewed for index design and query pattern improvements. This is an important step in preventing future performance issues and ensuring more stable query execution.
+While the optimizer improves performance, relying on it may mask potential underlying issues. Additionally, there are risks of unstable performance as data volume grows or statistics change. This feature aims to detect such issues early and guide appropriate solutions by comparing execution plans and performance with and without the optimizer.
 
 ## Project Statistics
 
