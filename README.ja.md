@@ -66,7 +66,7 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 
 アナライザーは指定された出力ディレクトリ（例：`build/sql-quality`）に2種類の分析レポートを生成します。
 
-### 1. クエリ分析リスト (Query Analysis List)
+### 1. クエリ分析リスト (Query Analysis)
 
 各SQLクエリの全体的な分析を表示します：
 
