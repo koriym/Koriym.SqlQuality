@@ -86,12 +86,28 @@ Example:
 
 ## Multilingual Support
 
-The AI advisor supports multiple languages for its analysis output. You can specify the desired language in the `AIQueryAdvisor` constructor.
+SQL query analysis results support multilingual output in both `ExplainAnalyzer` and `AIQueryAdvisor`.
+
+### Language Customization in ExplainAnalyzer
+
+While English is the default language, you can customize error messages in `ExplainAnalyzer` constructor for other languages:
 
 ```php
-// Japanese output
-$aiAdvisor = new AIQueryAdvisor('以上の分析を日本語で記述してください。');
+// Japanese error messages
+$analyzer = new ExplainAnalyzer([
+    'FullTableScan' => 'フルテーブルスキャンが検出されました。',
+    'IneffectiveJoin' => '非効率的な結合が検出されました。',
+    'FunctionInvalidatesIndex' => '関数の使用によりインデックスが無効化されています。',
+    // ... other messages
+]);
 
-// English output
-$aiAdvisor = new AIQueryAdvisor('Please provide the analysis in English');
+// Combined with AI Advisor for complete Japanese output
+$sqlAnalyzer = new SqlFileAnalyzer(
+    $pdo,
+    $analyzer,
+    $sqlDirectory,
+    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
+);
 ```
+
+This allows you to generate the entire analysis report in your preferred language. Both error messages and AI analysis results will be output in the specified language.
