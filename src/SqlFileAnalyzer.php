@@ -51,7 +51,7 @@ final class SqlFileAnalyzer
         private readonly ExplainAnalyzer $analyzer,
         private readonly string $sqlDir,
         private readonly AIQueryAdvisor $aiAdvisor,
-        OptimizerSettingsInterface|null $optimizerSettings
+        OptimizerSettingsInterface|null $optimizerSettings = null
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
     }
