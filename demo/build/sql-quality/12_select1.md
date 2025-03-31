@@ -27,7 +27,7 @@ N/A
 {"select_id":1,"message":"No tables used"}
 
 ### EXPLAIN ANALYZE
--> Rows fetched before execution  (cost=0..0 rows=1) (actual time=42e-6..84e-6 rows=1 loops=1)
+-> Rows fetched before execution  (cost=0.00 rows=1) (actual time=0.000..0.000 rows=1 loops=1)
 
 ### SHOW WARNINGS
 N/A

@@ -340,7 +340,15 @@ SQL;
 
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($result === false) {
-            throw new RuntimeException('No table status found');
+            // WITH句のエイリアスなどでテーブル情報が取得できない場合
+            return [
+                'table_rows' => null,
+                'data_length' => null,
+                'index_length' => null,
+                'auto_increment' => null,
+                'create_time' => null,
+                'update_time' => null
+            ];
         }
 
         /** @var TableStatus */

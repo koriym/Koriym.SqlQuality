@@ -1,6 +1,6 @@
 # SQL Performance Analysis
 - **SQL File:** `9_inefficient_in_query.sql`
-- **Cost:** 3447.95
+- **Cost:** 3483.85
 
 ## SQL
 ```sql
@@ -21,27 +21,27 @@ ORDER BY created_at;
 ## Explain Tree
 ```
 Sort (using filesort)
-sort_cost       2950.00
+sort_cost       2980.00
 +- Filter with IN condition
    +- Table scan
       +- Table
          table           posts
-         rows            4897
-         filtered        60.24
+         rows            4956
+         filtered        60.13
          condition       (`test`.`posts`.`status` in ('draft','published','archived','deleted','pending'))
 ```
 ## Analysis Detail
 
 ### Schema
-{"posts":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"user_id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"title","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"content","DATA_TYPE":"text","COLUMN_TYPE":"text","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":"draft","EXTRA":""},{"COLUMN_NAME":"view_count","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":"CURRENT_TIMESTAMP","EXTRA":"DEFAULT_GENERATED"}],"indexes":[{"INDEX_NAME":"idx_posts_status_created","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":3},{"INDEX_NAME":"idx_posts_status_created","COLUMN_NAME":"created_at","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":743},{"INDEX_NAME":"idx_posts_user_id","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":994},{"INDEX_NAME":"idx_posts_user_status","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":994},{"INDEX_NAME":"idx_posts_user_status","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":1450},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":4897}],"status":{"table_rows":4897,"data_length":540672,"index_length":491520,"auto_increment":null,"create_time":"2025-02-11 11:45:34","update_time":"2025-02-12 05:40:33"}}}
+{"posts":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"user_id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"title","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(255)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"content","DATA_TYPE":"text","COLUMN_TYPE":"text","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":"draft","EXTRA":""},{"COLUMN_NAME":"view_count","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":"CURRENT_TIMESTAMP","EXTRA":"DEFAULT_GENERATED"}],"indexes":[{"INDEX_NAME":"idx_posts_status_created","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":3},{"INDEX_NAME":"idx_posts_status_created","COLUMN_NAME":"created_at","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":1617},{"INDEX_NAME":"idx_posts_user_id","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":992},{"INDEX_NAME":"idx_posts_user_status","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":992},{"INDEX_NAME":"idx_posts_user_status","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":1439},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":4956}],"status":{"table_rows":4956,"data_length":540672,"index_length":491520,"auto_increment":null,"create_time":"2025-02-13 10:11:38","update_time":null}}}
 
 ### EXPLAIN JSON
-{"select_id":1,"cost_info":{"query_cost":"3447.95"},"ordering_operation":{"using_filesort":true,"cost_info":{"sort_cost":"2950.00"},"table":{"table_name":"posts","access_type":"ALL","possible_keys":["idx_posts_status_created"],"rows_examined_per_scan":4897,"rows_produced_per_join":2949,"filtered":"60.24","cost_info":{"read_cost":"202.95","eval_cost":"295.00","prefix_cost":"497.95","data_read_per_join":"3M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` in ('draft','published','archived','deleted','pending'))"}}}
+{"select_id":1,"cost_info":{"query_cost":"3483.85"},"ordering_operation":{"using_filesort":true,"cost_info":{"sort_cost":"2980.00"},"table":{"table_name":"posts","access_type":"ALL","possible_keys":["idx_posts_status_created"],"rows_examined_per_scan":4956,"rows_produced_per_join":2979,"filtered":"60.13","cost_info":{"read_cost":"205.85","eval_cost":"298.00","prefix_cost":"503.85","data_read_per_join":"3M"},"used_columns":["id","user_id","title","content","status","view_count","created_at"],"attached_condition":"(`test`.`posts`.`status` in ('draft','published','archived','deleted','pending'))"}}}
 
 ### EXPLAIN ANALYZE
--> Sort: posts.created_at  (cost=498 rows=4897) (actual time=2.98..3.39 rows=5000 loops=1)
-    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=498 rows=4897) (actual time=0.002..1.82 rows=5000 loops=1)
-        -> Table scan on posts  (cost=498 rows=4897) (actual time=0.00138..1.08 rows=5000 loops=1)
+-> Sort: posts.created_at  (cost=503.85 rows=4956) (actual time=7.261..8.090 rows=5000 loops=1)
+    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=503.85 rows=4956) (actual time=0.012..4.242 rows=5000 loops=1)
+        -> Table scan on posts  (cost=503.85 rows=4956) (actual time=0.011..2.446 rows=5000 loops=1)
 
 ### SHOW WARNINGS
 N/A

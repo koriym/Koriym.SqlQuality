@@ -40,4 +40,5 @@ return [
         'post_ids' => [375, 376, 377, 388, 389, 390],
         'target_count' => 2,
     ],
+    '25_pass_the_with_clause.sql' => [],
 ];
