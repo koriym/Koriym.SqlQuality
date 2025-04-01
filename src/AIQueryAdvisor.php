@@ -261,7 +261,7 @@ TEMPLATE;
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
     {
         $sql = <<<SQL
-            SELECT 
+            SELECT
                 column_name,
                 data_type,
                 column_type,
@@ -292,7 +292,7 @@ SQL;
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
     {
         $sql = <<<SQL
-            SELECT 
+            SELECT
                 index_name,
                 column_name,
                 non_unique,
@@ -321,14 +321,14 @@ SQL;
     private function getTableStatus(PDO $pdo, string $quotedTable): array
     {
         $sql = <<<SQL
-        SELECT 
+        SELECT
             TABLE_ROWS as table_rows,
             DATA_LENGTH as data_length,
             INDEX_LENGTH as index_length,
             AUTO_INCREMENT as auto_increment,
             CREATE_TIME as create_time,
             UPDATE_TIME as update_time
-        FROM information_schema.tables 
+        FROM information_schema.tables
         WHERE table_schema = DATABASE()
         AND table_name = {$quotedTable}
 SQL;
@@ -340,7 +340,15 @@ SQL;
 
         $result = $stmt->fetch(PDO::FETCH_ASSOC);
         if ($result === false) {
-            throw new RuntimeException('No table status found');
+            // WITH句のエイリアスなどでテーブル情報が取得できない場合
+            return [
+                'table_rows' => null,
+                'data_length' => null,
+                'index_length' => null,
+                'auto_increment' => null,
+                'create_time' => null,
+                'update_time' => null,
+            ];
         }
 
         /** @var TableStatus */

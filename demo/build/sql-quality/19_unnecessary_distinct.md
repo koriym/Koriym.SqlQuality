@@ -1,26 +1,23 @@
 # SQL Performance Analysis
-- **SQL File:** `7_temporary_table_grouping.sql`
-- **Cost:** 202.50
+- **SQL File:** `19_unnecessary_distinct.sql`
+- **Cost:** 0.35
 
 ## SQL
 ```sql
--- 7_temporary_table_grouping.sql
--- Problem: Requires temporary table for grouping with ORDER BY
-SELECT user_id, COUNT(*) as order_count
+-- Problem: Unnecessary DISTINCT on already unique columns
+SELECT DISTINCT id, created_at
 FROM orders
-GROUP BY user_id
-ORDER BY order_count DESC;
+WHERE user_id = 1
+ORDER BY created_at;
 
 ```
 
 ## Detected Issues
-- グループ化のために一時テーブルが必要です。 [Learn more](https://koriym.github.io/Koriym.SqlQuality/issues/TemporaryTableGrouping)
+
 
 ## Explain Tree
 ```
-Group and Sort
-using_temporary_table true
-using_filesort  true
+Sort (using filesort)
 ```
 ## Analysis Detail
 
@@ -28,13 +25,11 @@ using_filesort  true
 {"orders":{"columns":[{"COLUMN_NAME":"id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"NO","COLUMN_KEY":"PRI","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"user_id","DATA_TYPE":"int","COLUMN_TYPE":"int","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"total_amount","DATA_TYPE":"decimal","COLUMN_TYPE":"decimal(10,2)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""},{"COLUMN_NAME":"status","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(20)","IS_NULLABLE":"YES","COLUMN_KEY":"MUL","COLUMN_DEFAULT":"pending","EXTRA":""},{"COLUMN_NAME":"created_at","DATA_TYPE":"datetime","COLUMN_TYPE":"datetime","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":"CURRENT_TIMESTAMP","EXTRA":"DEFAULT_GENERATED"},{"COLUMN_NAME":"reference_code","DATA_TYPE":"varchar","COLUMN_TYPE":"varchar(50)","IS_NULLABLE":"YES","COLUMN_KEY":"","COLUMN_DEFAULT":null,"EXTRA":""}],"indexes":[{"INDEX_NAME":"idx_orders_status_created","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":3},{"INDEX_NAME":"idx_orders_status_created","COLUMN_NAME":"created_at","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":755},{"INDEX_NAME":"idx_orders_user_id","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":861},{"INDEX_NAME":"idx_orders_user_status","COLUMN_NAME":"user_id","NON_UNIQUE":1,"SEQ_IN_INDEX":1,"CARDINALITY":861},{"INDEX_NAME":"idx_orders_user_status","COLUMN_NAME":"status","NON_UNIQUE":1,"SEQ_IN_INDEX":2,"CARDINALITY":924},{"INDEX_NAME":"PRIMARY","COLUMN_NAME":"id","NON_UNIQUE":0,"SEQ_IN_INDEX":1,"CARDINALITY":2000}],"status":{"table_rows":2000,"data_length":163840,"index_length":212992,"auto_increment":null,"create_time":"2025-02-13 10:11:38","update_time":null}}}
 
 ### EXPLAIN JSON
-{"select_id":1,"cost_info":{"query_cost":"202.50"},"ordering_operation":{"using_temporary_table":true,"using_filesort":true,"grouping_operation":{"using_filesort":false,"table":{"table_name":"orders","access_type":"index","possible_keys":["idx_orders_user_id","idx_orders_user_status"],"key":"idx_orders_user_id","used_key_parts":["user_id"],"key_length":"5","rows_examined_per_scan":2000,"rows_produced_per_join":2000,"filtered":"100.00","using_index":true,"cost_info":{"read_cost":"2.50","eval_cost":"200.00","prefix_cost":"202.50","data_read_per_join":"593K"},"used_columns":["id","user_id"]}}}}
+{"select_id":1,"cost_info":{"query_cost":"0.35"},"ordering_operation":{"using_filesort":true,"duplicates_removal":{"using_filesort":false,"table":{"table_name":"orders","access_type":"ref","possible_keys":["idx_orders_user_id","idx_orders_status_created","idx_orders_user_status"],"key":"idx_orders_user_id","used_key_parts":["user_id"],"key_length":"5","ref":["const"],"rows_examined_per_scan":1,"rows_produced_per_join":1,"filtered":"100.00","cost_info":{"read_cost":"0.25","eval_cost":"0.10","prefix_cost":"0.35","data_read_per_join":"304"},"used_columns":["id","user_id","created_at"]}}}}
 
 ### EXPLAIN ANALYZE
--> Sort: order_count DESC  (actual time=0.845..0.893 rows=861 loops=1)
-    -> Stream results  (actual time=0.023..0.702 rows=861 loops=1)
-        -> Group aggregate: count(0)  (actual time=0.021..0.573 rows=861 loops=1)
-            -> Index scan on orders using idx_orders_user_id  (cost=202.50 rows=2000) (actual time=0.019..0.355 rows=2000 loops=1)
+-> Sort: orders.created_at  (cost=0.35 rows=1) (actual time=0.011..0.011 rows=1 loops=1)
+    -> Index lookup on orders using idx_orders_user_id (user_id=1)  (actual time=0.007..0.008 rows=1 loops=1)
 
 ### SHOW WARNINGS
 N/A
