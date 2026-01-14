@@ -1,5 +1,6 @@
 /vendor/
 /vendor-bin/*/vendor/
+/vendor-bin/*/composer.lock
 /build/
 /composer.lock
 /phpunit.xml
@@ -7,3 +8,7 @@
 /.phpcs-cache/*
 /.psalm.cache/*
 /.phpcs-cache
+/malt.json
+/malt/
+/public/
+/tests/sql/ai_prompts/

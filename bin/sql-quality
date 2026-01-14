@@ -1,0 +1,281 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+namespace Koriym\SqlQuality;
+
+use PDO;
+
+use function array_keys;
+use function array_slice;
+use function count;
+use function dirname;
+use function file_exists;
+use function fwrite;
+use function getopt;
+use function in_array;
+use function is_array;
+use function json_encode;
+use function sprintf;
+
+use const JSON_PRETTY_PRINT;
+use const JSON_UNESCAPED_SLASHES;
+use const JSON_UNESCAPED_UNICODE;
+use const PHP_EOL;
+use const STDERR;
+use const STDOUT;
+
+// Find autoloader
+$autoloadPaths = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
+
+$autoloaded = false;
+foreach ($autoloadPaths as $autoloadPath) {
+    if (file_exists($autoloadPath)) {
+        require $autoloadPath;
+        $autoloaded = true;
+        break;
+    }
+}
+
+if (! $autoloaded) {
+    fwrite(STDERR, "Error: Could not find autoloader. Run 'composer install' first.\n");
+    exit(1);
+}
+
+/**
+ * SQL Quality CLI
+ */
+final class SqlQualityCli
+{
+    private const VERSION = '1.0.0';
+
+    private const USAGE = <<<'USAGE'
+SQL Quality Analyzer - Detect performance issues in SQL queries
+
+Usage:
+  sql-quality analyze [options]
+  sql-quality --help
+  sql-quality --version
+
+Commands:
+  analyze    Analyze SQL files for performance issues
+
+Options:
+  --sql-dir=DIR       Directory containing SQL files (required)
+  --params=FILE       PHP file returning SQL parameters array (required)
+  --dsn=DSN           Database DSN (default: mysql:host=127.0.0.1;dbname=test)
+  --user=USER         Database user (default: root)
+  --password=PASS     Database password (default: empty)
+  --format=FORMAT     Output format: json or markdown (default: json)
+  --output=DIR        Output directory for markdown reports
+  --lang=LANG         Language for messages: en or ja (default: en)
+  --help              Show this help message
+  --version           Show version
+
+Examples:
+  sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
+  sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb"
+
+USAGE;
+
+    private const MESSAGES_EN = [
+        'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
+        'FunctionInvalidatesIndex'  => 'Function invalidates index.',
+        'FullTableScan'            => 'Full table scan detected.',
+        'ImplicitTypeConversion'   => 'Implicit type conversion detected.',
+        'IneffectiveJoin'          => 'Ineffective join detected.',
+        'IneffectiveLikePattern'   => 'Ineffective LIKE pattern detected.',
+        'IneffectiveRangeScan'     => 'Ineffective range scan detected.',
+        'IneffectiveSort'          => 'Ineffective sort operation detected.',
+        'IneffectiveUnion'         => 'Ineffective UNION usage detected.',
+        'LowCardinalityIndex'      => 'Index on low cardinality column detected.',
+        'MultiTableUpdate'         => 'Multi-table update detected.',
+        'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
+        'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected.',
+    ];
+
+    private const MESSAGES_JA = [
+        'ExcessiveDerivedTables'    => '派生テーブルの過度な使用が検出されました。',
+        'FunctionInvalidatesIndex'  => '関数の使用によりインデックスが無効化されています。',
+        'FullTableScan'            => 'フルテーブルスキャンが検出されました。',
+        'ImplicitTypeConversion'   => '暗黙的な型変換が検出されました。',
+        'IneffectiveJoin'          => '非効率的な結合が検出されました。',
+        'IneffectiveLikePattern'   => '非効率的なLIKEパターンが検出されました。',
+        'IneffectiveRangeScan'     => '非効率的な範囲スキャンが検出されました。',
+        'IneffectiveSort'          => '非効率的なソート操作が検出されました。',
+        'IneffectiveUnion'         => '非効率的なUNIONの使用が検出されました。',
+        'LowCardinalityIndex'      => 'カーディナリティの低い列にインデックスが設定されています。',
+        'MultiTableUpdate'         => '複数テーブルの更新が検出されました。',
+        'TemporaryTableGrouping'   => 'グループ化のために一時テーブルが必要です。',
+        'UnnecessaryDistinct'      => '不必要なDISTINCTが検出されました。',
+    ];
+
+    /** @param list<string> $argv */
+    public function run(array $argv): int
+    {
+        // Check for help/version before parsing
+        if (count($argv) < 2 || in_array('--help', $argv, true)) {
+            echo self::USAGE;
+            return 0;
+        }
+
+        if (in_array('--version', $argv, true)) {
+            echo 'sql-quality version ' . self::VERSION . PHP_EOL;
+            return 0;
+        }
+
+        $command = $argv[1] ?? '';
+        if ($command !== 'analyze') {
+            fwrite(STDERR, "Unknown command: {$command}\n");
+            fwrite(STDERR, "Run 'sql-quality --help' for usage.\n");
+            return 1;
+        }
+
+        // Parse options manually from argv
+        $options = $this->parseOptions(array_slice($argv, 2));
+
+        return $this->analyze($options);
+    }
+
+    /**
+     * @param list<string> $args
+     * @return array<string, string|false>
+     */
+    private function parseOptions(array $args): array
+    {
+        $options = [];
+        foreach ($args as $arg) {
+            if (preg_match('/^--([^=]+)=(.*)$/', $arg, $matches)) {
+                $options[$matches[1]] = $matches[2];
+            } elseif (preg_match('/^--([^=]+)$/', $arg, $matches)) {
+                $options[$matches[1]] = false;
+            }
+        }
+        return $options;
+    }
+
+    /** @param array<string, string|false> $options */
+    private function analyze(array $options): int
+    {
+        // Validate required options
+        $sqlDir = $options['sql-dir'] ?? null;
+        $paramsFile = $options['params'] ?? null;
+
+        if (! $sqlDir || ! $paramsFile) {
+            fwrite(STDERR, "Error: --sql-dir and --params are required.\n");
+            return 1;
+        }
+
+        if (! file_exists($sqlDir)) {
+            fwrite(STDERR, "Error: SQL directory not found: {$sqlDir}\n");
+            return 1;
+        }
+
+        if (! file_exists($paramsFile)) {
+            fwrite(STDERR, "Error: Params file not found: {$paramsFile}\n");
+            return 1;
+        }
+
+        // Database connection
+        $dsn = $options['dsn'] ?? 'mysql:host=127.0.0.1;dbname=test';
+        $user = $options['user'] ?? 'root';
+        $password = $options['password'] ?? '';
+        $format = $options['format'] ?? 'json';
+        $outputDir = $options['output'] ?? null;
+        $lang = $options['lang'] ?? 'en';
+
+        try {
+            $pdo = new PDO((string) $dsn, (string) $user, (string) $password, [
+                PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+            ]);
+        } catch (\PDOException $e) {
+            fwrite(STDERR, "Error: Database connection failed: {$e->getMessage()}\n");
+            return 1;
+        }
+
+        // Load parameters
+        /** @var array<string, array<string, mixed>> $sqlParams */
+        $sqlParams = require $paramsFile;
+
+        // Select messages based on language
+        $messages = $lang === 'ja' ? self::MESSAGES_JA : self::MESSAGES_EN;
+        $instruction = $lang === 'ja'
+            ? '以上の分析を日本語で記述してください。'
+            : 'Please provide your analysis in English.';
+
+        // Create analyzer
+        $analyzer = new SqlFileAnalyzer(
+            $pdo,
+            new ExplainAnalyzer($messages),
+            (string) $sqlDir,
+            new AIQueryAdvisor($instruction),
+            new OptimizerSettings($pdo),
+        );
+
+        // Run analysis
+        if ($format === 'markdown' && $outputDir) {
+            $results = $analyzer->analyzeSqlDirectory($sqlParams, (string) $outputDir);
+            fwrite(STDERR, "Markdown reports saved to: {$outputDir}\n");
+        } else {
+            $results = $analyzer->analyzeSQLFiles($sqlParams, $outputDir ?? '/tmp/sql-quality');
+        }
+
+        // Output JSON
+        if ($format === 'json') {
+            $output = $this->formatJsonOutput($results);
+            fwrite(STDOUT, json_encode($output, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $results
+     * @return array<string, mixed>
+     */
+    private function formatJsonOutput(array $results): array
+    {
+        $totalCost = 0.0;
+        $totalIssues = 0;
+        $queries = [];
+
+        foreach ($results as $sqlFile => $result) {
+            $cost = (float) ($result['cost'] ?? 0);
+            $totalCost += $cost;
+
+            $issues = $result['issues'] ?? [];
+            $totalIssues += count($issues);
+
+            $optimizerComparison = $result['optimizer_comparison'] ?? [];
+            $costReduction = $optimizerComparison['difference']['cost_percent'] ?? null;
+
+            $queries[$sqlFile] = [
+                'cost' => $cost,
+                'execution_time_ms' => ($result['execution_time'] ?? 0) * 1000,
+                'issues' => $issues,
+                'optimizer_impact' => $costReduction !== null ? [
+                    'cost_reduction_percent' => round($costReduction, 2),
+                ] : null,
+            ];
+        }
+
+        $queryCount = count($results);
+
+        return [
+            'summary' => [
+                'total_queries' => $queryCount,
+                'avg_cost' => $queryCount > 0 ? round($totalCost / $queryCount, 2) : 0,
+                'total_issues' => $totalIssues,
+            ],
+            'queries' => $queries,
+        ];
+    }
+}
+
+// Run CLI
+$cli = new SqlQualityCli();
+exit($cli->run($argv));

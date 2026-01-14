@@ -17,6 +17,9 @@
         "phpunit/phpunit": "^9.5",
         "rector/rector": "^2.0"
     },
+    "bin": [
+        "bin/sql-quality"
+    ],
     "autoload": {
         "psr-4": {
             "Koriym\\SqlQuality\\": "src/"

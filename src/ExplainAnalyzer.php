@@ -12,6 +12,8 @@ use Koriym\SqlQuality\Detector\IneffectiveLikePatternDetector;
 use Koriym\SqlQuality\Detector\IneffectiveRangeScanDetector;
 use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
+use Koriym\SqlQuality\Detector\LowCardinalityIndexDetector;
+use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
 use function is_array;
@@ -97,9 +99,7 @@ final class ExplainAnalyzer
             ],
             'LowCardinalityIndex' => [
                 'message' => $messages['LowCardinalityIndex'],
-                'pattern' => [
-                    'explain' => ['cardinality' => 'low'],
-                ],
+                'detector' => new LowCardinalityIndexDetector(),
             ],
             'MultiTableUpdate' => [
                 'message' => $messages['MultiTableUpdate'],
@@ -115,12 +115,7 @@ final class ExplainAnalyzer
             ],
             'UnnecessaryDistinct' => [
                 'message' => $messages['UnnecessaryDistinct'],
-                'pattern' => [
-                    'explain' => [
-                        'distinct' => true,
-                        'unique_rows' => true,
-                    ],
-                ],
+                'detector' => new UnnecessaryDistinctDetector(),
             ],
         ];
     }
