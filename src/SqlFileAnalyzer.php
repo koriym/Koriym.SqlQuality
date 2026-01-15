@@ -36,7 +36,9 @@ use const PATHINFO_FILENAME;
 /**
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type AnalysisWithSettingsResult from Types
  * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
@@ -152,7 +154,7 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
-     * @return array{0: ExplainResult, 1:string}
+     * @return ExplainWithSql
      *
      * @throws RuntimeException
      */
@@ -324,14 +326,7 @@ final class SqlFileAnalyzer
         ];
     }
 
-    /** @return array{
-     *     issues: list<DetectedWarning>,
-     *     explain_result: ExplainResult,
-     *     ai_suggestions: string,
-     *     cost: float,
-     *     execution_time: float
-     * }
-     */
+    /** @return AnalysisWithSettingsResult */
     private function analyzeWithSettings(
         string $sql,
         array $params,

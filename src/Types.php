@@ -216,6 +216,14 @@ namespace Koriym\SqlQuality;
  *    std_dev: float
  *  }
  * @psalm-type QueryBlock = array<mixed>
+ * @psalm-type ExplainWithSql = array{0: ExplainResult, 1: string}
+ * @psalm-type AnalysisWithSettingsResult = array{
+ *   issues: list<DetectedWarning>,
+ *   explain_result: ExplainResult,
+ *   ai_suggestions: string,
+ *   cost: float,
+ *   execution_time: float
+ * }
  */
 final class Types
 {
