@@ -37,7 +37,7 @@ class QueryStatisticsCalculator implements QueryStatisticsInterface
         // 標準偏差の計算
         $variance = $totalCount > 0 ? array_reduce(
             $costs,
-            static fn (float $carry, float $cost) => $carry + pow($cost - $mean, 2),
+            static fn (float $carry, mixed $cost) => $carry + pow((float) $cost - $mean, 2),
             0.0,
         ) / (float) $totalCount : 0.0;
 
