@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
+use Override;
 
 use function in_array;
 use function is_array;
@@ -13,10 +14,12 @@ use function is_array;
  * Detects unnecessary DISTINCT operations
  *
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type DuplicatesRemovalOperation from Types
  */
 final class UnnecessaryDistinctDetector implements DetectorInterface
 {
     /** @param ExplainResult $explainResult */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // Check for duplicates_removal in ordering_operation
@@ -35,7 +38,7 @@ final class UnnecessaryDistinctDetector implements DetectorInterface
     /**
      * Check if used_columns likely contains a primary key (column named 'id')
      *
-     * @param array<string, mixed> $duplicatesRemoval
+     * @param DuplicatesRemovalOperation $duplicatesRemoval
      */
     private function hasPrimaryKeyInUsedColumns(array $duplicatesRemoval): bool
     {

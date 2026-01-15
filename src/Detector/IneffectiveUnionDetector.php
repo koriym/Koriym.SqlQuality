@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Override;
+
 final class IneffectiveUnionDetector implements DetectorInterface
 {
     /**
@@ -11,6 +13,7 @@ final class IneffectiveUnionDetector implements DetectorInterface
      *
      * {@inheritDoc}
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // UNIONの結果が一時テーブルを使用し、

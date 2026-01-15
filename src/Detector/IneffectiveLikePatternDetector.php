@@ -4,16 +4,25 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\Types;
+use Override;
+
 use function is_array;
 use function preg_match;
 
+/**
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type ExplainNode from Types
+ */
 final class IneffectiveLikePatternDetector implements DetectorInterface
 {
     /**
      * 非効率なLIKEパターンを検出します
      *
-     * {@inheritDoc}
+     * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // 非効率なLIKEパターンの数をカウント
@@ -29,8 +38,8 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して非効率なLIKEパターンをカウントします
      *
-     * @param array<string, mixed> $node                 現在のノード
-     * @param int                  $ineffectiveLikeCount 非効率なLIKEパターンのカウンター（参照渡し）
+     * @param ExplainNode $node                 現在のノード
+     * @param int         $ineffectiveLikeCount 非効率なLIKEパターンのカウンター（参照渡し）
      */
     private function traverseQueryBlock(array $node, int &$ineffectiveLikeCount): void
     {
@@ -53,7 +62,7 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
     /**
      * テーブル情報から非効率なLIKEパターンを判定します
      *
-     * @param array<string, mixed> $table テーブル情報
+     * @param ExplainTable $table テーブル情報
      */
     private function isIneffectiveLikePattern(array $table): bool
     {

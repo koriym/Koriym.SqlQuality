@@ -4,15 +4,23 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\Types;
+use Override;
+
 use function is_array;
 
+/**
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainNode from Types
+ */
 final class ExcessiveDerivedTablesDetector implements DetectorInterface
 {
     /**
      * 派生テーブルの過剰使用を検出します
      *
-     * {@inheritDoc}
+     * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // 一時テーブルのカウント
@@ -28,8 +36,8 @@ final class ExcessiveDerivedTablesDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して一時テーブルをカウントします
      *
-     * @param array<string, mixed> $node           現在のノード
-     * @param int                  $tempTableCount 一時テーブルのカウンター（参照渡し）
+     * @param ExplainNode $node           現在のノード
+     * @param int         $tempTableCount 一時テーブルのカウンター（参照渡し）
      */
     private function traverseQueryBlock(array $node, int &$tempTableCount): void
     {

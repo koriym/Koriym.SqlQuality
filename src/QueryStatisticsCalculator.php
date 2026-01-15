@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Override;
+
 use function array_column;
 use function array_reduce;
 use function array_sum;
@@ -15,6 +17,7 @@ class QueryStatisticsCalculator implements QueryStatisticsInterface
 {
     private array $queryResults = [];
 
+    #[Override]
     public function calculate(array $queryResults): array
     {
         $this->queryResults = $queryResults;
@@ -29,14 +32,14 @@ class QueryStatisticsCalculator implements QueryStatisticsInterface
 
         $costs = array_column($queryResults, 'cost');
         $totalCount = count($costs);
-        $mean = $totalCount > 0 ? array_sum($costs) / $totalCount : 0;
+        $mean = $totalCount > 0 ? (float) array_sum($costs) / (float) $totalCount : 0.0;
 
         // 標準偏差の計算
         $variance = $totalCount > 0 ? array_reduce(
             $costs,
-            static fn (float $carry, float $cost) => $carry + pow($cost - $mean, 2),
+            static fn (float $carry, mixed $cost) => $carry + pow((float) $cost - $mean, 2),
             0.0,
-        ) / $totalCount : 0;
+        ) / (float) $totalCount : 0.0;
 
         return [
             'total_count' => $totalCount,
@@ -45,6 +48,7 @@ class QueryStatisticsCalculator implements QueryStatisticsInterface
         ];
     }
 
+    #[Override]
     public function getQueryResults(): array
     {
         return $this->queryResults;

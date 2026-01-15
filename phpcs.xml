@@ -43,7 +43,13 @@
         <exclude name="SlevomatCodingStandard.TypeHints.ReturnTypeHint.MissingTraversableTypeHintSpecification" />
         <exclude name="SlevomatCodingStandard.ControlStructures.UselessIfConditionWithReturn.UselessIfCondition" />
         <exclude name="Generic.PHP.ForbiddenFunctions.Found" />
+        <!-- Exclude deprecated sniffs -->
+        <exclude name="SlevomatCodingStandard.TypeHints.UnionTypeHintFormat" />
+        <exclude name="Squiz.WhiteSpace.LanguageConstructSpacing" />
     </rule>
+    <!-- Use new sniffs instead of deprecated ones -->
+    <rule ref="SlevomatCodingStandard.TypeHints.DNFTypeHintFormat" />
+    <rule ref="Generic.WhiteSpace.LanguageConstructSpacing" />
     <!-- Additional Rules -->
     <rule ref="SlevomatCodingStandard.Commenting.DocCommentSpacing">
         <properties>

@@ -4,16 +4,13 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+/** @psalm-import-type QueryStatisticsResult from Types */
 interface QueryStatisticsInterface
 {
     /**
      * Performs a calculation and returns the result
      *
-     * @return array{
-     *     total_count: int,
-     *     avg_cost: float,
-     *     std_dev: float
-     * }
+     * @return QueryStatisticsResult
      */
     public function calculate(array $queryResults): array;
 

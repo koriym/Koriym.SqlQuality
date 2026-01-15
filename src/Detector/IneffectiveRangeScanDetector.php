@@ -4,20 +4,27 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use function count;
+use Koriym\SqlQuality\Types;
+use Override;
+
 use function is_array;
-use function preg_match;
+use function is_string;
 use function str_contains;
 use function substr_count;
 
-/** @pas */
+/**
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type ExplainNode from Types
+ */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
     /**
      * 非効率的な範囲スキャンを検出します
      *
-     * {@inheritDoc}
+     * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         $ineffectiveScans = 0;
@@ -29,8 +36,8 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して非効率的な範囲スキャンをチェックします
      *
-     * @param array<string, mixed> $node             現在のノード
-     * @param int                  $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
+     * @param ExplainNode $node             現在のノード
+     * @param int         $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
      */
     private function traverseQueryBlock(array $node, int &$ineffectiveScans): void
     {
@@ -54,7 +61,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * テーブルアクセスが非効率的かどうかを判定します
      *
-     * @param array<string, mixed> $table テーブルアクセス情報
+     * @param ExplainTable $table テーブルアクセス情報
      */
     private function isIneffectiveTableAccess(array $table): bool
     {
@@ -69,14 +76,14 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
         }
 
         // 非効率的な範囲スキャン条件のチェック
-        if (isset($table['type']) && $table['type'] === 'range') {
+        if (isset($table['access_type']) && $table['access_type'] === 'range') {
             // 大量の行数を処理する範囲スキャン
             if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
                 return true;
             }
 
             // 複数のインデックス候補がある場合
-            if (isset($table['possible_keys']) && is_array($table['possible_keys']) && count($table['possible_keys']) > 1) {
+            if (isset($table['possible_keys']) && is_string($table['possible_keys']) && substr_count($table['possible_keys'], ',') > 0) {
                 return true;
             }
         }
@@ -96,19 +103,5 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
             isset($table['rows_examined_per_scan']) &&
             $table['filtered'] < 20.00 &&
             $table['rows_examined_per_scan'] > 100;
-    }
-
-    /**
-     * IN句の値の数をカウントします
-     *
-     * @param string $condition WHERE句の条件
-     */
-    private function countInClauseValues(string $condition): int
-    {
-        if (preg_match('/in\s*\((.*?)\)/i', $condition, $matches)) {
-            return substr_count($matches[1], ',') + 1;
-        }
-
-        return 0;
     }
 }

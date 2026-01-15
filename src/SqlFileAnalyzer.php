@@ -36,7 +36,9 @@ use const PATHINFO_FILENAME;
 /**
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type AnalysisWithSettingsResult from Types
  * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
@@ -60,8 +62,8 @@ final class SqlFileAnalyzer
      * Analyzes the SQL files contained in the specified parameters, generates statistical analyses,
      * outputs detailed Markdown reports for each SQL file, and creates a summary report.
      *
-     * @param array<string, mixed> $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
-     * @param string               $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
+     * @param SqlParams $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
+     * @param string    $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
      *
      *               example: $sqlParams [
      *                  1_full_table_scan.sql' => ['min_views' => 1000],
@@ -152,7 +154,7 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
-     * @return array{0: ExplainResult, 1:string}
+     * @return ExplainWithSql
      *
      * @throws RuntimeException
      */
@@ -308,27 +310,23 @@ final class SqlFileAnalyzer
             $noOptimizerAnalysisCost = 1;
         }
 
+        $noOptimizerCost = (float) $noOptimizerAnalysis['cost'];
+        $noOptimizerTime = (float) $noOptimizerAnalysis['execution_time'];
+
         return [
             ...$defaultAnalysis,
             'optimizer_comparison' => [
                 'with_optimizer' => $defaultAnalysis,
                 'without_optimizer' => $noOptimizerAnalysis,
                 'difference' => [
-                    'cost_percent' => ($defaultAnalysis['cost'] - $noOptimizerAnalysis['cost']) / $noOptimizerAnalysis['cost'] * 100,
-                    'time_percent' => ($defaultAnalysis['execution_time'] - $noOptimizerAnalysis['execution_time']) / $noOptimizerAnalysis['execution_time'] * 100,
+                    'cost_percent' => $noOptimizerCost > 0.0 ? ((float) $defaultAnalysis['cost'] - $noOptimizerCost) / $noOptimizerCost * 100.0 : 0.0,
+                    'time_percent' => $noOptimizerTime > 0.0 ? ((float) $defaultAnalysis['execution_time'] - $noOptimizerTime) / $noOptimizerTime * 100.0 : 0.0,
                 ],
             ],
         ];
     }
 
-    /** @return array{
-     *     issues: list<DetectedWarning>,
-     *     explain_result: ExplainResult,
-     *     ai_suggestions: string,
-     *     cost: float,
-     *     execution_time: float
-     * }
-     */
+    /** @return AnalysisWithSettingsResult */
     private function analyzeWithSettings(
         string $sql,
         array $params,
@@ -396,6 +394,6 @@ final class SqlFileAnalyzer
         array_shift($executionTimes); // Remove the minimum value
         array_pop($executionTimes);   // Remove the maximum value
 
-        return array_sum($executionTimes) / count($executionTimes);
+        return array_sum($executionTimes) / (float) count($executionTimes);
     }
 }

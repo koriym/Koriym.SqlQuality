@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Override;
+
 use function is_string;
 use function preg_match;
 
 final class FunctionInvalidatesIndexDetector implements DetectorInterface
 {
-    /** {@inheritDoc} */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         if (! isset($explainResult['query_block']['table'])) {

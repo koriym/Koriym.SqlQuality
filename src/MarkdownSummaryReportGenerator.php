@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\RuntimeException;
+use Override;
 
 use function abs;
 use function array_column;
@@ -49,6 +50,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
     }
 
     /** @param array<string, AnalysisResult> $queryResults */
+    #[Override]
     public function generate(array $queryResults): string
     {
         $stats = $this->statistics->calculate($queryResults);

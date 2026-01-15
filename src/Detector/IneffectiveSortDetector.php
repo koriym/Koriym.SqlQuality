@@ -4,10 +4,17 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\Types;
+use Override;
+
 use function count;
 use function is_array;
 use function substr;
 
+/**
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainNode from Types
+ */
 final class IneffectiveSortDetector implements DetectorInterface
 {
     // 行数の閾値（これ以上の行数を処理する場合は非効率とみなす）
@@ -19,8 +26,11 @@ final class IneffectiveSortDetector implements DetectorInterface
     /**
      * 非効率なソート操作を検出します
      *
+     * @param ExplainResult $explainResult
+     *
      * {@inheritDoc}
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         return $this->traverseQueryBlock($explainResult);
@@ -29,7 +39,7 @@ final class IneffectiveSortDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して非効率なソート操作をチェックします
      *
-     * @param array<string, mixed> $node 現在のノード
+     * @param ExplainNode $node 現在のノード
      */
     private function traverseQueryBlock(array $node): bool
     {
@@ -53,7 +63,7 @@ final class IneffectiveSortDetector implements DetectorInterface
     /**
      * ソート操作が非効率かどうかを判定します
      *
-     * @param array<string, mixed> $node クエリブロックノード
+     * @param ExplainNode $node クエリブロックノード
      */
     private function isIneffectiveSort(array $node): bool
     {
