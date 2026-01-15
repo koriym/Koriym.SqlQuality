@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
 
+use function in_array;
 use function is_array;
 
 /**
@@ -15,9 +16,7 @@ use function is_array;
  */
 final class UnnecessaryDistinctDetector implements DetectorInterface
 {
-    /**
-     * @param ExplainResult $explainResult
-     */
+    /** @param ExplainResult $explainResult */
     public function detect(array $explainResult): bool
     {
         // Check for duplicates_removal in ordering_operation

@@ -6,6 +6,9 @@ namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
 
+use function in_array;
+use function is_array;
+
 /**
  * Detects index usage on low cardinality columns
  *
@@ -18,9 +21,7 @@ final class LowCardinalityIndexDetector implements DetectorInterface
 {
     private const HIGH_SCAN_THRESHOLD = 0.5; // 50% of rows
 
-    /**
-     * @param ExplainResult $explainResult
-     */
+    /** @param ExplainResult $explainResult */
     public function detect(array $explainResult): bool
     {
         if (! isset($explainResult['query_block'])) {
@@ -56,9 +57,7 @@ final class LowCardinalityIndexDetector implements DetectorInterface
         return false;
     }
 
-    /**
-     * @param array<string, mixed> $table
-     */
+    /** @param array<string, mixed> $table */
     private function checkTable(array $table): bool
     {
         // Must be using an index (not full scan)
