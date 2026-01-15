@@ -5,7 +5,8 @@
       "Bash(php bin/sql-quality analyze:*)",
       "Bash(php -r:*)",
       "Bash(mysql:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(git push:*)"
     ],
     "deny": [],
     "ask": []

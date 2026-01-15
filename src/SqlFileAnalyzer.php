@@ -60,8 +60,8 @@ final class SqlFileAnalyzer
      * Analyzes the SQL files contained in the specified parameters, generates statistical analyses,
      * outputs detailed Markdown reports for each SQL file, and creates a summary report.
      *
-     * @param array<string, mixed> $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
-     * @param string               $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
+     * @param SqlParams $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
+     * @param string    $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
      *
      *               example: $sqlParams [
      *                  1_full_table_scan.sql' => ['min_views' => 1000],

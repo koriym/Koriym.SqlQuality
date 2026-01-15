@@ -24,14 +24,21 @@ namespace Koriym\SqlQuality;
  *   cost_info?: ExplainCostInfo,
  *   using_temporary_table?: bool,
  *   using_filesort?: bool,
- *   using_index?: bool
+ *   using_index?: bool,
+ *   used_columns?: list<string>
+ * }
+ * @psalm-type DuplicatesRemovalOperation = array{
+ *   using_temporary_table?: bool,
+ *   using_filesort?: bool,
+ *   table?: ExplainTable
  * }
  * @psalm-type ExplainOperation = array{
  *   using_temporary_table?: bool,
  *   using_filesort?: bool,
  *   cost_info?: ExplainCostInfo,
  *   table?: ExplainTable,
- *   nested_loop?: array<array{table: ExplainTable}>
+ *   nested_loop?: array<array{table: ExplainTable}>,
+ *   duplicates_removal?: DuplicatesRemovalOperation
  * }
  * @psalm-type ExplainQueryBlock = array{
  *   select_id: int,
@@ -39,12 +46,14 @@ namespace Koriym\SqlQuality;
  *   table?: ExplainTable,
  *   grouping_operation?: ExplainOperation,
  *   ordering_operation?: ExplainOperation,
+ *   duplicates_removal?: DuplicatesRemovalOperation,
  *   select_list_subqueries?: array<array{
  *     query_block: array{table: ExplainTable}
  *   }>,
  *   nested_loop?: ExplainOperation,
  *   union_result?: array<mixed>
  * }
+ * @psalm-type ExplainNode = array<string, mixed>
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock,
  *   analyze_result: array<string, mixed>

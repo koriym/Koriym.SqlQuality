@@ -13,6 +13,7 @@ use function is_array;
  * Detects unnecessary DISTINCT operations
  *
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type DuplicatesRemovalOperation from Types
  */
 final class UnnecessaryDistinctDetector implements DetectorInterface
 {
@@ -35,7 +36,7 @@ final class UnnecessaryDistinctDetector implements DetectorInterface
     /**
      * Check if used_columns likely contains a primary key (column named 'id')
      *
-     * @param array<string, mixed> $duplicatesRemoval
+     * @param DuplicatesRemovalOperation $duplicatesRemoval
      */
     private function hasPrimaryKeyInUsedColumns(array $duplicatesRemoval): bool
     {

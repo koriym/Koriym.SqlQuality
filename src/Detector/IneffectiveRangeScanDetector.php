@@ -4,19 +4,25 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\Types;
+
 use function count;
 use function is_array;
 use function preg_match;
 use function str_contains;
 use function substr_count;
 
-/** @pas */
+/**
+ * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type ExplainNode from Types
+ */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
     /**
      * 非効率的な範囲スキャンを検出します
      *
-     * {@inheritDoc}
+     * @param ExplainResult $explainResult
      */
     public function detect(array $explainResult): bool
     {
@@ -29,8 +35,8 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * クエリブロックを再帰的に探索して非効率的な範囲スキャンをチェックします
      *
-     * @param array<string, mixed> $node             現在のノード
-     * @param int                  $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
+     * @param ExplainNode $node             現在のノード
+     * @param int         $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
      */
     private function traverseQueryBlock(array $node, int &$ineffectiveScans): void
     {
@@ -54,7 +60,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * テーブルアクセスが非効率的かどうかを判定します
      *
-     * @param array<string, mixed> $table テーブルアクセス情報
+     * @param ExplainTable $table テーブルアクセス情報
      */
     private function isIneffectiveTableAccess(array $table): bool
     {

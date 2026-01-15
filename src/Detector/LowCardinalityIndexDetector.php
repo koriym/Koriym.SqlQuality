@@ -16,6 +16,7 @@ use function is_array;
  * of table rows, making them inefficient compared to full table scans.
  *
  * @psalm-import-type ExplainResult from Types
+ * @psalm-import-type ExplainTable from Types
  */
 final class LowCardinalityIndexDetector implements DetectorInterface
 {
@@ -31,33 +32,46 @@ final class LowCardinalityIndexDetector implements DetectorInterface
         $queryBlock = $explainResult['query_block'];
 
         // Check single table access
-        if (isset($queryBlock['table']) && $this->checkTable($queryBlock['table'])) {
+        if (isset($queryBlock['table']) && is_array($queryBlock['table']) && $this->checkTable($queryBlock['table'])) {
             return true;
         }
 
         // Check nested loop joins
         if (isset($queryBlock['nested_loop']) && is_array($queryBlock['nested_loop'])) {
             foreach ($queryBlock['nested_loop'] as $nestedTable) {
-                if (isset($nestedTable['table']) && $this->checkTable($nestedTable['table'])) {
+                if (
+                    is_array($nestedTable) &&
+                    isset($nestedTable['table']) &&
+                    is_array($nestedTable['table']) &&
+                    $this->checkTable($nestedTable['table'])
+                ) {
                     return true;
                 }
             }
         }
 
         // Check ordering_operation
-        if (isset($queryBlock['ordering_operation']['table']) && $this->checkTable($queryBlock['ordering_operation']['table'])) {
+        if (
+            isset($queryBlock['ordering_operation']['table']) &&
+            is_array($queryBlock['ordering_operation']['table']) &&
+            $this->checkTable($queryBlock['ordering_operation']['table'])
+        ) {
             return true;
         }
 
         // Check grouping_operation
-        if (isset($queryBlock['grouping_operation']['table']) && $this->checkTable($queryBlock['grouping_operation']['table'])) {
+        if (
+            isset($queryBlock['grouping_operation']['table']) &&
+            is_array($queryBlock['grouping_operation']['table']) &&
+            $this->checkTable($queryBlock['grouping_operation']['table'])
+        ) {
             return true;
         }
 
         return false;
     }
 
-    /** @param array<string, mixed> $table */
+    /** @param ExplainTable $table */
     private function checkTable(array $table): bool
     {
         // Must be using an index (not full scan)
