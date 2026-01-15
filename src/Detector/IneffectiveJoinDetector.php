@@ -65,7 +65,7 @@ class IneffectiveJoinDetector implements DetectorInterface
         $rowsProduced = $tableInfo['rows_produced_per_join'] ?? 0;
 
         // 検査する行数と生成される行数に大きな差がある場合
-        return $rowsExamined > 1000 || ($rowsProduced / $rowsExamined < 0.1);
+        return $rowsExamined > 1000 || ($rowsExamined > 0 && $rowsProduced / $rowsExamined < 0.1);
     }
 
     private function hasInappropriateIndexUsage(array $tableInfo): bool

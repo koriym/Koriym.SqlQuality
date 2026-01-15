@@ -9,7 +9,6 @@ use Override;
 
 use function is_array;
 use function is_string;
-use function preg_match;
 use function str_contains;
 use function substr_count;
 
@@ -104,19 +103,5 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
             isset($table['rows_examined_per_scan']) &&
             $table['filtered'] < 20.00 &&
             $table['rows_examined_per_scan'] > 100;
-    }
-
-    /**
-     * IN句の値の数をカウントします
-     *
-     * @param string $condition WHERE句の条件
-     */
-    private function countInClauseValues(string $condition): int
-    {
-        if (preg_match('/in\s*\((.*?)\)/i', $condition, $matches)) {
-            return substr_count($matches[1], ',') + 1;
-        }
-
-        return 0;
     }
 }

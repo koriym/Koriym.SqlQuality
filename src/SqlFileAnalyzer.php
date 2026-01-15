@@ -308,14 +308,17 @@ final class SqlFileAnalyzer
             $noOptimizerAnalysisCost = 1;
         }
 
+        $noOptimizerCost = (float) $noOptimizerAnalysis['cost'];
+        $noOptimizerTime = (float) $noOptimizerAnalysis['execution_time'];
+
         return [
             ...$defaultAnalysis,
             'optimizer_comparison' => [
                 'with_optimizer' => $defaultAnalysis,
                 'without_optimizer' => $noOptimizerAnalysis,
                 'difference' => [
-                    'cost_percent' => ((float) $defaultAnalysis['cost'] - (float) $noOptimizerAnalysis['cost']) / (float) $noOptimizerAnalysis['cost'] * 100.0,
-                    'time_percent' => ((float) $defaultAnalysis['execution_time'] - (float) $noOptimizerAnalysis['execution_time']) / (float) $noOptimizerAnalysis['execution_time'] * 100.0,
+                    'cost_percent' => $noOptimizerCost > 0.0 ? ((float) $defaultAnalysis['cost'] - $noOptimizerCost) / $noOptimizerCost * 100.0 : 0.0,
+                    'time_percent' => $noOptimizerTime > 0.0 ? ((float) $defaultAnalysis['execution_time'] - $noOptimizerTime) / $noOptimizerTime * 100.0 : 0.0,
                 ],
             ],
         ];

@@ -21,8 +21,6 @@ use function is_array;
  */
 final class LowCardinalityIndexDetector implements DetectorInterface
 {
-    private const HIGH_SCAN_THRESHOLD = 0.5; // 50% of rows
-
     /** @param ExplainResult $explainResult */
     #[Override]
     public function detect(array $explainResult): bool
