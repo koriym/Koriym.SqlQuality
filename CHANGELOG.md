@@ -10,24 +10,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [0.2.0] - 2026-01-15
 
 ### Added
-- CLI tool for analyzing SQL files directly from command line
-- `UnnecessaryDistinctDetector` for detecting redundant DISTINCT operations
-- `LowCardinalityIndexDetector` for detecting inefficient low-cardinality indexes
-- Claude Code Skills for SQL analysis and detector development
+- **Claude Code Skills integration** - AI-powered SQL analysis and detector development assistance
+- **New detector: `UnnecessaryDistinctDetector`** - Detects redundant DISTINCT operations
+- **New detector: `LowCardinalityIndexDetector`** - Identifies inefficient low-cardinality indexes
 
-### Changed
-- Replaced generic array shapes with Psalm domain types for better IDE support and type safety
-- Added `#[Override]` attributes to all interface implementations using symfony/polyfill-php83
-- Updated PHPCS configuration to use modern sniffs (DNFTypeHintFormat, Generic.WhiteSpace.LanguageConstructSpacing)
+### Improved
+- Enhanced type safety with Psalm domain types throughout the codebase
+- Added `#[Override]` attributes for better IDE support (requires symfony/polyfill-php83)
 
 ### Fixed
-- Fixed potential division by zero in `IneffectiveJoinDetector::hasHighRowCount()`
-- Fixed potential division by zero in `SqlFileAnalyzer` optimizer comparison calculations
-- Fixed type safety in `QueryStatisticsCalculator::calculate()` array_reduce callback
-
-### Removed
-- Unused `HIGH_SCAN_THRESHOLD` constant from `LowCardinalityIndexDetector`
-- Unused `countInClauseValues()` method from `IneffectiveRangeScanDetector`
+- Division by zero errors in `IneffectiveJoinDetector` and `SqlFileAnalyzer`
+- Type safety in `QueryStatisticsCalculator` variance calculation
 
 ## [0.1.7] - 2025-01-14
 
