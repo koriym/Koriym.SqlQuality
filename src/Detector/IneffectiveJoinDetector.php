@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Override;
+
 use function in_array;
 
 class IneffectiveJoinDetector implements DetectorInterface
 {
-    /** {@inheritDoc} */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         return $this->hasIneffectiveJoin($explainResult);

@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Override;
 use PDO;
 
 use function array_map;
@@ -40,6 +41,7 @@ final class OptimizerSettings implements OptimizerSettingsInterface
     ) {
     }
 
+    #[Override]
     public function saveCurrentSettings(): array
     {
         $stmt = $this->pdo->query('SELECT @@optimizer_switch');
@@ -50,11 +52,13 @@ final class OptimizerSettings implements OptimizerSettingsInterface
         return $settings;
     }
 
+    #[Override]
     public function restore(array $settings): void
     {
         $this->pdo->exec("SET optimizer_switch = '{$settings['@@optimizer_switch']}'");
     }
 
+    #[Override]
     public function disableAll(): void
     {
         $options = array_map(
@@ -65,6 +69,7 @@ final class OptimizerSettings implements OptimizerSettingsInterface
         $this->pdo->exec("SET optimizer_switch = '$optionString'");
     }
 
+    #[Override]
     public function enableAll(): void
     {
         $options = array_map(

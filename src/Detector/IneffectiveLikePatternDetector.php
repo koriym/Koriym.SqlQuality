@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
+use Override;
 
 use function is_array;
 use function preg_match;
@@ -21,6 +22,7 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
      *
      * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // 非効率なLIKEパターンの数をカウント

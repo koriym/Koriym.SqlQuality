@@ -314,8 +314,8 @@ final class SqlFileAnalyzer
                 'with_optimizer' => $defaultAnalysis,
                 'without_optimizer' => $noOptimizerAnalysis,
                 'difference' => [
-                    'cost_percent' => ($defaultAnalysis['cost'] - $noOptimizerAnalysis['cost']) / $noOptimizerAnalysis['cost'] * 100,
-                    'time_percent' => ($defaultAnalysis['execution_time'] - $noOptimizerAnalysis['execution_time']) / $noOptimizerAnalysis['execution_time'] * 100,
+                    'cost_percent' => ((float) $defaultAnalysis['cost'] - (float) $noOptimizerAnalysis['cost']) / (float) $noOptimizerAnalysis['cost'] * 100.0,
+                    'time_percent' => ((float) $defaultAnalysis['execution_time'] - (float) $noOptimizerAnalysis['execution_time']) / (float) $noOptimizerAnalysis['execution_time'] * 100.0,
                 ],
             ],
         ];
@@ -396,6 +396,6 @@ final class SqlFileAnalyzer
         array_shift($executionTimes); // Remove the minimum value
         array_pop($executionTimes);   // Remove the maximum value
 
-        return array_sum($executionTimes) / count($executionTimes);
+        return array_sum($executionTimes) / (float) count($executionTimes);
     }
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
+use Override;
 
 use function is_array;
 
@@ -19,6 +20,7 @@ final class ExcessiveDerivedTablesDetector implements DetectorInterface
      *
      * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         // 一時テーブルのカウント

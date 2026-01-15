@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Override;
+
 use function preg_match;
 
 final class ImplicitTypeConversionDetector implements DetectorInterface
@@ -13,6 +15,7 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
      *
      * {@inheritDoc}
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         if (! isset($explainResult['query_block']['table'])) {

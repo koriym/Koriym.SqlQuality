@@ -137,13 +137,13 @@ TEMPLATE;
             // ソート操作のコスト
             if (isset($queryBlock['ordering_operation']['cost_info'])) {
                 $sortCost = $queryBlock['ordering_operation']['cost_info'];
-                $planCost += $sortCost['sort_cost'] ?? 0;
+                $planCost += $sortCost['sort_cost'] ?? 0.0;
             }
 
             // 一時テーブルのコスト
             if (isset($queryBlock['grouping_operation']['cost_info'])) {
                 $groupCost = $queryBlock['grouping_operation']['cost_info'];
-                $planCost += $groupCost['tmp_table_cost'] ?? 0;
+                $planCost += $groupCost['tmp_table_cost'] ?? 0.0;
             }
         }
 

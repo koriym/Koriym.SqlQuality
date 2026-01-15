@@ -5,9 +5,10 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
+use Override;
 
-use function count;
 use function is_array;
+use function is_string;
 use function preg_match;
 use function str_contains;
 use function substr_count;
@@ -24,6 +25,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
      *
      * @param ExplainResult $explainResult
      */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         $ineffectiveScans = 0;
@@ -75,14 +77,14 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
         }
 
         // 非効率的な範囲スキャン条件のチェック
-        if (isset($table['type']) && $table['type'] === 'range') {
+        if (isset($table['access_type']) && $table['access_type'] === 'range') {
             // 大量の行数を処理する範囲スキャン
             if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
                 return true;
             }
 
             // 複数のインデックス候補がある場合
-            if (isset($table['possible_keys']) && is_array($table['possible_keys']) && count($table['possible_keys']) > 1) {
+            if (isset($table['possible_keys']) && is_string($table['possible_keys']) && substr_count($table['possible_keys'], ',') > 0) {
                 return true;
             }
         }

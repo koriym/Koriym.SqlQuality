@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Types;
+use Override;
 
 use function in_array;
 use function is_array;
@@ -23,6 +24,7 @@ final class LowCardinalityIndexDetector implements DetectorInterface
     private const HIGH_SCAN_THRESHOLD = 0.5; // 50% of rows
 
     /** @param ExplainResult $explainResult */
+    #[Override]
     public function detect(array $explainResult): bool
     {
         if (! isset($explainResult['query_block'])) {
@@ -39,12 +41,13 @@ final class LowCardinalityIndexDetector implements DetectorInterface
         // Check nested loop joins
         if (isset($queryBlock['nested_loop']) && is_array($queryBlock['nested_loop'])) {
             foreach ($queryBlock['nested_loop'] as $nestedTable) {
-                if (
-                    is_array($nestedTable) &&
-                    isset($nestedTable['table']) &&
-                    is_array($nestedTable['table']) &&
-                    $this->checkTable($nestedTable['table'])
-                ) {
+                if (! is_array($nestedTable) || ! isset($nestedTable['table']) || ! is_array($nestedTable['table'])) {
+                    continue;
+                }
+
+                /** @var ExplainTable $table */
+                $table = $nestedTable['table'];
+                if ($this->checkTable($table)) {
                     return true;
                 }
             }
