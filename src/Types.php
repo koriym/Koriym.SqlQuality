@@ -53,7 +53,7 @@ namespace Koriym\SqlQuality;
  *   nested_loop?: ExplainOperation,
  *   union_result?: array<mixed>
  * }
- * @psalm-type ExplainNode = array<string, mixed>
+ * @psalm-type ExplainNode = array<string, mixed> Intentionally loose type for recursive traversal of arbitrary EXPLAIN JSON structures
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock,
  *   analyze_result: array<string, mixed>
