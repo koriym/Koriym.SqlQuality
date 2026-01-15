@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-01-15
+
 ### Added
 - CLI tool for analyzing SQL files directly from command line
 - `UnnecessaryDistinctDetector` for detecting redundant DISTINCT operations
