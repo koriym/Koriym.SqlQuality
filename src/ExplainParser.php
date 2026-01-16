@@ -267,8 +267,8 @@ class ExplainParser
     {
         /** @var TreeNodeAttributes $attributes */
         $attributes = [
-            'rows' => (string) $table['rows_examined_per_scan'],
-            'filtered' => (string) $table['filtered'],
+            'rows' => isset($table['rows_examined_per_scan']) ? (string) $table['rows_examined_per_scan'] : null,
+            'filtered' => isset($table['filtered']) ? (string) $table['filtered'] : null,
         ];
 
         if (isset($table['attached_condition'])) {
