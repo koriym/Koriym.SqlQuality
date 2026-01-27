@@ -58,6 +58,50 @@ $analyzer = new SqlFileAnalyzer(
 $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```
 
+## Claude Code Skills
+
+[Claude Code](https://claude.ai/code)ユーザー向けに、SQL最適化の自動化スキルが利用可能です：
+
+### インストール
+
+**マーケットプレイスから:**
+```bash
+# マーケットプレイスを追加
+/plugin marketplace add koriym/Koriym.SqlQuality
+
+# プラグインをインストール
+/plugin install sql-quality-check@sql-quality
+/plugin install sql-quality-fix@sql-quality
+/plugin install sql-params-generate@sql-quality
+```
+
+**プロジェクト開発者向け:**
+このプロジェクトフォルダを信頼すると、Claude Codeが自動的にマーケットプレイスの追加とプラグインの有効化を促します（`.claude/settings.json`で設定済み）。
+
+### 使用方法
+
+```bash
+# SQLファイルを分析（CI対応）
+/sql-quality-check tests/sql tests/params/sql_params.php
+
+# 段階的な測定で自動修正
+/sql-quality-fix tests/sql tests/params/sql_params.php
+
+# SQLファイルからパラメータバインディングを生成
+/sql-params-generate tests/sql
+```
+
+### 機能
+
+これらのAI駆動型スキルは以下を実現します：
+- パフォーマンス問題の検出（FullTableScan、IneffectiveJoinなど）
+- 問題のあるSQLパターンの書き換え（カラムの関数使用、暗黙的な型変換など）
+- インデックスの作成とリアルタイムでの影響測定
+- 効果のないインデックスの自動ロールバック
+- コスト削減を含む詳細な改善レポートの生成
+
+詳細なドキュメントは`skills/*/SKILL.md`を参照してください。
+
 ## 分析レポート
 
 例：

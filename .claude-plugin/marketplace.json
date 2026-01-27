@@ -1,0 +1,15 @@
+{
+  "name": "sql-quality",
+  "owner": {
+    "name": "Akihito Koriyama",
+    "email": "akihito.koriyama@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "sql-quality",
+      "source": "./",
+      "description": "Claude Skills for SQL quality analysis and optimization",
+      "version": "1.0.0"
+    }
+  ]
+}

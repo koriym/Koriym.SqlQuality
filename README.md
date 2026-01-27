@@ -68,14 +68,17 @@ For [Claude Code](https://claude.ai/code) users, automated SQL optimization skil
 
 **From Marketplace:**
 ```bash
+# Add marketplace
 /plugin marketplace add koriym/Koriym.SqlQuality
-/plugin install sql-quality-check
-/plugin install sql-quality-fix
-/plugin install sql-params-generate
+
+# Install plugins
+/plugin install sql-quality-check@sql-quality
+/plugin install sql-quality-fix@sql-quality
+/plugin install sql-params-generate@sql-quality
 ```
 
 **For Project Developers:**
-Skills are automatically available when you clone this repository (located in `.claude/commands/`).
+When you trust this project folder, Claude Code will automatically prompt you to add the marketplace and enable the plugins (configured in `.claude/settings.json`).
 
 ### Usage
 
