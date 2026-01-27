@@ -71,10 +71,8 @@ For [Claude Code](https://claude.ai/code) users, automated SQL optimization skil
 # Add marketplace
 /plugin marketplace add koriym/Koriym.SqlQuality
 
-# Install plugins
-/plugin install sql-quality-check@sql-quality
-/plugin install sql-quality-fix@sql-quality
-/plugin install sql-params-generate@sql-quality
+# Install plugin (includes all 3 skills)
+/plugin install sql-quality@sql-quality
 ```
 
 **For Project Developers:**

@@ -69,10 +69,8 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 # マーケットプレイスを追加
 /plugin marketplace add koriym/Koriym.SqlQuality
 
-# プラグインをインストール
-/plugin install sql-quality-check@sql-quality
-/plugin install sql-quality-fix@sql-quality
-/plugin install sql-params-generate@sql-quality
+# プラグインをインストール（3つのスキルすべてが含まれます）
+/plugin install sql-quality@sql-quality
 ```
 
 **プロジェクト開発者向け:**
