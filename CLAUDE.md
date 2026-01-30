@@ -67,6 +67,8 @@ Existing detectors in `src/Detector/`:
 - IneffectiveRangeScanDetector
 - IneffectiveSortDetector
 - IneffectiveUnionDetector
+- LowCardinalityIndexDetector
+- UnnecessaryDistinctDetector
 
 ### Type Definitions
 

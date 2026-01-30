@@ -58,6 +58,28 @@ $analyzer = new SqlFileAnalyzer(
 $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```
 
+## CLI使用方法
+
+```bash
+sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
+sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --output=build/sql-quality
+sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
+sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
+```
+
+### オプション
+
+| オプション | 説明 | デフォルト |
+|--------|-------------|---------|
+| `--sql-dir=DIR` | SQLファイルを含むディレクトリ（必須） | |
+| `--params=FILE` | SQLパラメータ配列を返すPHPファイル（必須） | |
+| `--dsn=DSN` | データベースDSN | `mysql:host=127.0.0.1;dbname=test` |
+| `--user=USER` | データベースユーザー | `root` |
+| `--password=PASS` | データベースパスワード | （空） |
+| `--format=FORMAT` | 出力フォーマット: `json`または`markdown` | `json` |
+| `--output=DIR` | Markdownレポートの出力ディレクトリ | |
+| `--lang=LANG` | メッセージの言語: `en`または`ja` | `en` |
+
 ## Claude Code Skills
 
 [Claude Code](https://claude.ai/code)ユーザー向けに、SQL最適化の自動化スキルが利用可能です：

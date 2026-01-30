@@ -10,7 +10,8 @@
     ],
     "require": {
         "php": "^8.1",
-        "ext-pdo": "*"
+        "ext-pdo": "*",
+        "ext-pdo_mysql": "*"
     },
     "require-dev": {
         "bamarni/composer-bin-plugin": "^1.8",

@@ -60,6 +60,28 @@ $analyzer = new SqlFileAnalyzer(
 $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```
 
+## CLI Usage
+
+```bash
+sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
+sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --output=build/sql-quality
+sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
+sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
+```
+
+### Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--sql-dir=DIR` | Directory containing SQL files (required) | |
+| `--params=FILE` | PHP file returning SQL parameters array (required) | |
+| `--dsn=DSN` | Database DSN | `mysql:host=127.0.0.1;dbname=test` |
+| `--user=USER` | Database user | `root` |
+| `--password=PASS` | Database password | (empty) |
+| `--format=FORMAT` | Output format: `json` or `markdown` | `json` |
+| `--output=DIR` | Output directory for markdown reports | |
+| `--lang=LANG` | Language for messages: `en` or `ja` | `en` |
+
 ## Claude Code Skills
 
 For [Claude Code](https://claude.ai/code) users, automated SQL optimization skills are available:
