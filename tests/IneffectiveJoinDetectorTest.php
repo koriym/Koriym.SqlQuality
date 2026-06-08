@@ -15,11 +15,13 @@ final class IneffectiveJoinDetectorTest extends TestCase
 
         $this->assertTrue($detector->detect([
             'query_block' => [
+                'select_id' => 1,
                 'nested_loop' => [
                     [
                         'table' => [
                             'table_name' => 'posts',
                             'access_type' => 'ALL',
+                            'rows' => 5000,
                             'rows_examined_per_scan' => 5000,
                             'rows_produced_per_join' => 100,
                         ],
@@ -28,12 +30,14 @@ final class IneffectiveJoinDetectorTest extends TestCase
                         'table' => [
                             'table_name' => 'comments',
                             'access_type' => 'ref',
+                            'rows' => 1,
                             'rows_examined_per_scan' => 1,
                             'rows_produced_per_join' => 1,
                         ],
                     ],
                 ],
             ],
+            'analyze_result' => [],
         ]));
     }
 
@@ -43,11 +47,13 @@ final class IneffectiveJoinDetectorTest extends TestCase
 
         $this->assertFalse($detector->detect([
             'query_block' => [
+                'select_id' => 1,
                 'nested_loop' => [
                     [
                         'table' => [
                             'table_name' => 'posts',
                             'access_type' => 'ALL',
+                            'rows' => 5000,
                             'rows_examined_per_scan' => 5000,
                         ],
                     ],
@@ -55,11 +61,13 @@ final class IneffectiveJoinDetectorTest extends TestCase
                 'select_list_subqueries' => [
                     [
                         'query_block' => [
+                            'select_id' => 2,
                             'nested_loop' => [
                                 [
                                     'table' => [
                                         'table_name' => 'users',
                                         'access_type' => 'ALL',
+                                        'rows' => 5000,
                                         'rows_examined_per_scan' => 5000,
                                     ],
                                 ],
@@ -68,6 +76,7 @@ final class IneffectiveJoinDetectorTest extends TestCase
                     ],
                 ],
             ],
+            'analyze_result' => [],
         ]));
     }
 }

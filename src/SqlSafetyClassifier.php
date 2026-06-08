@@ -25,13 +25,13 @@ final class SqlSafetyClassifier
     /** @return SqlClassification */
     public function classify(string $sql): array
     {
+        if (self::containsStackedStatement($sql)) {
+            return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
+        }
+
         $normalized = $this->normalize($sql);
         if ($normalized === '') {
             return ['kind' => 'empty', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'empty SQL'];
-        }
-
-        if ($this->containsStackedStatement($normalized)) {
-            return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
         }
 
         if (preg_match('/^select\b/i', $normalized)) {
@@ -84,16 +84,14 @@ final class SqlSafetyClassifier
     /** @psalm-pure */
     public function normalize(string $sql): string
     {
-        $withoutBlockComments = preg_replace('/\/\*.*?\*\//s', ' ', $sql) ?? $sql;
-        $withoutLineComments = preg_replace('/--.*$/m', ' ', $withoutBlockComments) ?? $withoutBlockComments;
-        $withoutHashComments = preg_replace('/#.*$/m', ' ', $withoutLineComments) ?? $withoutLineComments;
-        $collapsed = preg_replace('/\s+/', ' ', $withoutHashComments) ?? $withoutHashComments;
+        $withoutComments = self::stripComments($sql);
+        $collapsed = preg_replace('/\s+/', ' ', $withoutComments) ?? $withoutComments;
 
         return trim($collapsed);
     }
 
     /** @psalm-pure */
-    private function containsStackedStatement(string $normalizedSql): bool
+    private static function containsStackedStatement(string $normalizedSql): bool
     {
         $quote = null;
         $isEscaped = false;
@@ -127,18 +125,132 @@ final class SqlSafetyClassifier
                 continue;
             }
 
+            if ($char === '/' && $offset + 1 < $length && $normalizedSql[$offset + 1] === '*') {
+                $offset += 2;
+                while ($offset + 1 < $length && ! ($normalizedSql[$offset] === '*' && $normalizedSql[$offset + 1] === '/')) {
+                    $offset++;
+                }
+
+                $offset++;
+
+                continue;
+            }
+
+            if ($char === '-' && $offset + 1 < $length && $normalizedSql[$offset + 1] === '-') {
+                $offset += 2;
+                while ($offset < $length && $normalizedSql[$offset] !== "\n" && $normalizedSql[$offset] !== "\r") {
+                    $offset++;
+                }
+
+                continue;
+            }
+
+            if ($char === '#') {
+                while ($offset < $length && $normalizedSql[$offset] !== "\n" && $normalizedSql[$offset] !== "\r") {
+                    $offset++;
+                }
+
+                continue;
+            }
+
             if ($char === '\'' || $char === '"' || $char === '`') {
                 $quote = $char;
 
                 continue;
             }
 
-            if ($char === ';' && trim(substr($normalizedSql, $offset + 1)) !== '') {
+            if ($char === ';' && self::hasExecutableTail(substr($normalizedSql, $offset + 1))) {
                 return true;
             }
         }
 
         return false;
+    }
+
+    /** @psalm-pure */
+    private static function hasExecutableTail(string $sql): bool
+    {
+        return trim(self::stripComments($sql)) !== '';
+    }
+
+    /** @psalm-pure */
+    private static function stripComments(string $sql): string
+    {
+        $result = '';
+        $quote = null;
+        $isEscaped = false;
+        $length = strlen($sql);
+        for ($offset = 0; $offset < $length; $offset++) {
+            $char = $sql[$offset];
+
+            if ($isEscaped) {
+                $result .= $char;
+                $isEscaped = false;
+
+                continue;
+            }
+
+            if ($quote !== null) {
+                $result .= $char;
+                if ($char === '\\') {
+                    $isEscaped = true;
+
+                    continue;
+                }
+
+                if ($char === $quote) {
+                    if ($offset + 1 < $length && $sql[$offset + 1] === $quote) {
+                        $offset++;
+                        $result .= $sql[$offset];
+
+                        continue;
+                    }
+
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($char === '/' && $offset + 1 < $length && $sql[$offset + 1] === '*') {
+                $result .= ' ';
+                $offset += 2;
+                while ($offset + 1 < $length && ! ($sql[$offset] === '*' && $sql[$offset + 1] === '/')) {
+                    $offset++;
+                }
+
+                $offset++;
+
+                continue;
+            }
+
+            if ($char === '-' && $offset + 1 < $length && $sql[$offset + 1] === '-') {
+                $result .= ' ';
+                $offset += 2;
+                while ($offset < $length && $sql[$offset] !== "\n" && $sql[$offset] !== "\r") {
+                    $offset++;
+                }
+
+                continue;
+            }
+
+            if ($char === '#') {
+                $result .= ' ';
+                while ($offset < $length && $sql[$offset] !== "\n" && $sql[$offset] !== "\r") {
+                    $offset++;
+                }
+
+                continue;
+            }
+
+            if ($char === '\'' || $char === '"' || $char === '`') {
+                $quote = $char;
+            }
+
+            $result .= $char;
+        }
+
+        return $result;
     }
 
     /** @psalm-pure */
