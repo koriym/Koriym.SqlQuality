@@ -110,4 +110,48 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertFalse($result['is_explainable']);
         $this->assertFalse($result['is_read_only_select']);
     }
+
+    public function testSelectWritingToOutfileIsExplainableButNotExecutable(): void
+    {
+        $result = $this->classifier->classify("SELECT * FROM users INTO OUTFILE '/tmp/users.txt'");
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testSelectWithLockingOrBlockingConstructIsExplainableButNotExecutable(): void
+    {
+        $unsafeSelects = [
+            "SELECT GET_LOCK('report', 10)",
+            'SELECT SLEEP(5)',
+            'SELECT * FROM users WHERE id = 1 LOCK IN SHARE MODE',
+        ];
+
+        foreach ($unsafeSelects as $sql) {
+            $result = $this->classifier->classify($sql);
+
+            $this->assertSame('select', $result['kind'], $sql);
+            $this->assertTrue($result['is_explainable'], $sql);
+            $this->assertFalse($result['is_read_only_select'], $sql);
+        }
+    }
+
+    public function testCallStatementIsUnsafeAndNotExplainable(): void
+    {
+        $result = $this->classifier->classify('CALL recalc_totals()');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testSetStatementIsUnsafeAndNotExplainable(): void
+    {
+        $result = $this->classifier->classify('SET @counter = 0');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
 }
