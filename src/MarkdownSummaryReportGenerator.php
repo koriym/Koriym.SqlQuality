@@ -21,7 +21,10 @@ use function str_replace;
 
 use const PATHINFO_FILENAME;
 
-/** @psalm-import-type AnalysisResult from Types */
+/**
+ * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type DetectedWarning from Types
+ */
 class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
 {
     private const SIGNIFICANT_COST_IMPACT = 20.0; // 20% difference in cost
@@ -243,7 +246,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
         return sprintf('%+.1f%%', $impact);
     }
 
-    /** @param array<array<string, string>> $issues */
+    /** @param list<DetectedWarning> $issues */
     private function formatIssues(array $issues): string
     {
         return empty($issues) ? '-' : implode(', ', array_column($issues, 'type'));

@@ -47,6 +47,7 @@ final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
+    private readonly SqlSafetyClassifier $sqlSafetyClassifier;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -56,6 +57,7 @@ final class SqlFileAnalyzer
         OptimizerSettingsInterface|null $optimizerSettings = null
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
+        $this->sqlSafetyClassifier = new SqlSafetyClassifier();
     }
 
     /**
@@ -158,8 +160,12 @@ final class SqlFileAnalyzer
      *
      * @throws RuntimeException
      */
-    private function executeExplain(string $sql, array $params): array
+    private function executeExplain(string $sql, array $params, bool $executeAnalyze): array
     {
+        if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
+            throw new RuntimeException('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
+        }
+
         $interpolatedSql = $this->interpolateQuery($sql, $params);
 
         // FORMAT=JSON の EXPLAIN を実行
@@ -179,7 +185,23 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        if (! is_string($explainJson)) {
+            throw new RuntimeException('Invalid EXPLAIN result');
+        }
+
         $explainJsonData = json_decode($explainJson, true);
+        if (! is_array($explainJsonData)) {
+            throw new RuntimeException('Invalid EXPLAIN JSON result');
+        }
+
+        if (! isset($explainJsonData['query_block']) || ! is_array($explainJsonData['query_block'])) {
+            throw new RuntimeException('Invalid EXPLAIN JSON query block');
+        }
+
+        /** @var ExplainResult $explainJsonData */
+        if (! $executeAnalyze) {
+            return [$explainJsonData, 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)'];
+        }
 
         // EXPLAIN ANALYZE を実行
         $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
@@ -300,9 +322,12 @@ final class SqlFileAnalyzer
 
         // オプティマイザーを無効化して分析
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
-        $this->optimizerSettings->disableAll();
-        $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
-        $this->optimizerSettings->restore($savedSettings);
+        try {
+            $this->optimizerSettings->disableAll();
+            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        } finally {
+            $this->optimizerSettings->restore($savedSettings);
+        }
 
         // 両方の結果を含めて返す
         $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
@@ -326,16 +351,23 @@ final class SqlFileAnalyzer
         ];
     }
 
-    /** @return AnalysisWithSettingsResult */
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
     private function analyzeWithSettings(
         string $sql,
         array $params,
         string $sqlFile,
         string $outputDir
     ): array {
-        $executionTime = $this->getExecutedTime($sql, $params);
+        $classification = $this->sqlSafetyClassifier->classify($sql);
+        $executed = $classification['is_read_only_select'];
+        $skippedReason = $executed ? null : $classification['reason'];
+        $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
         /** @var ExplainResult $explainResult */
-        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params);
+        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params, $executed);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
         $warnings = $this->getWarnings();
         /** @var list<DetectedWarning> $issues */
@@ -357,6 +389,9 @@ final class SqlFileAnalyzer
         $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
 
         return [
+            'mode' => 'wd',
+            'executed' => $executed,
+            'skipped_reason' => $skippedReason,
             'issues' => $issues,
             'explain_result' => $explainResult,
             'ai_suggestions' => $aiPrompt,
@@ -368,18 +403,34 @@ final class SqlFileAnalyzer
     /** @param array<string, mixed> $params */
     public function getExecutedTime(string $sql, array $params): float
     {
+        if (! $this->sqlSafetyClassifier->isReadOnlySelect($sql)) {
+            throw new RuntimeException('Execution timing is limited to read-only SELECT statements');
+        }
+
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         // warm up the cache
-        $this->pdo->query($interpolatedSql);
-        $stmt = $this->pdo->query($interpolatedSql);
-        if ($stmt === false) {
+        $warmupStmt = $this->pdo->query($interpolatedSql);
+        if ($warmupStmt === false) {
             throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
         }
+
+        $warmupStmt->fetchAll();
+
+        $secondWarmupStmt = $this->pdo->query($interpolatedSql);
+        if ($secondWarmupStmt === false) {
+            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+        }
+
+        $secondWarmupStmt->fetchAll();
 
         $executionTimes = [];
         for ($i = 0; $i < self::TRIAL_COUNT; $i++) {
             $startTime = microtime(true);
             $stmt = $this->pdo->query($interpolatedSql);
+            if ($stmt === false) {
+                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            }
+
             // Fetch all results to ensure:
             // 1. The query is fully executed
             // 2. The result set is fully retrieved

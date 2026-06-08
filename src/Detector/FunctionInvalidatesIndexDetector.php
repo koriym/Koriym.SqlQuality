@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\ExplainWalker;
 use Override;
 
 use function is_string;
@@ -14,11 +15,14 @@ final class FunctionInvalidatesIndexDetector implements DetectorInterface
     #[Override]
     public function detect(array $explainResult): bool
     {
-        if (! isset($explainResult['query_block']['table'])) {
-            return false;
+        $walker = new ExplainWalker();
+        foreach ($walker->tables($explainResult) as $table) {
+            if ($this->hasAttachedConditionWithFunction($table)) {
+                return true;
+            }
         }
 
-        return $this->hasAttachedConditionWithFunction($explainResult['query_block']['table']);
+        return false;
     }
 
     private function hasAttachedConditionWithFunction(array $table): bool

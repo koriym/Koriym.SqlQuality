@@ -254,6 +254,9 @@ USAGE;
             $costReduction = $optimizerComparison['difference']['cost_percent'] ?? null;
 
             $queries[$sqlFile] = [
+                'mode' => $result['mode'] ?? 'wd',
+                'executed' => $result['executed'] ?? true,
+                'skipped_reason' => $result['skipped_reason'] ?? null,
                 'cost' => $cost,
                 'execution_time_ms' => ($result['execution_time'] ?? 0) * 1000,
                 'issues' => $issues,
