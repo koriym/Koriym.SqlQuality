@@ -51,6 +51,15 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertFalse($result['is_read_only_select']);
     }
 
+    public function testDoubleDashWithoutWhitespaceDoesNotHideStackedWrite(): void
+    {
+        $result = $this->classifier->classify('SELECT 1--1; UPDATE users SET status = "banned"');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
     public function testSemicolonInsideStringLiteralDoesNotMakeSelectUnsafe(): void
     {
         $result = $this->classifier->classify("SELECT ';' AS semicolon;");

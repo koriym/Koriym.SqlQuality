@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function ord;
 use function preg_match;
 use function preg_replace;
 use function strlen;
@@ -136,7 +137,7 @@ final class SqlSafetyClassifier
                 continue;
             }
 
-            if ($char === '-' && $offset + 1 < $length && $normalizedSql[$offset + 1] === '-') {
+            if (self::isMysqlDashCommentStart($normalizedSql, $offset, $length)) {
                 $offset += 2;
                 while ($offset < $length && $normalizedSql[$offset] !== "\n" && $normalizedSql[$offset] !== "\r") {
                     $offset++;
@@ -224,7 +225,7 @@ final class SqlSafetyClassifier
                 continue;
             }
 
-            if ($char === '-' && $offset + 1 < $length && $sql[$offset + 1] === '-') {
+            if (self::isMysqlDashCommentStart($sql, $offset, $length)) {
                 $result .= ' ';
                 $offset += 2;
                 while ($offset < $length && $sql[$offset] !== "\n" && $sql[$offset] !== "\r") {
@@ -251,6 +252,15 @@ final class SqlSafetyClassifier
         }
 
         return $result;
+    }
+
+    /** @psalm-pure */
+    private static function isMysqlDashCommentStart(string $sql, int $offset, int $length): bool
+    {
+        return $offset + 2 < $length
+            && $sql[$offset] === '-'
+            && $sql[$offset + 1] === '-'
+            && ord($sql[$offset + 2]) <= 32;
     }
 
     /** @psalm-pure */
