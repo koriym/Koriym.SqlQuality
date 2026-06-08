@@ -102,10 +102,15 @@ namespace Koriym\SqlQuality;
  *   pattern: WarningPattern,
  *   detector?: Detector\DetectorInterface
  * }
+ * @psalm-type WarningSeverity = 'Info'|'Warning'|'Critical'
+ * @psalm-type WarningEvidence = array<string, mixed>
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,
  *   message: string,
- *   documentation: string
+ *   documentation: string,
+ *   severity: WarningSeverity,
+ *   confidence: float,
+ *   evidence: WarningEvidence
  * }
  * @psalm-type TreeNodeAttributes = array<string, string>
  * @psalm-type SchemaColumn = array{
@@ -139,6 +144,9 @@ namespace Koriym\SqlQuality;
  * }
  * @psalm-type SqlParams = array<string, array<string, mixed>>
  * @psalm-type AnalysisResult = array{
+ *   mode: 'wd',
+ *   executed: bool,
+ *   skipped_reason: string|null,
  *   issues: list<DetectedWarning>,
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
@@ -218,6 +226,9 @@ namespace Koriym\SqlQuality;
  * @psalm-type QueryBlock = array<mixed>
  * @psalm-type ExplainWithSql = array{0: ExplainResult, 1: string}
  * @psalm-type AnalysisWithSettingsResult = array{
+ *   mode: 'wd',
+ *   executed: bool,
+ *   skipped_reason: string|null,
  *   issues: list<DetectedWarning>,
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,

@@ -1,0 +1,62 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Koriym\SqlQuality;
+
+use PHPUnit\Framework\TestCase;
+
+final class SqlSafetyClassifierTest extends TestCase
+{
+    private SqlSafetyClassifier $classifier;
+
+    protected function setUp(): void
+    {
+        $this->classifier = new SqlSafetyClassifier();
+    }
+
+    public function testSelectIsExplainableAndExecutable(): void
+    {
+        $result = $this->classifier->classify('SELECT * FROM users WHERE id = :id');
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testWithSelectIsExplainableAndExecutable(): void
+    {
+        $result = $this->classifier->classify('WITH active_users AS (SELECT * FROM users) SELECT * FROM active_users');
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testDmlIsExplainableButNotExecutable(): void
+    {
+        $result = $this->classifier->classify('UPDATE posts p JOIN comments c ON p.id = c.post_id SET p.view_count = p.view_count + 1');
+
+        $this->assertSame('write', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testUnsafeSelectIsExplainableButNotExecutable(): void
+    {
+        $result = $this->classifier->classify('SELECT * FROM users WHERE id = 1 FOR UPDATE');
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testDdlIsNotExplainableOrExecutable(): void
+    {
+        $result = $this->classifier->classify('CREATE TABLE users (id INT PRIMARY KEY)');
+
+        $this->assertSame('ddl', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+}

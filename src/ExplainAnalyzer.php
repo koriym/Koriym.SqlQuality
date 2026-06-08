@@ -13,10 +13,11 @@ use Koriym\SqlQuality\Detector\IneffectiveRangeScanDetector;
 use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Detector\LowCardinalityIndexDetector;
+use Koriym\SqlQuality\Detector\MultiTableUpdateDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
-use function is_array;
+use function get_class;
 use function sprintf;
 use function str_contains;
 
@@ -25,6 +26,7 @@ use function str_contains;
  * @psalm-import-type WarningMessages from Types
  * @psalm-import-type WarningPattern from Types
  * @psalm-import-type Warning from Types
+ * @psalm-import-type WarningSeverity from Types
  * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type ShowWarning from Types
  * @psalm-import-type ShowWarnings from Types
@@ -103,9 +105,7 @@ final class ExplainAnalyzer
             ],
             'MultiTableUpdate' => [
                 'message' => $messages['MultiTableUpdate'],
-                'pattern' => [
-                    'explain' => ['update_operation' => 'multi_table'],
-                ],
+                'detector' => new MultiTableUpdateDetector(),
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
@@ -126,8 +126,13 @@ final class ExplainAnalyzer
         $detectedWarnings = [];
         foreach ($this->warnings as $warningType => $warning) {
             if (isset($warning['detector'])) {
-                if ($warning['detector']->detect($explainResult)) {
-                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                $detector = $warning['detector'];
+                if ($detector->detect($explainResult)) {
+                    $detectedWarnings[] = $this->createIssue(
+                        $warningType,
+                        $warning['message'],
+                        ['source' => 'EXPLAIN FORMAT=JSON', 'detector' => get_class($detector)],
+                    );
                 }
 
                 continue;
@@ -135,7 +140,11 @@ final class ExplainAnalyzer
 
             if (isset($warning['pattern'])) {
                 if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
-                    $detectedWarnings[] = ['type' => $warningType, 'message' => $warning['message'], 'documentation' => $this->getDocumentationUrl($warningType)];
+                    $detectedWarnings[] = $this->createIssue(
+                        $warningType,
+                        $warning['message'],
+                        ['source' => 'EXPLAIN FORMAT=JSON / SHOW WARNINGS', 'pattern' => $warning['pattern']],
+                    );
                 }
 
                 continue;
@@ -172,7 +181,8 @@ final class ExplainAnalyzer
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
         if (isset($explainResult['query_block'])) {
-            if ($this->findInArray($explainResult['query_block'], $key, $value)) {
+            $walker = new ExplainWalker();
+            if ($walker->contains($explainResult['query_block'], $key, $value)) {
                 return true;
             }
         }
@@ -191,22 +201,50 @@ final class ExplainAnalyzer
         return false;
     }
 
-    /** @param array<string, mixed> $array */
-    private function findInArray(array $array, string $key, mixed $value): bool
+    /**
+     * @param WarningType          $warningType
+     * @param array<string, mixed> $evidence
+     *
+     * @return DetectedWarning
+     */
+    private function createIssue(string $warningType, string $message, array $evidence): array
     {
-        foreach ($array as $k => $v) {
-            if ($k === $key && $v === $value) {
-                return true;
-            }
+        return [
+            'type' => $warningType,
+            'message' => $message,
+            'documentation' => $this->getDocumentationUrl($warningType),
+            'severity' => self::getSeverity($warningType),
+            'confidence' => self::getConfidence($warningType),
+            'evidence' => $evidence,
+        ];
+    }
 
-            if (is_array($v)) {
-                if ($this->findInArray($v, $key, $value)) {
-                    return true;
-                }
-            }
-        }
+    /**
+     * @param WarningType $warningType
+     *
+     * @return WarningSeverity
+     *
+     * @psalm-pure
+     */
+    private static function getSeverity(string $warningType): string
+    {
+        return match ($warningType) {
+            'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
+            default => 'Warning',
+        };
+    }
 
-        return false;
+    /**
+     * @param WarningType $warningType
+     *
+     * @psalm-pure
+     */
+    private static function getConfidence(string $warningType): float
+    {
+        return match ($warningType) {
+            'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
+            default => 0.95,
+        };
     }
 
     /** @param WarningType $warningType */

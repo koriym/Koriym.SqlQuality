@@ -243,7 +243,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
         return sprintf('%+.1f%%', $impact);
     }
 
-    /** @param array<array<string, string>> $issues */
+    /** @param array<array<string, mixed>> $issues */
     private function formatIssues(array $issues): string
     {
         return empty($issues) ? '-' : implode(', ', array_column($issues, 'type'));

@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\ExplainWalker;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function is_array;
 use function is_string;
 use function str_contains;
 use function substr_count;
@@ -15,7 +15,6 @@ use function substr_count;
 /**
  * @psalm-import-type ExplainResult from Types
  * @psalm-import-type ExplainTable from Types
- * @psalm-import-type ExplainNode from Types
  */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
@@ -27,41 +26,20 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     #[Override]
     public function detect(array $explainResult): bool
     {
-        $ineffectiveScans = 0;
-        $this->traverseQueryBlock($explainResult, $ineffectiveScans);
-
-        return $ineffectiveScans > 0;
-    }
-
-    /**
-     * クエリブロックを再帰的に探索して非効率的な範囲スキャンをチェックします
-     *
-     * @param ExplainNode $node             現在のノード
-     * @param int         $ineffectiveScans 非効率的なスキャンのカウンター（参照渡し）
-     */
-    private function traverseQueryBlock(array $node, int &$ineffectiveScans): void
-    {
-        // テーブルアクセスの検証
-        if (isset($node['table'])) {
-            if ($this->isIneffectiveTableAccess($node['table'])) {
-                $ineffectiveScans++;
-
-                return;
+        $walker = new ExplainWalker();
+        foreach ($walker->tables($explainResult) as $table) {
+            if ($this->isIneffectiveTableAccess($table)) {
+                return true;
             }
         }
 
-        // 子ノードの再帰的な探索
-        foreach ($node as $value) {
-            if (is_array($value)) {
-                $this->traverseQueryBlock($value, $ineffectiveScans);
-            }
-        }
+        return false;
     }
 
     /**
      * テーブルアクセスが非効率的かどうかを判定します
      *
-     * @param ExplainTable $table テーブルアクセス情報
+     * @param array<string, mixed> $table テーブルアクセス情報
      */
     private function isIneffectiveTableAccess(array $table): bool
     {
