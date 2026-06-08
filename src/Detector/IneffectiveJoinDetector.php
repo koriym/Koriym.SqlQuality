@@ -13,6 +13,7 @@ use function count;
 use function implode;
 use function in_array;
 use function is_array;
+use function is_int;
 use function is_numeric;
 
 class IneffectiveJoinDetector implements DetectorInterface
@@ -53,14 +54,18 @@ class IneffectiveJoinDetector implements DetectorInterface
      */
     private function nestedLoopGroupKey(array $path): string|null
     {
-        $nestedLoopOffset = null;
-        foreach ($path as $offset => $part) {
-            if ($part === 'nested_loop') {
-                $nestedLoopOffset = $offset;
-            }
+        if (count($path) < 3) {
+            return null;
         }
 
-        if ($nestedLoopOffset === null) {
+        $tableOffset = count($path) - 1;
+        $memberOffset = count($path) - 2;
+        $nestedLoopOffset = count($path) - 3;
+        if (
+            $path[$nestedLoopOffset] !== 'nested_loop' ||
+            ! is_int($path[$memberOffset]) ||
+            $path[$tableOffset] !== 'table'
+        ) {
             return null;
         }
 

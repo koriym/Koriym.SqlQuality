@@ -79,4 +79,37 @@ final class IneffectiveJoinDetectorTest extends TestCase
             'analyze_result' => [],
         ]));
     }
+
+    public function testDoesNotTreatNestedSubqueryTableAsJoinMember(): void
+    {
+        $detector = new IneffectiveJoinDetector();
+
+        $this->assertFalse($detector->detect([
+            'query_block' => [
+                'select_id' => 1,
+                'nested_loop' => [
+                    [
+                        'table' => [
+                            'table_name' => 'posts',
+                            'access_type' => 'ref',
+                            'rows' => 1,
+                            'rows_examined_per_scan' => 1,
+                            'materialized_from_subquery' => [
+                                'query_block' => [
+                                    'select_id' => 2,
+                                    'table' => [
+                                        'table_name' => 'users',
+                                        'access_type' => 'ALL',
+                                        'rows' => 5000,
+                                        'rows_examined_per_scan' => 5000,
+                                    ],
+                                ],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+            'analyze_result' => [],
+        ]));
+    }
 }
