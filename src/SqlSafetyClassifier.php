@@ -6,7 +6,9 @@ namespace Koriym\SqlQuality;
 
 use function preg_match;
 use function preg_replace;
+use function strlen;
 use function strtolower;
+use function substr;
 use function trim;
 
 /**
@@ -26,6 +28,10 @@ final class SqlSafetyClassifier
         $normalized = $this->normalize($sql);
         if ($normalized === '') {
             return ['kind' => 'empty', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'empty SQL'];
+        }
+
+        if ($this->containsStackedStatement($normalized)) {
+            return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
         }
 
         if (preg_match('/^select\b/i', $normalized)) {
@@ -84,6 +90,55 @@ final class SqlSafetyClassifier
         $collapsed = preg_replace('/\s+/', ' ', $withoutHashComments) ?? $withoutHashComments;
 
         return trim($collapsed);
+    }
+
+    /** @psalm-pure */
+    private function containsStackedStatement(string $normalizedSql): bool
+    {
+        $quote = null;
+        $isEscaped = false;
+        $length = strlen($normalizedSql);
+        for ($offset = 0; $offset < $length; $offset++) {
+            $char = $normalizedSql[$offset];
+
+            if ($isEscaped) {
+                $isEscaped = false;
+
+                continue;
+            }
+
+            if ($quote !== null) {
+                if ($char === '\\') {
+                    $isEscaped = true;
+
+                    continue;
+                }
+
+                if ($char === $quote) {
+                    if ($offset + 1 < $length && $normalizedSql[$offset + 1] === $quote) {
+                        $offset++;
+
+                        continue;
+                    }
+
+                    $quote = null;
+                }
+
+                continue;
+            }
+
+            if ($char === '\'' || $char === '"' || $char === '`') {
+                $quote = $char;
+
+                continue;
+            }
+
+            if ($char === ';' && trim(substr($normalizedSql, $offset + 1)) !== '') {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /** @psalm-pure */

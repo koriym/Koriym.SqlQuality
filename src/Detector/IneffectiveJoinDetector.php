@@ -7,7 +7,10 @@ namespace Koriym\SqlQuality\Detector;
 use Koriym\SqlQuality\ExplainWalker;
 use Override;
 
+use function array_map;
+use function array_slice;
 use function count;
+use function implode;
 use function in_array;
 use function is_array;
 use function is_numeric;
@@ -18,24 +21,52 @@ class IneffectiveJoinDetector implements DetectorInterface
     public function detect(array $explainResult): bool
     {
         $walker = new ExplainWalker();
-        $joinAccesses = [];
+        $joinGroups = [];
         foreach ($walker->tableAccesses($explainResult) as $access) {
-            if (in_array('nested_loop', $access['path'], true)) {
-                $joinAccesses[] = $access['table'];
+            $groupKey = $this->nestedLoopGroupKey($access['path']);
+            if ($groupKey === null) {
+                continue;
             }
+
+            $joinGroups[$groupKey][] = $access['table'];
         }
 
-        if (count($joinAccesses) < 2) {
-            return false;
-        }
+        foreach ($joinGroups as $joinAccesses) {
+            if (count($joinAccesses) < 2) {
+                continue;
+            }
 
-        foreach ($joinAccesses as $tableInfo) {
-            if ($this->isIneffectiveJoin($tableInfo)) {
-                return true;
+            foreach ($joinAccesses as $tableInfo) {
+                if ($this->isIneffectiveJoin($tableInfo)) {
+                    return true;
+                }
             }
         }
 
         return false;
+    }
+
+    /**
+     * @param list<array-key> $path
+     *
+     * @psalm-pure
+     */
+    private function nestedLoopGroupKey(array $path): string|null
+    {
+        $nestedLoopOffset = null;
+        foreach ($path as $offset => $part) {
+            if ($part === 'nested_loop') {
+                $nestedLoopOffset = $offset;
+            }
+        }
+
+        if ($nestedLoopOffset === null) {
+            return null;
+        }
+
+        $groupPath = array_slice($path, 0, $nestedLoopOffset + 1);
+
+        return implode("\0", array_map(static fn (int|string $part): string => (string) $part, $groupPath));
     }
 
     private function isIneffectiveJoin(array $tableInfo): bool

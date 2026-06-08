@@ -24,6 +24,33 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertTrue($result['is_read_only_select']);
     }
 
+    public function testSelectWithTrailingSemicolonIsExecutable(): void
+    {
+        $result = $this->classifier->classify('SELECT * FROM users WHERE id = :id;');
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testSelectWithStackedWriteStatementIsUnsafe(): void
+    {
+        $result = $this->classifier->classify('SELECT 1; UPDATE users SET status = "banned"');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testSemicolonInsideStringLiteralDoesNotMakeSelectUnsafe(): void
+    {
+        $result = $this->classifier->classify("SELECT ';' AS semicolon;");
+
+        $this->assertSame('select', $result['kind']);
+        $this->assertTrue($result['is_explainable']);
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
     public function testWithSelectIsExplainableAndExecutable(): void
     {
         $result = $this->classifier->classify('WITH active_users AS (SELECT * FROM users) SELECT * FROM active_users');
