@@ -194,6 +194,11 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Invalid EXPLAIN JSON result');
         }
 
+        if (! isset($explainJsonData['query_block']) || ! is_array($explainJsonData['query_block'])) {
+            throw new RuntimeException('Invalid EXPLAIN JSON query block');
+        }
+
+        /** @var ExplainResult $explainJsonData */
         if (! $executeAnalyze) {
             return [$explainJsonData, 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)'];
         }
@@ -346,7 +351,11 @@ final class SqlFileAnalyzer
         ];
     }
 
-    /** @return AnalysisWithSettingsResult */
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
     private function analyzeWithSettings(
         string $sql,
         array $params,
@@ -400,11 +409,19 @@ final class SqlFileAnalyzer
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         // warm up the cache
-        $this->pdo->query($interpolatedSql);
-        $stmt = $this->pdo->query($interpolatedSql);
-        if ($stmt === false) {
+        $warmupStmt = $this->pdo->query($interpolatedSql);
+        if ($warmupStmt === false) {
             throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
         }
+
+        $warmupStmt->fetchAll();
+
+        $secondWarmupStmt = $this->pdo->query($interpolatedSql);
+        if ($secondWarmupStmt === false) {
+            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+        }
+
+        $secondWarmupStmt->fetchAll();
 
         $executionTimes = [];
         for ($i = 0; $i < self::TRIAL_COUNT; $i++) {

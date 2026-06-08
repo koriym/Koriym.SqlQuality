@@ -39,7 +39,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     /**
      * テーブルアクセスが非効率的かどうかを判定します
      *
-     * @param array<string, mixed> $table テーブルアクセス情報
+     * @param ExplainTable $table テーブルアクセス情報
      */
     private function isIneffectiveTableAccess(array $table): bool
     {

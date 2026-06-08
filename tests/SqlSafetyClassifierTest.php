@@ -49,6 +49,12 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertSame('select', $result['kind']);
         $this->assertTrue($result['is_explainable']);
         $this->assertFalse($result['is_read_only_select']);
+
+        $forShareResult = $this->classifier->classify('SELECT * FROM users WHERE id = 1 FOR SHARE');
+
+        $this->assertSame('select', $forShareResult['kind']);
+        $this->assertTrue($forShareResult['is_explainable']);
+        $this->assertFalse($forShareResult['is_read_only_select']);
     }
 
     public function testDdlIsNotExplainableOrExecutable(): void

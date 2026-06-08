@@ -25,6 +25,7 @@ namespace Koriym\SqlQuality;
  *   using_temporary_table?: bool,
  *   using_filesort?: bool,
  *   using_index?: bool,
+ *   update?: bool,
  *   used_columns?: list<string>
  * }
  * @psalm-type DuplicatesRemovalOperation = array{
@@ -54,6 +55,10 @@ namespace Koriym\SqlQuality;
  *   union_result?: array<mixed>
  * }
  * @psalm-type ExplainNode = array<string, mixed> Intentionally loose type for recursive traversal of arbitrary EXPLAIN JSON structures
+ * @psalm-type ExplainTableAccess = array{
+ *   path: list<array-key>,
+ *   table: ExplainTable
+ * }
  * @psalm-type ExplainResult = array{
  *   query_block: ExplainQueryBlock,
  *   analyze_result: array<string, mixed>
@@ -143,6 +148,12 @@ namespace Koriym\SqlQuality;
  *   status: TableStatus
  * }
  * @psalm-type SqlParams = array<string, array<string, mixed>>
+ * @psalm-type SqlClassification = array{
+ *   kind: string,
+ *   is_explainable: bool,
+ *   is_read_only_select: bool,
+ *   reason: string
+ * }
  * @psalm-type AnalysisResult = array{
  *   mode: 'wd',
  *   executed: bool,

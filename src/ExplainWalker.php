@@ -15,13 +15,16 @@ use function is_array;
  * detectors from re-implementing ad-hoc recursion for each shape.
  *
  * @psalm-immutable
+ * @psalm-import-type ExplainNode from Types
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type ExplainTableAccess from Types
  */
 final class ExplainWalker
 {
     /**
-     * @param array<string, mixed> $explainResult
+     * @param ExplainNode $explainResult
      *
-     * @return list<array{path: list<array-key>, table: array<string, mixed>}>
+     * @return list<ExplainTableAccess>
      *
      * @psalm-mutation-free
      */
@@ -31,9 +34,9 @@ final class ExplainWalker
     }
 
     /**
-     * @param array<string, mixed> $explainResult
+     * @param ExplainNode $explainResult
      *
-     * @return list<array<string, mixed>>
+     * @return list<ExplainTable>
      *
      * @psalm-mutation-free
      */
@@ -48,7 +51,7 @@ final class ExplainWalker
     }
 
     /**
-     * @param array<string, mixed> $node
+     * @param ExplainNode $node
      *
      * @psalm-mutation-free
      */
@@ -60,7 +63,7 @@ final class ExplainWalker
             }
 
             if (is_array($nodeValue)) {
-                /** @var array<string, mixed> $child */
+                /** @var ExplainNode $child */
                 $child = $nodeValue;
                 if ($this->contains($child, $key, $value)) {
                     return true;
@@ -72,10 +75,10 @@ final class ExplainWalker
     }
 
     /**
-     * @param array<string, mixed> $node
-     * @param list<array-key>      $path
+     * @param ExplainNode     $node
+     * @param list<array-key> $path
      *
-     * @return list<array{path: list<array-key>, table: array<string, mixed>}>
+     * @return list<ExplainTableAccess>
      *
      * @psalm-mutation-free
      */
@@ -83,7 +86,9 @@ final class ExplainWalker
     {
         $accesses = [];
         if (isset($node['table_name'], $node['access_type'])) {
-            $accesses[] = ['path' => $path, 'table' => $node];
+            /** @var ExplainTable $table */
+            $table = $node;
+            $accesses[] = ['path' => $path, 'table' => $table];
         }
 
         foreach ($node as $key => $value) {
@@ -91,7 +96,7 @@ final class ExplainWalker
                 continue;
             }
 
-            /** @var array<string, mixed> $child */
+            /** @var ExplainNode $child */
             $child = $value;
             foreach ($this->collectTableAccesses($child, [...$path, $key]) as $access) {
                 $accesses[] = $access;

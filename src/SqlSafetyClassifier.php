@@ -16,10 +16,11 @@ use function trim;
  * timing loops execute the statement and are restricted to read-only SELECT.
  *
  * @psalm-immutable
+ * @psalm-import-type SqlClassification from Types
  */
 final class SqlSafetyClassifier
 {
-    /** @return array{kind: string, is_explainable: bool, is_read_only_select: bool, reason: string} */
+    /** @return SqlClassification */
     public function classify(string $sql): array
     {
         $normalized = $this->normalize($sql);
@@ -91,6 +92,7 @@ final class SqlSafetyClassifier
         $lower = strtolower($normalizedSql);
 
         return preg_match('/\bfor\s+update\b/i', $lower) === 1
+            || preg_match('/\bfor\s+share\b/i', $lower) === 1
             || preg_match('/\block\s+in\s+share\s+mode\b/i', $lower) === 1
             || preg_match('/\binto\s+(?:out|dump)file\b/i', $lower) === 1
             || preg_match('/\bget_lock\s*\(/i', $lower) === 1

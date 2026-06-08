@@ -37,7 +37,7 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
     /**
      * テーブル情報から非効率なLIKEパターンを判定します
      *
-     * @param array<string, mixed> $table テーブル情報
+     * @param ExplainTable $table テーブル情報
      */
     private function isIneffectiveLikePattern(array $table): bool
     {

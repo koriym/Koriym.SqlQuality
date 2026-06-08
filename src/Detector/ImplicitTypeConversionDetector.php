@@ -7,6 +7,7 @@ namespace Koriym\SqlQuality\Detector;
 use Koriym\SqlQuality\ExplainWalker;
 use Override;
 
+use function is_string;
 use function preg_match;
 
 final class ImplicitTypeConversionDetector implements DetectorInterface
@@ -22,12 +23,12 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
         $walker = new ExplainWalker();
         foreach ($walker->tables($explainResult) as $table) {
             // attached_condition の確認
-            if (! isset($table['attached_condition'])) {
+            if (! isset($table['attached_condition']) || ! is_string($table['attached_condition'])) {
                 continue;
             }
 
             // reference_code のような文字列型のカラムに数値を直接比較している場合を検出
-            if ($this->containsStringNumericComparison((string) $table['attached_condition'])) {
+            if ($this->containsStringNumericComparison($table['attached_condition'])) {
                 return true;
             }
         }

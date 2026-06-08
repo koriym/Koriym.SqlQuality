@@ -18,6 +18,7 @@ use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 use Koriym\SqlQuality\Exception\LogicException;
 
 use function get_class;
+use function is_array;
 use function sprintf;
 use function str_contains;
 
@@ -120,7 +121,12 @@ final class ExplainAnalyzer
         ];
     }
 
-    /** @return list<DetectedWarning> */
+    /**
+     * @param ExplainResult $explainResult
+     * @param ShowWarnings  $warnings
+     *
+     * @return list<DetectedWarning>
+     */
     public function analyze(array $explainResult, array $warnings = []): array
     {
         $detectedWarnings = [];
@@ -156,7 +162,11 @@ final class ExplainAnalyzer
         return $detectedWarnings;
     }
 
-    /** @param WarningPattern $pattern */
+    /**
+     * @param ExplainResult  $explainResult
+     * @param ShowWarnings   $warnings
+     * @param WarningPattern $pattern
+     */
     private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
     {
         if (isset($pattern['explain'])) {
@@ -178,9 +188,10 @@ final class ExplainAnalyzer
         return true;
     }
 
+    /** @param ExplainResult $explainResult */
     private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
     {
-        if (isset($explainResult['query_block'])) {
+        if (isset($explainResult['query_block']) && is_array($explainResult['query_block'])) {
             $walker = new ExplainWalker();
             if ($walker->contains($explainResult['query_block'], $key, $value)) {
                 return true;
@@ -190,6 +201,7 @@ final class ExplainAnalyzer
         return false;
     }
 
+    /** @param ShowWarnings $warnings */
     private function matchWarningPattern(array $warnings, string $pattern): bool
     {
         foreach ($warnings as $warning) {

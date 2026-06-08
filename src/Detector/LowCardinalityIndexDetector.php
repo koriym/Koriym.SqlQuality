@@ -35,7 +35,7 @@ final class LowCardinalityIndexDetector implements DetectorInterface
         return false;
     }
 
-    /** @param array<string, mixed> $table */
+    /** @param ExplainTable $table */
     private function checkTable(array $table): bool
     {
         // Must be using an index (not full scan)
