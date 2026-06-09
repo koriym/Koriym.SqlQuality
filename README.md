@@ -82,6 +82,25 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 | `--output=DIR` | Output directory for markdown reports | |
 | `--lang=LANG` | Language for messages: `en` or `ja` | `en` |
 
+### Execution Safety
+
+The analyzer is conservative about what it runs against your database:
+
+- **Read-only `SELECT` / `WITH ... SELECT`** are fully analyzed: `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE`, and a timing loop that actually executes the query.
+- **DML (`INSERT` / `UPDATE` / `DELETE` / `REPLACE`)** is **never executed**. Only the read-only `EXPLAIN FORMAT=JSON` runs, so issues such as `MultiTableUpdate` are still detected without modifying any data.
+- **Unsafe `SELECT`s** (`FOR UPDATE`, `LOCK IN SHARE MODE`, `INTO OUTFILE`/`DUMPFILE`, `SLEEP()`, `GET_LOCK()`, …) are treated like DML: planned via `EXPLAIN FORMAT=JSON` but not executed.
+- **DDL** and other statements that `EXPLAIN` cannot plan are skipped.
+
+Each query in the JSON output carries an `executed` flag and, when not executed, a `skipped_reason` explaining why:
+
+```json
+"20_multi_table_update.sql": {
+    "executed": false,
+    "skipped_reason": "UPDATE statement: read-only EXPLAIN executed, query not run (no EXPLAIN ANALYZE/timing)",
+    "issues": [ { "type": "MultiTableUpdate", "...": "..." } ]
+}
+```
+
 ## Claude Code Skills
 
 For [Claude Code](https://claude.ai/code) users, automated SQL optimization skills are available:

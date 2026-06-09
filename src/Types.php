@@ -144,6 +144,8 @@ namespace Koriym\SqlQuality;
  *   ai_suggestions: string,
  *   cost: float,
  *   execution_time: float,
+ *   executed: bool,
+ *   skipped_reason: string|null,
  *   optimizer_comparison: array{
  *      with_optimizer: array<array-key, mixed>,
  *      without_optimizer: array<array-key, mixed>,
@@ -222,7 +224,9 @@ namespace Koriym\SqlQuality;
  *   explain_result: ExplainResult,
  *   ai_suggestions: string,
  *   cost: float,
- *   execution_time: float
+ *   execution_time: float,
+ *   executed: bool,
+ *   skipped_reason: string|null
  * }
  */
 final class Types

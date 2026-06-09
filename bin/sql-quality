@@ -256,6 +256,8 @@ USAGE;
             $queries[$sqlFile] = [
                 'cost' => $cost,
                 'execution_time_ms' => ($result['execution_time'] ?? 0) * 1000,
+                'executed' => $result['executed'] ?? true,
+                'skipped_reason' => $result['skipped_reason'] ?? null,
                 'issues' => $issues,
                 'optimizer_impact' => $costReduction !== null ? [
                     'cost_reduction_percent' => round($costReduction, 2),

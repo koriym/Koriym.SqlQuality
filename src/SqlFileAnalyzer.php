@@ -36,7 +36,6 @@ use const PATHINFO_FILENAME;
 /**
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
  * @psalm-import-type AnalysisWithSettingsResult from Types
  * @psalm-import-type DetectedWarning from Types
@@ -47,15 +46,18 @@ final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
+    private readonly SqlClassifier $classifier;
 
     public function __construct(
         private readonly PDO $pdo,
         private readonly ExplainAnalyzer $analyzer,
         private readonly string $sqlDir,
         private readonly AIQueryAdvisor $aiAdvisor,
-        OptimizerSettingsInterface|null $optimizerSettings = null
+        OptimizerSettingsInterface|null $optimizerSettings = null,
+        SqlClassifier|null $classifier = null
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
+        $this->classifier = $classifier ?? new SqlClassifier();
     }
 
     /**
@@ -152,17 +154,18 @@ final class SqlFileAnalyzer
     }
 
     /**
+     * Executes `EXPLAIN FORMAT=JSON`, which is read-only and safe for both SELECT and DML.
+     *
      * @param array<string, mixed> $params
      *
-     * @return ExplainWithSql
+     * @return ExplainResult
      *
      * @throws RuntimeException
      */
-    private function executeExplain(string $sql, array $params): array
+    private function executeExplainJson(string $sql, array $params): array
     {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
 
-        // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
             throw new RuntimeException('Failed to execute EXPLAIN query');
@@ -179,9 +182,23 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Empty EXPLAIN result');
         }
 
+        /** @var ExplainResult $explainJsonData */
         $explainJsonData = json_decode($explainJson, true);
 
-        // EXPLAIN ANALYZE を実行
+        return $explainJsonData;
+    }
+
+    /**
+     * Executes `EXPLAIN ANALYZE`, which actually runs the query. Only call for executable statements.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @throws RuntimeException
+     */
+    private function executeExplainAnalyze(string $sql, array $params): string
+    {
+        $interpolatedSql = $this->interpolateQuery($sql, $params);
+
         $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
         if ($analyzeStmt === false) {
             throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
@@ -193,7 +210,7 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
         }
 
-        return [$explainJsonData, $analyzeResult[0]];
+        return (string) $analyzeResult[0];
     }
 
     /**
@@ -295,14 +312,23 @@ final class SqlFileAnalyzer
     ): array {
         $sql = $this->readSqlFile($sqlFile);
 
-        // デフォルト（オプティマイザーあり）の分析を実行
-        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        // SQL を分類し、EXPLAIN すら実行できない文（DDL など）は早期にスキップする
+        $classification = $this->classifier->classify($sql);
+        if (! $classification->explainable) {
+            throw new RuntimeException($classification->skippedReason ?? 'Statement is not analyzable');
+        }
 
-        // オプティマイザーを無効化して分析
+        // デフォルト（オプティマイザーあり）の分析を実行
+        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir, $classification);
+
+        // オプティマイザーを無効化して分析。例外が出ても optimizer_switch を必ず復元する
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         $this->optimizerSettings->disableAll();
-        $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
-        $this->optimizerSettings->restore($savedSettings);
+        try {
+            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir, $classification);
+        } finally {
+            $this->optimizerSettings->restore($savedSettings);
+        }
 
         // 両方の結果を含めて返す
         $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
@@ -331,11 +357,21 @@ final class SqlFileAnalyzer
         string $sql,
         array $params,
         string $sqlFile,
-        string $outputDir
+        string $outputDir,
+        SqlClassification $classification
     ): array {
-        $executionTime = $this->getExecutedTime($sql, $params);
-        /** @var ExplainResult $explainResult */
-        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params);
+        // EXPLAIN FORMAT=JSON は読み取り専用なので SELECT/DML を問わず安全に実行できる
+        $explainResult = $this->executeExplainJson($sql, $params);
+
+        // 実際にクエリを走らせる処理（計測ループ・EXPLAIN ANALYZE）は安全な SELECT のみに限定する
+        if ($classification->executable) {
+            $executionTime = $this->getExecutedTime($sql, $params);
+            $explainAnalyze = $this->executeExplainAnalyze($sql, $params);
+        } else {
+            $executionTime = 0.0;
+            $explainAnalyze = '-- Skipped: ' . ($classification->skippedReason ?? 'query not executed');
+        }
+
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
         $warnings = $this->getWarnings();
         /** @var list<DetectedWarning> $issues */
@@ -362,6 +398,8 @@ final class SqlFileAnalyzer
             'ai_suggestions' => $aiPrompt,
             'cost' => $cost,
             'execution_time' => $executionTime,
+            'executed' => $classification->executable,
+            'skipped_reason' => $classification->skippedReason,
         ];
     }
 
