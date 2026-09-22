@@ -4,20 +4,11 @@
   "title": "Koriym.SqlQuality explain report",
   "description": "Output of `sql-quality explain --sql-file=FILE`.",
   "type": "object",
-  "required": ["file", "sql", "classification", "executed", "skipped_reason", "cost", "execution_time_ms", "issues", "optimizer_impact", "context"],
+  "required": ["file", "sql", "executed", "skipped_reason", "cost", "execution_time_ms", "issues", "optimizer_impact", "context"],
   "additionalProperties": false,
   "properties": {
     "file": { "type": "string" },
     "sql": { "type": "string" },
-    "classification": {
-      "type": "object",
-      "required": ["is_read_only_select", "reason"],
-      "additionalProperties": false,
-      "properties": {
-        "is_read_only_select": { "type": "boolean" },
-        "reason": { "type": ["string", "null"] }
-      }
-    },
     "executed": { "type": "boolean" },
     "skipped_reason": { "type": ["string", "null"] },
     "cost": { "type": "number" },

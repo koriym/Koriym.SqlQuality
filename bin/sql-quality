@@ -311,7 +311,6 @@ USAGE;
         $report = [
             'file' => $sqlFileName,
             'sql' => $context->sql,
-            'classification' => ['is_read_only_select' => $result['executed'], 'reason' => $result['skipped_reason']],
             'executed' => $result['executed'],
             'skipped_reason' => $result['skipped_reason'],
             'cost' => $result['cost'],
