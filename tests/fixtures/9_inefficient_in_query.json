@@ -40,8 +40,14 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: posts.created_at  (cost=504 rows=4956) (actual time=4.52..5.09 rows=5000 loops=1)\n    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=504 rows=4956) (actual time=0.00287..2.64 rows=5000 loops=1)\n        -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00237..1.63 rows=5000 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Sort: posts.created_at  (cost=504 rows=4956) (actual time=5.01..5.57 rows=5000 loops=1)\n    -> Filter: (posts.`status` in ('draft','published','archived','deleted','pending'))  (cost=504 rows=4956) (actual time=0.00279..2.77 rows=5000 loops=1)\n        -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00229..1.66 rows=5000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`posts`.`id` AS `id`,`test`.`posts`.`user_id` AS `user_id`,`test`.`posts`.`title` AS `title`,`test`.`posts`.`content` AS `content`,`test`.`posts`.`status` AS `status`,`test`.`posts`.`view_count` AS `view_count`,`test`.`posts`.`created_at` AS `created_at` from `test`.`posts` where (`test`.`posts`.`status` in ('draft','published','archived','deleted','pending')) order by `test`.`posts`.`created_at`"
+        }
+    ],
     "schema": {
         "posts": {
             "columns": [

@@ -130,8 +130,14 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: created_at  (cost=13950..13950 rows=8109) (actual time=15.8..16.3 rows=13409 loops=1)\n    -> Table scan on <union temporary>  (cost=2505..2609 rows=8109) (actual time=11.5..12.5 rows=13409 loops=1)\n        -> Union materialize with deduplication  (cost=2505..2505 rows=8109) (actual time=11.5..11.5 rows=13409 loops=1)\n            -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0234..1.03 rows=4500 loops=1)\n            -> Nested loop inner join  (cost=1439 rows=5631) (actual time=0.0287..7.27 rows=8909 loops=1)\n                -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0236..1 rows=4500 loops=1)\n                -> Covering index lookup on comments using idx_comments_post_created (post_id=posts.id)  (cost=0.251 rows=2.27) (actual time=967e-6..0.00123 rows=1.98 loops=4500)\n",
-    "warnings": [],
+    "explain_analyze": "-> Sort: created_at  (cost=13950..13950 rows=8109) (actual time=15.5..16 rows=13409 loops=1)\n    -> Table scan on <union temporary>  (cost=2505..2609 rows=8109) (actual time=11.4..12.4 rows=13409 loops=1)\n        -> Union materialize with deduplication  (cost=2505..2505 rows=8109) (actual time=11.4..11.4 rows=13409 loops=1)\n            -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0228..1.01 rows=4500 loops=1)\n            -> Nested loop inner join  (cost=1439 rows=5631) (actual time=0.0265..7.18 rows=8909 loops=1)\n                -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0223..0.998 rows=4500 loops=1)\n                -> Covering index lookup on comments using idx_comments_post_created (post_id=posts.id)  (cost=0.251 rows=2.27) (actual time=957e-6..0.00122 rows=1.98 loops=4500)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`posts`.`id` AS `item_id`,'post' AS `type`,`test`.`posts`.`created_at` AS `created_at` from `test`.`posts` where (`test`.`posts`.`status` = 'published') union /* select#2 */ select `test`.`comments`.`id` AS `item_id`,'comment' AS `type`,`test`.`comments`.`created_at` AS `created_at` from `test`.`posts` join `test`.`comments` where ((`test`.`comments`.`post_id` = `test`.`posts`.`id`) and (`test`.`posts`.`status` = 'published')) order by `created_at`"
+        }
+    ],
     "schema": {
         "posts": {
             "columns": [

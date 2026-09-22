@@ -66,8 +66,19 @@
             ]
         }
     },
-    "explain_analyze": "-> Table scan on u  (cost=102 rows=1000) (actual time=0.0137..0.163 rows=1000 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: max(o.created_at)  (cost=1.05 rows=1) (actual time=0.00235..0.00237 rows=1 loops=1000)\n        -> Index lookup on o using idx_orders_user_id (user_id=u.id)  (cost=0.819 rows=2.34) (actual time=0.00182..0.0021 rows=2 loops=1000)\n",
-    "warnings": [],
+    "explain_analyze": "-> Table scan on u  (cost=102 rows=1000) (actual time=0.0132..0.166 rows=1000 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: max(o.created_at)  (cost=1.05 rows=1) (actual time=0.00234..0.00236 rows=1 loops=1000)\n        -> Index lookup on o using idx_orders_user_id (user_id=u.id)  (cost=0.819 rows=2.34) (actual time=0.00181..0.00209 rows=2 loops=1000)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1276,
+            "Message": "Field or reference 'test.u.id' of SELECT #2 was resolved in SELECT #1"
+        },
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`u`.`id` AS `id`,`test`.`u`.`name` AS `name`,(/* select#2 */ select max(`test`.`o`.`created_at`) from `test`.`orders` `o` where (`test`.`o`.`user_id` = `test`.`u`.`id`)) AS `last_order_date` from `test`.`users` `u`"
+        }
+    ],
     "schema": {
         "orders": {
             "columns": [

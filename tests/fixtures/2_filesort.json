@@ -45,8 +45,14 @@
             }
         }
     },
-    "explain_analyze": "-> Limit: 10 row(s)  (cost=273 rows=10) (actual time=0.00629..0.018 rows=10 loops=1)\n    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=273 rows=2478) (actual time=0.00596..0.0172 rows=10 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Limit: 10 row(s)  (cost=273 rows=10) (actual time=0.00575..0.0145 rows=10 loops=1)\n    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=273 rows=2478) (actual time=0.00554..0.0138 rows=10 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`posts`.`id` AS `id`,`test`.`posts`.`user_id` AS `user_id`,`test`.`posts`.`title` AS `title`,`test`.`posts`.`content` AS `content`,`test`.`posts`.`status` AS `status`,`test`.`posts`.`view_count` AS `view_count`,`test`.`posts`.`created_at` AS `created_at` from `test`.`posts` where (`test`.`posts`.`status` = 'published') order by `test`.`posts`.`created_at` desc limit 10"
+        }
+    ],
     "schema": {
         "posts": {
             "columns": [

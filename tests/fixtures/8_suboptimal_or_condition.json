@@ -36,8 +36,14 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=504 rows=1655) (actual time=0.00404..2.24 rows=4500 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00258..1.63 rows=5000 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=504 rows=1655) (actual time=0.00396..2.27 rows=4500 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00254..1.66 rows=5000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`posts`.`id` AS `id`,`test`.`posts`.`user_id` AS `user_id`,`test`.`posts`.`title` AS `title`,`test`.`posts`.`content` AS `content`,`test`.`posts`.`status` AS `status`,`test`.`posts`.`view_count` AS `view_count`,`test`.`posts`.`created_at` AS `created_at` from `test`.`posts` where ((`test`.`posts`.`user_id` = 1) or (`test`.`posts`.`status` = 'published'))"
+        }
+    ],
     "schema": {
         "posts": {
             "columns": [

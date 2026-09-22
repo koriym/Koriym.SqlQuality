@@ -45,8 +45,14 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: orders.created_at  (cost=0.35 rows=1) (actual time=0.00358..0.00358 rows=0 loops=1)\n    -> Index lookup on orders using idx_orders_user_id (user_id=1)  (cost=0.35 rows=1) (actual time=0.00246..0.00246 rows=0 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Sort: orders.created_at  (cost=0.35 rows=1) (actual time=0.00337..0.00337 rows=0 loops=1)\n    -> Index lookup on orders using idx_orders_user_id (user_id=1)  (cost=0.35 rows=1) (actual time=0.00242..0.00242 rows=0 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select distinct `test`.`orders`.`id` AS `id`,`test`.`orders`.`created_at` AS `created_at` from `test`.`orders` where (`test`.`orders`.`user_id` = 1) order by `test`.`orders`.`created_at`"
+        }
+    ],
     "schema": {
         "orders": {
             "columns": [

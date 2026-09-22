@@ -69,6 +69,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertStringContainsString('view_count > 1000', $context->sql);
         $this->assertSame('posts', $context->explain['query_block']['table']['table_name']);
         $this->assertStringStartsWith('-> ', (string) $context->explainAnalyze);
+        $this->assertCount(1, $context->warningsWithCode(1003));
         $this->assertSame(['posts'], array_keys($context->schema));
         $this->assertSame(['id'], $context->primaryKeyColumns('posts'));
     }

@@ -42,8 +42,14 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: order_count DESC  (actual time=0.486..0.508 rows=855 loops=1)\n    -> Stream results  (cost=402 rows=855) (actual time=0.0364..0.372 rows=855 loops=1)\n        -> Group aggregate: count(0)  (cost=402 rows=855) (actual time=0.0359..0.317 rows=855 loops=1)\n            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.0345..0.224 rows=2000 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Sort: order_count DESC  (actual time=0.489..0.51 rows=855 loops=1)\n    -> Stream results  (cost=402 rows=855) (actual time=0.037..0.384 rows=855 loops=1)\n        -> Group aggregate: count(0)  (cost=402 rows=855) (actual time=0.0363..0.328 rows=855 loops=1)\n            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.0349..0.235 rows=2000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`orders`.`user_id` AS `user_id`,count(0) AS `order_count` from `test`.`orders` group by `test`.`orders`.`user_id` order by `order_count` desc"
+        }
+    ],
     "schema": {
         "orders": {
             "columns": [

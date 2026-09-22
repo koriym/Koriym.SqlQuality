@@ -30,8 +30,14 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.0143..0.34 rows=2 loops=1)\n    -> Table scan on users  (cost=102 rows=1000) (actual time=0.0138..0.273 rows=1000 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.0177..0.345 rows=2 loops=1)\n    -> Table scan on users  (cost=102 rows=1000) (actual time=0.0169..0.278 rows=1000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`users`.`id` AS `id`,`test`.`users`.`name` AS `name`,`test`.`users`.`email` AS `email`,`test`.`users`.`status` AS `status`,`test`.`users`.`created_at` AS `created_at`,`test`.`users`.`updated_at` AS `updated_at` from `test`.`users` where (`test`.`users`.`name` in ('User 1','User 10'))"
+        }
+    ],
     "schema": {
         "users": {
             "columns": [

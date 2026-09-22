@@ -6,7 +6,13 @@
             "message": "No tables used"
         }
     },
-    "explain_analyze": "-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=84e-6..84e-6 rows=1 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0..0 rows=1 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select 1 AS `1`"
+        }
+    ],
     "schema": []
 }

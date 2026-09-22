@@ -40,8 +40,14 @@
             }
         }
     },
-    "explain_analyze": "-> Group (no aggregates)  (cost=2.66 rows=2.83) (actual time=0.011..0.011 rows=0 loops=1)\n    -> Filter: ((comments.user_id in (371,963)) and (comments.id in (1,2,555,999)))  (cost=1.86 rows=8) (actual time=0.0108..0.0108 rows=0 loops=1)\n        -> Covering index range scan on comments using user_id over (user_id = 371 AND id = 1) OR (user_id = 371 AND id = 2) OR (6 more)  (cost=1.86 rows=8) (actual time=0.0103..0.0103 rows=0 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Group (no aggregates)  (cost=2.66 rows=2.83) (actual time=0.00929..0.00929 rows=0 loops=1)\n    -> Filter: ((comments.user_id in (371,963)) and (comments.id in (1,2,555,999)))  (cost=1.86 rows=8) (actual time=0.00913..0.00913 rows=0 loops=1)\n        -> Covering index range scan on comments using user_id over (user_id = 371 AND id = 1) OR (user_id = 371 AND id = 2) OR (6 more)  (cost=1.86 rows=8) (actual time=0.00879..0.00879 rows=0 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select distinct `test`.`comments`.`user_id` AS `user_id` from `test`.`comments` where ((`test`.`comments`.`user_id` in (371,963)) and (`test`.`comments`.`id` in (1,2,555,999)))"
+        }
+    ],
     "schema": {
         "comments": {
             "columns": [

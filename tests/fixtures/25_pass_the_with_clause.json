@@ -77,8 +77,14 @@
             ]
         }
     },
-    "explain_analyze": "-> Nested loop inner join  (cost=2829 rows=7848) (actual time=0.0193..5.42 rows=7975 loops=1)\n    -> Covering index lookup on users using idx_users_status_created (status='active')  (cost=82.5 rows=800) (actual time=0.013..0.177 rows=800 loops=1)\n    -> Index lookup on comments using user_id (user_id=users.id)  (cost=2.45 rows=9.81) (actual time=0.00101..0.00603 rows=9.97 loops=800)\n",
-    "warnings": [],
+    "explain_analyze": "-> Nested loop inner join  (cost=2829 rows=7848) (actual time=0.0166..5.31 rows=7975 loops=1)\n    -> Covering index lookup on users using idx_users_status_created (status='active')  (cost=82.5 rows=800) (actual time=0.0119..0.174 rows=800 loops=1)\n    -> Index lookup on comments using user_id (user_id=users.id)  (cost=2.45 rows=9.81) (actual time=924e-6..0.0059 rows=9.97 loops=800)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`comments`.`id` AS `id`,`test`.`comments`.`post_id` AS `post_id`,`test`.`comments`.`user_id` AS `user_id`,`test`.`comments`.`content` AS `content`,`test`.`comments`.`status` AS `status`,`test`.`comments`.`created_at` AS `created_at` from `test`.`users` join `test`.`comments` where ((`test`.`users`.`status` = 'active') and (`test`.`comments`.`user_id` = `test`.`users`.`id`))"
+        }
+    ],
     "schema": {
         "users": {
             "columns": [

@@ -168,8 +168,9 @@ final class SqlFileAnalyzer
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         $explain = $this->executeExplain($interpolatedSql);
-        $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
+        // SHOW WARNINGS covers the last statement only; EXPLAIN ANALYZE and the session reset would clear these
         $warnings = $this->getWarnings();
+        $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
         $schema = $this->getSchemaInfo($sql);
 
         return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema);

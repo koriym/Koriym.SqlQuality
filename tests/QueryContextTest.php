@@ -23,7 +23,7 @@ final class QueryContextTest extends TestCase
     {
         $this->assertCount(1, Fixture::load('20_multi_table_update.sql')->warningsWithCode(1003));
         $this->assertSame([], Fixture::load('20_multi_table_update.sql')->warningsWithCode(1265));
-        $this->assertSame([], Fixture::load('1_full_table_scan.sql')->warningsWithCode(1003));
+        $this->assertCount(2, Fixture::load('10_redundant_join.sql')->warningsWithCode(1276));
     }
 
     public function testIndexColumnsOrdersColumnsBySeqInIndex(): void

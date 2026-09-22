@@ -123,8 +123,14 @@
             ]
         }
     },
-    "explain_analyze": "-> Nested loop inner join  (cost=2637 rows=4277) (actual time=0.0177..16.4 rows=6958 loops=1)\n    -> Nested loop inner join  (cost=1140 rows=1982) (actual time=0.00942..7.69 rows=3583 loops=1)\n        -> Filter: (posts.user_id is not null)  (cost=273 rows=2478) (actual time=0.00704..3.6 rows=4500 loops=1)\n            -> Index lookup on posts using idx_posts_status_created (status='published')  (cost=273 rows=2478) (actual time=0.00687..3.4 rows=4500 loops=1)\n        -> Filter: (users.`status` = 'active')  (cost=0.25 rows=0.8) (actual time=756e-6..809e-6 rows=0.796 loops=4500)\n            -> Single-row index lookup on users using PRIMARY (id=posts.user_id)  (cost=0.25 rows=1) (actual time=613e-6..636e-6 rows=1 loops=4500)\n    -> Index lookup on orders using idx_orders_user_status (user_id=posts.user_id, status='completed')  (cost=0.539 rows=2.16) (actual time=0.00193..0.00226 rows=1.94 loops=3583)\n",
-    "warnings": [],
+    "explain_analyze": "-> Nested loop inner join  (cost=2637 rows=4277) (actual time=0.0147..16.4 rows=6958 loops=1)\n    -> Nested loop inner join  (cost=1140 rows=1982) (actual time=0.00733..7.64 rows=3583 loops=1)\n        -> Filter: (posts.user_id is not null)  (cost=273 rows=2478) (actual time=0.00492..3.5 rows=4500 loops=1)\n            -> Index lookup on posts using idx_posts_status_created (status='published')  (cost=273 rows=2478) (actual time=0.00471..3.3 rows=4500 loops=1)\n        -> Filter: (users.`status` = 'active')  (cost=0.25 rows=0.8) (actual time=767e-6..820e-6 rows=0.796 loops=4500)\n            -> Single-row index lookup on users using PRIMARY (id=posts.user_id)  (cost=0.25 rows=1) (actual time=620e-6..642e-6 rows=1 loops=4500)\n    -> Index lookup on orders using idx_orders_user_status (user_id=posts.user_id, status='completed')  (cost=0.539 rows=2.16) (actual time=0.00196..0.00228 rows=1.94 loops=3583)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`orders`.`id` AS `id`,`test`.`orders`.`user_id` AS `user_id`,`test`.`orders`.`total_amount` AS `total_amount`,`test`.`orders`.`status` AS `status`,`test`.`orders`.`created_at` AS `created_at`,`test`.`orders`.`reference_code` AS `reference_code`,`test`.`users`.`id` AS `id`,`test`.`users`.`name` AS `name`,`test`.`users`.`email` AS `email`,`test`.`users`.`status` AS `status`,`test`.`users`.`created_at` AS `created_at`,`test`.`users`.`updated_at` AS `updated_at`,`test`.`posts`.`id` AS `id`,`test`.`posts`.`user_id` AS `user_id`,`test`.`posts`.`title` AS `title`,`test`.`posts`.`content` AS `content`,`test`.`posts`.`status` AS `status`,`test`.`posts`.`view_count` AS `view_count`,`test`.`posts`.`created_at` AS `created_at` from `test`.`orders` join `test`.`users` join `test`.`posts` where ((`test`.`orders`.`status` = 'completed') and (`test`.`users`.`status` = 'active') and (`test`.`posts`.`status` = 'published') and (`test`.`users`.`id` = `test`.`posts`.`user_id`) and (`test`.`orders`.`user_id` = `test`.`posts`.`user_id`))"
+        }
+    ],
     "schema": {
         "orders": {
             "columns": [

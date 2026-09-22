@@ -43,8 +43,14 @@
             }
         }
     },
-    "explain_analyze": "-> Index lookup on users using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.0481..0.533 rows=800 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Index lookup on users using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.0407..0.493 rows=800 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`users`.`id` AS `id`,`test`.`users`.`name` AS `name`,`test`.`users`.`email` AS `email`,`test`.`users`.`status` AS `status`,`test`.`users`.`created_at` AS `created_at`,`test`.`users`.`updated_at` AS `updated_at` from `test`.`users` where (`test`.`users`.`status` = 'active') order by `test`.`users`.`created_at`"
+        }
+    ],
     "schema": {
         "users": {
             "columns": [

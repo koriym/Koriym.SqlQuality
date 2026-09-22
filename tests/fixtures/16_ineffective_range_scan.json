@@ -36,8 +36,14 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: orders.created_at  (cost=202 rows=2000) (actual time=1.05..1.15 rows=1998 loops=1)\n    -> Filter: (orders.total_amount between 1 and 1000)  (cost=202 rows=2000) (actual time=0.0381..0.619 rows=1998 loops=1)\n        -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0367..0.471 rows=2000 loops=1)\n",
-    "warnings": [],
+    "explain_analyze": "-> Sort: orders.created_at  (cost=202 rows=2000) (actual time=1.07..1.18 rows=1998 loops=1)\n    -> Filter: (orders.total_amount between 1 and 1000)  (cost=202 rows=2000) (actual time=0.0358..0.627 rows=1998 loops=1)\n        -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0346..0.476 rows=2000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`orders`.`id` AS `id`,`test`.`orders`.`user_id` AS `user_id`,`test`.`orders`.`total_amount` AS `total_amount`,`test`.`orders`.`status` AS `status`,`test`.`orders`.`created_at` AS `created_at`,`test`.`orders`.`reference_code` AS `reference_code` from `test`.`orders` where (`test`.`orders`.`total_amount` between 1 and 1000) order by `test`.`orders`.`created_at`"
+        }
+    ],
     "schema": {
         "orders": {
             "columns": [
