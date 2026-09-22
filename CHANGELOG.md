@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DeepOffsetDetector` detecting `LIMIT`/`OFFSET` pagination that scans and discards a large number of rows
 - `OrderByRandDetector` detecting `ORDER BY RAND()` forcing a filesort over every matching row
 - `EstimateDivergenceDetector` detecting `EXPLAIN ANALYZE` nodes where the row estimate diverges from the actual row count
+- `sql-quality explain` command analyzing a single SQL file and printing structured JSON
+- JSON Schema for the `analyze` and `explain` CLI output (`schema/analyze-report.schema.json`, `schema/explain-report.schema.json`)
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress

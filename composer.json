@@ -17,7 +17,8 @@
         "bamarni/composer-bin-plugin": "^1.8",
         "phpunit/phpunit": "^9.5",
         "rector/rector": "^2.0",
-        "symfony/polyfill-php83": "^1.33"
+        "symfony/polyfill-php83": "^1.33",
+        "justinrainbow/json-schema": "^6.12"
     },
     "bin": [
         "bin/sql-quality"
