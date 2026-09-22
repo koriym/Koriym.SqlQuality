@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `--fail-on=LEVEL` option and exit codes 0 / 1 / 2 for the CLI
 - Skipped files and their reasons in the analysis result and the JSON output
 - `ReadOnlySession` guard around query timing and `EXPLAIN ANALYZE`
+- MySQL service and database-backed tests in CI
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress
