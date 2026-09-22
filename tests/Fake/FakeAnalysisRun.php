@@ -64,7 +64,9 @@ final class FakeAnalysisRun
             'documentation' => 'https://koriym.github.io/Koriym.SqlQuality/issues/' . $type,
             'severity' => $severity,
             'confidence' => 0.95,
-            'evidence' => ['source' => 'EXPLAIN FORMAT=JSON / SHOW WARNINGS'],
+            'detector' => 'Koriym\\SqlQuality\\Detector\\' . $type . 'Detector',
+            'evidence' => ['table_name' => 'posts'],
+            'suggestion' => null,
         ];
     }
 }

@@ -13,7 +13,7 @@ final class IneffectiveJoinDetectorTest extends TestCase
     {
         $detector = new IneffectiveJoinDetector();
 
-        $this->assertTrue($detector->detect([
+        $findings = $detector->detect(self::context([
             'query_block' => [
                 'select_id' => 1,
                 'nested_loop' => [
@@ -21,7 +21,6 @@ final class IneffectiveJoinDetectorTest extends TestCase
                         'table' => [
                             'table_name' => 'posts',
                             'access_type' => 'ALL',
-                            'rows' => 5000,
                             'rows_examined_per_scan' => 5000,
                             'rows_produced_per_join' => 100,
                         ],
@@ -30,22 +29,24 @@ final class IneffectiveJoinDetectorTest extends TestCase
                         'table' => [
                             'table_name' => 'comments',
                             'access_type' => 'ref',
-                            'rows' => 1,
                             'rows_examined_per_scan' => 1,
                             'rows_produced_per_join' => 1,
                         ],
                     ],
                 ],
             ],
-            'analyze_result' => [],
         ]));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('posts', $findings[0]->evidence['table_name']);
+        $this->assertSame('ALL', $findings[0]->evidence['access_type']);
     }
 
     public function testDoesNotCombineSeparateSingleTableNestedLoops(): void
     {
         $detector = new IneffectiveJoinDetector();
 
-        $this->assertFalse($detector->detect([
+        $findings = $detector->detect(self::context([
             'query_block' => [
                 'select_id' => 1,
                 'nested_loop' => [
@@ -53,7 +54,6 @@ final class IneffectiveJoinDetectorTest extends TestCase
                         'table' => [
                             'table_name' => 'posts',
                             'access_type' => 'ALL',
-                            'rows' => 5000,
                             'rows_examined_per_scan' => 5000,
                         ],
                     ],
@@ -67,7 +67,6 @@ final class IneffectiveJoinDetectorTest extends TestCase
                                     'table' => [
                                         'table_name' => 'users',
                                         'access_type' => 'ALL',
-                                        'rows' => 5000,
                                         'rows_examined_per_scan' => 5000,
                                     ],
                                 ],
@@ -76,15 +75,16 @@ final class IneffectiveJoinDetectorTest extends TestCase
                     ],
                 ],
             ],
-            'analyze_result' => [],
         ]));
+
+        $this->assertSame([], $findings);
     }
 
     public function testDoesNotTreatNestedSubqueryTableAsJoinMember(): void
     {
         $detector = new IneffectiveJoinDetector();
 
-        $this->assertFalse($detector->detect([
+        $findings = $detector->detect(self::context([
             'query_block' => [
                 'select_id' => 1,
                 'nested_loop' => [
@@ -92,7 +92,6 @@ final class IneffectiveJoinDetectorTest extends TestCase
                         'table' => [
                             'table_name' => 'posts',
                             'access_type' => 'ref',
-                            'rows' => 1,
                             'rows_examined_per_scan' => 1,
                             'materialized_from_subquery' => [
                                 'query_block' => [
@@ -100,7 +99,6 @@ final class IneffectiveJoinDetectorTest extends TestCase
                                     'table' => [
                                         'table_name' => 'users',
                                         'access_type' => 'ALL',
-                                        'rows' => 5000,
                                         'rows_examined_per_scan' => 5000,
                                     ],
                                 ],
@@ -109,7 +107,14 @@ final class IneffectiveJoinDetectorTest extends TestCase
                     ],
                 ],
             ],
-            'analyze_result' => [],
         ]));
+
+        $this->assertSame([], $findings);
+    }
+
+    /** @param array<string, mixed> $explain */
+    private static function context(array $explain): QueryContext
+    {
+        return new QueryContext(sql: '', explain: $explain, explainAnalyze: null, warnings: [], schema: []);
     }
 }

@@ -349,10 +349,16 @@ final class SqlFileAnalyzer
         [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params, $executed);
         /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
         $warnings = $this->getWarnings();
-        /** @var list<DetectedWarning> $issues */
-        $issues = $this->analyzer->analyze($explainResult, $warnings);
         /** @var array<string, SchemaInfo> $schemaInfo */
         $schemaInfo = $this->getSchemaInfo($sql);
+        $context = new QueryContext(
+            $this->interpolateQuery($sql, $params),
+            $explainResult,
+            $executed ? $explainAnalyze : null,
+            $warnings,
+            $schemaInfo,
+        );
+        $issues = $this->analyzer->analyze($context);
         $cost = $this->calculateCost($explainResult);
 
         $aiPrompt = $this->aiAdvisor->generatePrompt(

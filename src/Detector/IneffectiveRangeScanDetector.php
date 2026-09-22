@@ -4,36 +4,33 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
+use function array_flip;
+use function array_intersect_key;
 use function is_string;
 use function str_contains;
 use function substr_count;
 
-/**
- * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainTable from Types
- */
+/** @psalm-import-type ExplainTable from Types */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
     /**
      * 非効率的な範囲スキャンを検出します
-     *
-     * @param ExplainResult $explainResult
      */
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
-        $walker = new ExplainWalker();
-        foreach ($walker->tables($explainResult) as $table) {
+        $findings = [];
+        foreach ($context->tables() as $table) {
             if ($this->isIneffectiveTableAccess($table)) {
-                return true;
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'access_type', 'rows_examined_per_scan', 'possible_keys', 'filtered', 'attached_condition'])));
             }
         }
 
-        return false;
+        return $findings;
     }
 
     /**
@@ -61,7 +58,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
             }
 
             // 複数のインデックス候補がある場合
-            if (isset($table['possible_keys']) && is_string($table['possible_keys']) && substr_count($table['possible_keys'], ',') > 0) {
+            if ($this->hasMultipleIndexCandidates($table['possible_keys'] ?? null)) {
                 return true;
             }
         }
@@ -79,7 +76,12 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
         // 選択性の低いインデックススキャン
         return isset($table['filtered']) &&
             isset($table['rows_examined_per_scan']) &&
-            $table['filtered'] < 20.00 &&
+            (float) $table['filtered'] < 20.00 &&
             $table['rows_examined_per_scan'] > 100;
+    }
+
+    private function hasMultipleIndexCandidates(mixed $possibleKeys): bool
+    {
+        return is_string($possibleKeys) && substr_count($possibleKeys, ',') > 0;
     }
 }

@@ -42,9 +42,7 @@ final class DetectorCorpusTest extends TestCase
     /** @dataProvider fixtureProvider */
     public function testDetectedTypesMatchExpectation(string $name): void
     {
-        $fixture = Fixture::load($name);
-
-        $issues = (new ExplainAnalyzer())->analyze($fixture['explain'], $fixture['warnings']);
+        $issues = (new ExplainAnalyzer())->analyze(Fixture::load($name));
         $types = array_values(array_unique(array_column($issues, 'type')));
         sort($types, SORT_STRING);
 

@@ -15,13 +15,13 @@ use const SORT_STRING;
 
 final class Fixture
 {
-    /** @return array<string, mixed> */
-    public static function load(string $name): array
+    public static function load(string $name): QueryContext
     {
         $json = (string) file_get_contents(__DIR__ . '/fixtures/' . basename($name, '.sql') . '.json');
+        /** @var array<string, mixed> $data */
+        $data = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
 
-        /** @var array<string, mixed> */
-        return json_decode($json, true, 512, JSON_THROW_ON_ERROR);
+        return QueryContext::fromArray($data);
     }
 
     /** @return list<string> */

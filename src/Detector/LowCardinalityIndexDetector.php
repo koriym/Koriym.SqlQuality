@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
+use function array_flip;
+use function array_intersect_key;
 use function in_array;
 
 /**
@@ -16,23 +18,21 @@ use function in_array;
  * Low cardinality indexes (e.g., status, gender) often scan a large percentage
  * of table rows, making them inefficient compared to full table scans.
  *
- * @psalm-import-type ExplainResult from Types
  * @psalm-import-type ExplainTable from Types
  */
 final class LowCardinalityIndexDetector implements DetectorInterface
 {
-    /** @param ExplainResult $explainResult */
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
-        $walker = new ExplainWalker();
-        foreach ($walker->tables($explainResult) as $table) {
+        $findings = [];
+        foreach ($context->tables() as $table) {
             if ($this->checkTable($table)) {
-                return true;
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'access_type', 'key', 'rows_examined_per_scan', 'filtered'])));
             }
         }
 
-        return false;
+        return $findings;
     }
 
     /** @param ExplainTable $table */
@@ -48,8 +48,8 @@ final class LowCardinalityIndexDetector implements DetectorInterface
             return false;
         }
 
-        $rowsExamined = $table['rows_examined_per_scan'] ?? $table['rows'] ?? 0;
-        $filtered = $table['filtered'] ?? 100.0;
+        $rowsExamined = $table['rows_examined_per_scan'] ?? 0;
+        $filtered = (float) ($table['filtered'] ?? 100.0);
 
         // If examining many rows with high filtered percentage, likely low cardinality
         // This means the index isn't selective enough

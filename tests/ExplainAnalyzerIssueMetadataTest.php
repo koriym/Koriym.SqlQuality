@@ -4,28 +4,39 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\FullTableScanDetector;
 use PHPUnit\Framework\TestCase;
 
 final class ExplainAnalyzerIssueMetadataTest extends TestCase
 {
-    public function testAnalyzeAddsSeverityConfidenceAndEvidence(): void
+    public function testAnalyzeAddsSeverityConfidenceDetectorAndEvidence(): void
     {
         $analyzer = new ExplainAnalyzer();
 
-        $issues = $analyzer->analyze([
-            'query_block' => [
-                'table' => [
-                    'table_name' => 'users',
-                    'access_type' => 'ALL',
-                    'rows' => 1000,
+        $issues = $analyzer->analyze(new QueryContext(
+            sql: 'SELECT * FROM users',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'table' => [
+                        'table_name' => 'users',
+                        'access_type' => 'ALL',
+                        'rows_examined_per_scan' => 1000,
+                    ],
                 ],
             ],
-        ]);
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
 
+        $this->assertCount(1, $issues);
         $this->assertSame('FullTableScan', $issues[0]['type']);
         $this->assertSame('Critical', $issues[0]['severity']);
         $this->assertSame(0.95, $issues[0]['confidence']);
-        $this->assertSame('EXPLAIN FORMAT=JSON / SHOW WARNINGS', $issues[0]['evidence']['source']);
-        $this->assertArrayHasKey('pattern', $issues[0]['evidence']);
+        $this->assertSame(FullTableScanDetector::class, $issues[0]['detector']);
+        $this->assertSame('users', $issues[0]['evidence']['table_name']);
+        $this->assertSame(1000, $issues[0]['evidence']['rows_examined_per_scan']);
+        $this->assertNull($issues[0]['suggestion']);
     }
 }

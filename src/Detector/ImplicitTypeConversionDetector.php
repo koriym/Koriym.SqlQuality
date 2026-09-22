@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Override;
 
+use function array_flip;
+use function array_intersect_key;
 use function is_string;
 use function preg_match;
 
@@ -18,10 +20,10 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
      * {@inheritDoc}
      */
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
-        $walker = new ExplainWalker();
-        foreach ($walker->tables($explainResult) as $table) {
+        $findings = [];
+        foreach ($context->tables() as $table) {
             // attached_condition の確認
             if (! isset($table['attached_condition']) || ! is_string($table['attached_condition'])) {
                 continue;
@@ -29,11 +31,11 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
 
             // reference_code のような文字列型のカラムに数値を直接比較している場合を検出
             if ($this->containsStringNumericComparison($table['attached_condition'])) {
-                return true;
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'attached_condition'])));
             }
         }
 
-        return false;
+        return $findings;
     }
 
     /**

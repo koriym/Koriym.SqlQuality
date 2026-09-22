@@ -4,25 +4,27 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Override;
 
+use function array_flip;
+use function array_intersect_key;
 use function is_string;
 use function preg_match;
 
 final class FunctionInvalidatesIndexDetector implements DetectorInterface
 {
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
-        $walker = new ExplainWalker();
-        foreach ($walker->tables($explainResult) as $table) {
+        $findings = [];
+        foreach ($context->tables() as $table) {
             if ($this->hasAttachedConditionWithFunction($table)) {
-                return true;
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'attached_condition'])));
             }
         }
 
-        return false;
+        return $findings;
     }
 
     private function hasAttachedConditionWithFunction(array $table): bool

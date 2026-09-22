@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\DetectorInterface;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
+use Koriym\SqlQuality\Detector\Finding;
+use Koriym\SqlQuality\Detector\FullTableScanDetector;
 use Koriym\SqlQuality\Detector\FunctionInvalidatesIndexDetector;
 use Koriym\SqlQuality\Detector\ImplicitTypeConversionDetector;
 use Koriym\SqlQuality\Detector\IneffectiveJoinDetector;
@@ -14,25 +17,17 @@ use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Detector\LowCardinalityIndexDetector;
 use Koriym\SqlQuality\Detector\MultiTableUpdateDetector;
+use Koriym\SqlQuality\Detector\TemporaryTableGroupingDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
-use Koriym\SqlQuality\Exception\LogicException;
 
-use function get_class;
-use function is_array;
 use function sprintf;
-use function str_contains;
 
 /**
  * @psalm-import-type WarningType from Types
  * @psalm-import-type WarningMessages from Types
- * @psalm-import-type WarningPattern from Types
  * @psalm-import-type Warning from Types
  * @psalm-import-type WarningSeverity from Types
  * @psalm-import-type DetectedWarning from Types
- * @psalm-import-type ShowWarning from Types
- * @psalm-import-type ShowWarnings from Types
- * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainOperation from Types
  * @psalm-import-type QueryCost from Types
  */
 final class ExplainAnalyzer
@@ -72,9 +67,7 @@ final class ExplainAnalyzer
             ],
             'FullTableScan' => [
                 'message' => $messages['FullTableScan'],
-                'pattern' => [
-                    'explain' => ['access_type' => 'ALL'],
-                ],
+                'detector' => new FullTableScanDetector(),
             ],
             'ImplicitTypeConversion' => [
                 'message' => $messages['ImplicitTypeConversion'],
@@ -110,9 +103,7 @@ final class ExplainAnalyzer
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
-                'pattern' => [
-                    'explain' => ['using_temporary_table' => true],
-                ],
+                'detector' => new TemporaryTableGroupingDetector(),
             ],
             'UnnecessaryDistinct' => [
                 'message' => $messages['UnnecessaryDistinct'],
@@ -121,113 +112,35 @@ final class ExplainAnalyzer
         ];
     }
 
-    /**
-     * @param ExplainResult $explainResult
-     * @param ShowWarnings  $warnings
-     *
-     * @return list<DetectedWarning>
-     */
-    public function analyze(array $explainResult, array $warnings = []): array
+    /** @return list<DetectedWarning> */
+    public function analyze(QueryContext $context): array
     {
         $detectedWarnings = [];
         foreach ($this->warnings as $warningType => $warning) {
-            if (isset($warning['detector'])) {
-                $detector = $warning['detector'];
-                if ($detector->detect($explainResult)) {
-                    $detectedWarnings[] = $this->createIssue(
-                        $warningType,
-                        $warning['message'],
-                        ['source' => 'EXPLAIN FORMAT=JSON', 'detector' => get_class($detector)],
-                    );
-                }
-
-                continue;
+            foreach ($warning['detector']->detect($context) as $finding) {
+                $detectedWarnings[] = $this->createIssue($warningType, $warning['message'], $warning['detector'], $finding);
             }
-
-            if (isset($warning['pattern'])) {
-                if ($this->matchesPattern($explainResult, $warnings, $warning['pattern'])) {
-                    $detectedWarnings[] = $this->createIssue(
-                        $warningType,
-                        $warning['message'],
-                        ['source' => 'EXPLAIN FORMAT=JSON / SHOW WARNINGS', 'pattern' => $warning['pattern']],
-                    );
-                }
-
-                continue;
-            }
-
-            throw new LogicException('Invalid warning configuration:' . $warningType);
         }
 
         return $detectedWarnings;
     }
 
     /**
-     * @param ExplainResult  $explainResult
-     * @param ShowWarnings   $warnings
-     * @param WarningPattern $pattern
-     */
-    private function matchesPattern(array $explainResult, array $warnings, array $pattern): bool
-    {
-        if (isset($pattern['explain'])) {
-            foreach ($pattern['explain'] as $key => $value) {
-                if (! $this->matchExplainPattern($explainResult, $key, $value)) {
-                    return false;
-                }
-            }
-        }
-
-        if (isset($pattern['warnings'])) {
-            foreach ($pattern['warnings'] as $warningPattern) {
-                if (! $this->matchWarningPattern($warnings, $warningPattern)) {
-                    return false;
-                }
-            }
-        }
-
-        return true;
-    }
-
-    /** @param ExplainResult $explainResult */
-    private function matchExplainPattern(array $explainResult, string $key, mixed $value): bool
-    {
-        if (isset($explainResult['query_block']) && is_array($explainResult['query_block'])) {
-            $walker = new ExplainWalker();
-            if ($walker->contains($explainResult['query_block'], $key, $value)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /** @param ShowWarnings $warnings */
-    private function matchWarningPattern(array $warnings, string $pattern): bool
-    {
-        foreach ($warnings as $warning) {
-            if (str_contains($warning['Message'], $pattern)) {
-                return true;
-            }
-        }
-
-        return false;
-    }
-
-    /**
-     * @param WarningType          $warningType
-     * @param array<string, mixed> $evidence
+     * @param WarningType $warningType
      *
      * @return DetectedWarning
      */
-    private function createIssue(string $warningType, string $message, array $evidence): array
+    private function createIssue(string $warningType, string $message, DetectorInterface $detector, Finding $finding): array
     {
         return [
             'type' => $warningType,
             'message' => $message,
             'documentation' => $this->getDocumentationUrl($warningType),
-            'severity' => self::getSeverity($warningType),
-            'confidence' => self::getConfidence($warningType),
-            'evidence' => $evidence,
+            'severity' => $finding->severity ?? self::getSeverity($warningType),
+            'confidence' => $finding->confidence ?? self::getConfidence($warningType),
+            'detector' => $detector::class,
+            'evidence' => $finding->evidence,
+            'suggestion' => $finding->suggestion,
         ];
     }
 
