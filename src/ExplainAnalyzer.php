@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\CartesianProductDetector;
 use Koriym\SqlQuality\Detector\DependentSubqueryDetector;
 use Koriym\SqlQuality\Detector\DetectorInterface;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
@@ -36,6 +37,7 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
+        'CartesianProduct'         => 'Cartesian product detected; the join has no key connecting it to the preceding table.',
         'DependentSubquery'        => 'Dependent subquery detected; it runs once per outer row.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
@@ -59,6 +61,10 @@ final class ExplainAnalyzer
     {
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
+            'CartesianProduct' => [
+                'detector' => new CartesianProductDetector(),
+                'message' => $messages['CartesianProduct'],
+            ],
             'DependentSubquery' => [
                 'detector' => new DependentSubqueryDetector(),
                 'message' => $messages['DependentSubquery'],

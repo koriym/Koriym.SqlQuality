@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `SqlFileAnalyzer::queryContext()` returning the `QueryContext` the detectors receive
 - `ExplainAnalyzeParser` turning the text of `EXPLAIN ANALYZE` into a list of plan nodes
 - `DependentSubqueryDetector` detecting correlated subqueries that run once per outer row
+- `CartesianProductDetector` detecting joined tables with no key connecting them to the preceding tables
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress
