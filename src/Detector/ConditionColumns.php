@@ -83,7 +83,7 @@ final class ConditionColumns
         return $wrapped;
     }
 
-    /** @return list<ConditionColumnMatch> predicates on a column of the alias that is not wrapped in a function */
+    /** @return list<ConditionColumnMatch> */
     private static function predicates(string $attachedCondition, string $aliasOrTable): array
     {
         $wrapped = array_flip(array_column(self::functionWrapped($attachedCondition, $aliasOrTable), 'column'));

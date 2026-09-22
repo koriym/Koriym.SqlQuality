@@ -25,10 +25,8 @@ final class ImplicitTypeConversionDetector implements DetectorInterface
     /** MySQL warning "Cannot use ref access on index ... due to type or collation conversion on field ..." */
     private const REF_ACCESS_LOST = 1739;
 
-    /** Confidence when MySQL itself reported the lost ref access */
     private const CONFIDENCE_WITH_WARNING = 0.95;
 
-    /** Confidence from the schema type and the literal alone */
     private const CONFIDENCE = 0.8;
 
     #[Override]
