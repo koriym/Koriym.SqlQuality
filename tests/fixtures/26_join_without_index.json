@@ -1,0 +1,269 @@
+{
+    "sql": "-- Problem: Join condition has no supporting index, forcing a hash join\nSELECT o.id, u.name FROM orders o JOIN users u ON u.email = o.reference_code;\n",
+    "explain": {
+        "query_block": {
+            "select_id": 1,
+            "cost_info": {
+                "query_cost": "200123.75"
+            },
+            "nested_loop": [
+                {
+                    "table": {
+                        "table_name": "u",
+                        "access_type": "ALL",
+                        "rows_examined_per_scan": 1000,
+                        "rows_produced_per_join": 1000,
+                        "filtered": "100.00",
+                        "cost_info": {
+                            "read_cost": "1.75",
+                            "eval_cost": "100.00",
+                            "prefix_cost": "101.75",
+                            "data_read_per_join": "2M"
+                        },
+                        "used_columns": [
+                            "name",
+                            "email"
+                        ]
+                    }
+                },
+                {
+                    "table": {
+                        "table_name": "o",
+                        "access_type": "ALL",
+                        "rows_examined_per_scan": 2000,
+                        "rows_produced_per_join": 200000,
+                        "filtered": "10.00",
+                        "using_join_buffer": "hash join",
+                        "cost_info": {
+                            "read_cost": "22.00",
+                            "eval_cost": "20000.00",
+                            "prefix_cost": "200123.75",
+                            "data_read_per_join": "57M"
+                        },
+                        "used_columns": [
+                            "id",
+                            "reference_code"
+                        ],
+                        "attached_condition": "(`test`.`u`.`email` = `test`.`o`.`reference_code`)"
+                    }
+                }
+            ]
+        }
+    },
+    "explain_analyze": "-> Filter: (u.email = o.reference_code)  (cost=200124 rows=200000) (actual time=0.802..0.802 rows=0 loops=1)\n    -> Inner hash join (<hash>(u.email)=<hash>(o.reference_code))  (cost=200124 rows=200000) (actual time=0.802..0.802 rows=0 loops=1)\n        -> Table scan on o  (cost=0.042 rows=2000) (actual time=0.027..0.308 rows=2000 loops=1)\n        -> Hash\n            -> Table scan on u  (cost=102 rows=1000) (actual time=0.0522..0.22 rows=1000 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select `test`.`o`.`id` AS `id`,`test`.`u`.`name` AS `name` from `test`.`orders` `o` join `test`.`users` `u` where (`test`.`u`.`email` = `test`.`o`.`reference_code`)"
+        }
+    ],
+    "schema": {
+        "orders": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "user_id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "total_amount",
+                    "DATA_TYPE": "decimal",
+                    "COLUMN_TYPE": "decimal(10,2)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": "pending",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                },
+                {
+                    "COLUMN_NAME": "reference_code",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(50)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_orders_status_created",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 3
+                },
+                {
+                    "INDEX_NAME": "idx_orders_status_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 440
+                },
+                {
+                    "INDEX_NAME": "idx_orders_user_id",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 855
+                },
+                {
+                    "INDEX_NAME": "idx_orders_user_status",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 855
+                },
+                {
+                    "INDEX_NAME": "idx_orders_user_status",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 927
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 2000
+                }
+            ],
+            "status": {
+                "table_rows": 2000,
+                "data_length": 163840,
+                "index_length": 212992,
+                "auto_increment": null,
+                "create_time": "2026-09-23 00:49:27",
+                "update_time": "2026-09-23 00:49:29"
+            }
+        },
+        "users": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "name",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "email",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": "active",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                },
+                {
+                    "COLUMN_NAME": "updated_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_users_id",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 1000
+                },
+                {
+                    "INDEX_NAME": "idx_users_status_created",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 3
+                },
+                {
+                    "INDEX_NAME": "idx_users_status_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 495
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 1000
+                }
+            ],
+            "status": {
+                "table_rows": 1000,
+                "data_length": 114688,
+                "index_length": 65536,
+                "auto_increment": null,
+                "create_time": "2026-09-23 00:49:27",
+                "update_time": "2026-09-23 00:49:27"
+            }
+        }
+    }
+}

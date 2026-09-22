@@ -18,6 +18,8 @@ return [
     '23_ineffective_union.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveUnion', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
     '24_grouping_operation.sql' => [],
     '25_pass_the_with_clause.sql' => ['IneffectiveJoin', 'LowCardinalityIndex'],
+    '26_join_without_index.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveRangeScan'],
+    '27_range_scan_low_filter.sql' => ['IneffectiveLikePattern', 'IneffectiveRangeScan'],
     '2_filesort.sql' => ['IneffectiveSort', 'LowCardinalityIndex'],
     '3_function_on_indexed_column.sql' => ['FullTableScan', 'FunctionInvalidatesIndex'],
     '4_no_index_on_join.sql' => ['IneffectiveJoin', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
