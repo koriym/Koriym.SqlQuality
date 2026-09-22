@@ -21,6 +21,7 @@ return [
     '28_cartesian_product.sql' => ['CartesianProduct', 'IneffectiveJoin', 'LowCardinalityIndex'],
     '29_deep_offset.sql' => ['DeepOffset', 'FullTableScan', 'IneffectiveSort'],
     '2_filesort.sql' => ['IneffectiveSort', 'LowCardinalityIndex'],
+    '30_order_by_rand.sql' => ['IneffectiveSort', 'LowCardinalityIndex', 'OrderByRand', 'TemporaryTableGrouping'],
     '3_function_on_indexed_column.sql' => ['FullTableScan', 'FunctionInvalidatesIndex'],
     '4_no_index_on_join.sql' => ['IneffectiveJoin', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
     '5_multiple_wildcard_like.sql' => ['FullTableScan', 'IneffectiveLikePattern'],

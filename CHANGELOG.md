@@ -17,6 +17,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `DependentSubqueryDetector` detecting correlated subqueries that run once per outer row
 - `CartesianProductDetector` detecting joined tables with no key connecting them to the preceding tables
 - `DeepOffsetDetector` detecting `LIMIT`/`OFFSET` pagination that scans and discards a large number of rows
+- `OrderByRandDetector` detecting `ORDER BY RAND()` forcing a filesort over every matching row
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress

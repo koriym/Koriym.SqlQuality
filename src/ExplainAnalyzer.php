@@ -20,6 +20,7 @@ use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Detector\LowCardinalityIndexDetector;
 use Koriym\SqlQuality\Detector\MultiTableUpdateDetector;
+use Koriym\SqlQuality\Detector\OrderByRandDetector;
 use Koriym\SqlQuality\Detector\TemporaryTableGroupingDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 
@@ -52,6 +53,7 @@ final class ExplainAnalyzer
         'IneffectiveUnion'         => 'Ineffective UNION usage detected; temporary table may be used.',
         'LowCardinalityIndex'      => 'Index on low cardinality column detected; this may cause inefficient scans.',
         'MultiTableUpdate'         => 'Multi-table update detected; this may lead to heavy table locking.',
+        'OrderByRand'              => 'ORDER BY RAND() detected; it forces a filesort over every matching row.',
         'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
         'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected on already unique columns.',
     ];
@@ -118,6 +120,10 @@ final class ExplainAnalyzer
             'MultiTableUpdate' => [
                 'message' => $messages['MultiTableUpdate'],
                 'detector' => new MultiTableUpdateDetector(),
+            ],
+            'OrderByRand' => [
+                'detector' => new OrderByRandDetector(),
+                'message' => $messages['OrderByRand'],
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
@@ -187,7 +193,7 @@ final class ExplainAnalyzer
     {
         return match ($warningType) {
             'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
-            'DeepOffset' => 1.0,
+            'DeepOffset', 'OrderByRand' => 1.0,
             default => 0.95,
         };
     }

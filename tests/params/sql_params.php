@@ -49,4 +49,5 @@ return [
         'offset' => 10000,
         'limit' => 10,
     ],
+    '30_order_by_rand.sql' => ['status' => 'published'],
 ];

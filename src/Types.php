@@ -100,6 +100,7 @@ namespace Koriym\SqlQuality;
  * | 'IneffectiveUnion'
  * | 'LowCardinalityIndex'
  * | 'MultiTableUpdate'
+ * | 'OrderByRand'
  * | 'TemporaryTableGrouping'
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
@@ -117,6 +118,7 @@ namespace Koriym\SqlQuality;
  *   IneffectiveUnion: string,
  *   LowCardinalityIndex: string,
  *   MultiTableUpdate: string,
+ *   OrderByRand: string,
  *   TemporaryTableGrouping: string,
  *   UnnecessaryDistinct: string
  * }

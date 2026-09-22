@@ -76,6 +76,7 @@ Existing detectors in `src/Detector/`:
 - IneffectiveUnionDetector
 - LowCardinalityIndexDetector
 - MultiTableUpdateDetector
+- OrderByRandDetector
 - TemporaryTableGroupingDetector
 - UnnecessaryDistinctDetector
 

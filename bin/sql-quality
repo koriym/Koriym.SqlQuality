@@ -105,6 +105,7 @@ USAGE;
         'IneffectiveUnion'         => 'Ineffective UNION usage detected.',
         'LowCardinalityIndex'      => 'Index on low cardinality column detected.',
         'MultiTableUpdate'         => 'Multi-table update detected.',
+        'OrderByRand'              => 'ORDER BY RAND() detected.',
         'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
         'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected.',
     ];
@@ -124,6 +125,7 @@ USAGE;
         'IneffectiveUnion'         => '非効率的なUNIONの使用が検出されました。',
         'LowCardinalityIndex'      => 'カーディナリティの低い列にインデックスが設定されています。',
         'MultiTableUpdate'         => '複数テーブルの更新が検出されました。',
+        'OrderByRand'              => 'ORDER BY RAND()が検出されました。',
         'TemporaryTableGrouping'   => 'グループ化のために一時テーブルが必要です。',
         'UnnecessaryDistinct'      => '不必要なDISTINCTが検出されました。',
     ];
