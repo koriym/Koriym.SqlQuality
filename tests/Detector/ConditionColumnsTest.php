@@ -74,4 +74,18 @@ final class ConditionColumnsTest extends TestCase
     {
         $this->assertSame([], ConditionColumns::comparedToNumber('(length(`test`.`o`.`a`) = 5)', 'o'));
     }
+
+    public function testInAnyBranchKeepsPredicatesUnderAnOr(): void
+    {
+        $groups = ConditionColumns::inAnyBranch("((`test`.`posts`.`user_id` = 1) or (`test`.`posts`.`status` = 'published'))", 'posts');
+
+        $this->assertSame(['user_id', 'status'], array_column($groups['equality'], 'column'));
+    }
+
+    public function testFunctionWrappedCarriesTheComparisonOfTheCall(): void
+    {
+        $groups = ConditionColumns::forAlias("(cast(`test`.`posts`.`created_at` as date) = '2024-01-01')", 'posts');
+
+        $this->assertSame(['column' => 'created_at', 'operator' => '=', 'literal' => "'2024-01-01'", 'function' => 'cast'], $groups['functionWrapped'][0]);
+    }
 }
