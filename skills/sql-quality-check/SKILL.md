@@ -18,37 +18,46 @@ Analyze SQL files for performance issues. Suitable for CI pipelines.
 php bin/sql-quality analyze \
   --sql-dir="$(echo $ARGUMENTS | cut -d' ' -f1)" \
   --params="$(echo $ARGUMENTS | cut -d' ' -f2)" \
-  --format=json
+  --format=json \
+  --fail-on=critical
 ```
+
+Keep the exit status. stdout is the JSON report and nothing else.
 
 ### 2. Report Results
 
-Parse the JSON output and report:
+Parse the JSON. Severity comes from the report: `queries[].issues[].severity`
+for each issue, `summary.issues_by_severity` for the totals. Do not classify
+issue types yourself.
 
 **Summary Table:**
 | SQL File | Cost | Issues |
 |----------|------|--------|
-| file.sql | 497.95 | FullTableScan, IneffectiveSort |
+| file.sql | 497.95 | FullTableScan (Critical), IneffectiveSort (Warning) |
 
-**Issue Severity:**
-- CRITICAL: FullTableScan, IneffectiveJoin (block release)
-- WARNING: IneffectiveSort, TemporaryTableGrouping (review recommended)
-- INFO: Other issues (minor impact)
+**Skipped files:**
+
+List every entry of `skipped` with its reason. They were not analyzed.
 
 ### 3. Exit Status for CI
 
-- **Exit 0**: No critical issues found
-- **Exit 1**: Critical issues detected (FullTableScan, IneffectiveJoin)
+Report the status the CLI returned:
+
+- **Exit 0**: no issue reached the `--fail-on` level
+- **Exit 1**: an issue reached the `--fail-on` level
+- **Exit 2**: usage, connection or params file error
 
 Report format for CI:
 ```
-SQL Quality Check: FAILED
-- 3 critical issues found
-- 2 warnings found
+SQL Quality Check: FAILED (exit 1)
+- Critical: 2, Warning: 6, Info: 2
 
 Critical:
   1_full_table_scan.sql: FullTableScan (cost: 497.95)
   4_no_index_on_join.sql: IneffectiveJoin (cost: 234.50)
+
+Skipped:
+  14_not_found.sql: SQL file not found: tests/sql/14_not_found.sql
 
 Run '/sql-quality-fix' to auto-fix these issues.
 ```

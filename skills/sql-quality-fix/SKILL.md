@@ -26,7 +26,11 @@ php bin/sql-quality analyze \
   --format=json
 ```
 
-Record as baseline.
+Exit 2 means the run failed (usage, connection or params file) — stop there.
+
+Total cost is the sum of `queries[].cost`; the report itself carries only
+`summary.avg_cost`. Files in `skipped` have no cost and stay out of every
+total, so each step compares the same set of queries. Record as baseline.
 
 ### Step 1: Fix SQL Files
 
@@ -100,10 +104,8 @@ Save to `build/sql-quality/fix-result.json`:
 }
 ```
 
-Generate markdown:
-```bash
-php bin/sql-quality report --input=build/sql-quality/fix-result.json
-```
+Write `build/sql-quality/fix-report.md` from that JSON yourself, in the shape
+of the summary below. The CLI has no report command.
 
 ### Output Summary
 
