@@ -47,6 +47,13 @@ final class QueryContextTest extends TestCase
         $this->assertSame(['p' => 'posts', 'c' => 'comments'], Fixture::load('20_multi_table_update.sql')->aliases());
     }
 
+    public function testAliasesResolveEveryMemberOfACommaSeparatedFromList(): void
+    {
+        $context = new QueryContext('SELECT * FROM users u, posts p WHERE u.id = p.user_id', ['query_block' => [], 'analyze_result' => []], null, [], []);
+
+        $this->assertSame(['u' => 'users', 'p' => 'posts'], $context->aliases());
+    }
+
     public function testAliasesExcludeDerivedTables(): void
     {
         $aliases = Fixture::load('22_excessive_derived_tables.sql')->aliases();
