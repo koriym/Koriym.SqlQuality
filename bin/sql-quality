@@ -372,13 +372,7 @@ USAGE;
         );
     }
 
-    /**
-     * Resolves --params for explain: null keeps the default {}, a `{`-prefixed value is decoded as
-     * a JSON object, anything else is required as a PHP file. A PHP file returning an array whose
-     * values are all arrays is treated as keyed by SQL file basename; otherwise it is used as-is.
-     *
-     * @return array<string, mixed>|null null means the value was invalid and an error was already written
-     */
+    /** @return array<string, mixed>|null null means the value was invalid and an error was already written */
     private function resolveExplainParams(string $sqlFileName, string|false|null $paramsOption): array|null
     {
         if ($paramsOption === null) {
