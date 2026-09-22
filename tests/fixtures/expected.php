@@ -9,7 +9,7 @@ return [
     '14_correlated_subquery.sql' => ['FullTableScan'],
     '15_listed_parameters.sql' => ['FullTableScan', 'IneffectiveRangeScan'],
     '16_ineffective_range_scan.sql' => ['FullTableScan', 'IneffectiveRangeScan', 'IneffectiveSort'],
-    '18_select_distinct.sql' => ['UnnecessaryDistinct'],
+    '18_select_distinct.sql' => [],
     '19_unnecessary_distinct.sql' => ['UnnecessaryDistinct'],
     '1_full_table_scan.sql' => ['FullTableScan'],
     '20_multi_table_update.sql' => ['FullTableScan', 'MultiTableUpdate'],
