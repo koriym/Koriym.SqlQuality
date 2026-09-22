@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `EstimateDivergenceDetector` detecting `EXPLAIN ANALYZE` nodes where the row estimate diverges from the actual row count
 - `sql-quality explain` command analyzing a single SQL file and printing structured JSON
 - JSON Schema for the `analyze` and `explain` CLI output (`schema/analyze-report.schema.json`, `schema/explain-report.schema.json`)
+- `NotExplainable`, `NotReadOnlySelect`, `InvalidExplainResult` and `QueryFailed` exceptions thrown by `SqlFileAnalyzer`, all extending its `RuntimeException`
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress

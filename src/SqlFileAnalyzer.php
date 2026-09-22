@@ -4,6 +4,10 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\InvalidExplainResult;
+use Koriym\SqlQuality\Exception\NotExplainable;
+use Koriym\SqlQuality\Exception\NotReadOnlySelect;
+use Koriym\SqlQuality\Exception\QueryFailed;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 
@@ -29,6 +33,7 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function sort;
+use function var_export;
 
 use const PATHINFO_FILENAME;
 
@@ -163,7 +168,7 @@ final class SqlFileAnalyzer
     private function buildQueryContext(string $sql, array $params): QueryContext
     {
         if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
-            throw new RuntimeException('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
+            throw new NotExplainable($sql);
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
@@ -201,16 +206,16 @@ final class SqlFileAnalyzer
         }
 
         if (! is_string($explainJson)) {
-            throw new RuntimeException('Invalid EXPLAIN result');
+            throw new InvalidExplainResult(var_export($explainJson, true));
         }
 
         $explainJsonData = json_decode($explainJson, true);
         if (! is_array($explainJsonData)) {
-            throw new RuntimeException('Invalid EXPLAIN JSON result');
+            throw new InvalidExplainResult($explainJson);
         }
 
         if (! isset($explainJsonData['query_block']) || ! is_array($explainJsonData['query_block'])) {
-            throw new RuntimeException('Invalid EXPLAIN JSON query block');
+            throw new InvalidExplainResult($explainJson);
         }
 
         /** @var ExplainResult $explainJsonData */
@@ -447,7 +452,7 @@ final class SqlFileAnalyzer
     public function getExecutedTime(string $sql, array $params): float
     {
         if (! $this->sqlSafetyClassifier->isReadOnlySelect($sql)) {
-            throw new RuntimeException('Execution timing is limited to read-only SELECT statements');
+            throw new NotReadOnlySelect($sql);
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
@@ -460,14 +465,14 @@ final class SqlFileAnalyzer
         // warm up the cache
         $warmupStmt = $this->pdo->query($interpolatedSql);
         if ($warmupStmt === false) {
-            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            throw new QueryFailed($interpolatedSql);
         }
 
         $warmupStmt->fetchAll();
 
         $secondWarmupStmt = $this->pdo->query($interpolatedSql);
         if ($secondWarmupStmt === false) {
-            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            throw new QueryFailed($interpolatedSql);
         }
 
         $secondWarmupStmt->fetchAll();
@@ -477,7 +482,7 @@ final class SqlFileAnalyzer
             $startTime = microtime(true);
             $stmt = $this->pdo->query($interpolatedSql);
             if ($stmt === false) {
-                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+                throw new QueryFailed($interpolatedSql);
             }
 
             // Fetch all results to ensure:
