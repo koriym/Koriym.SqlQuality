@@ -1,0 +1,359 @@
+{
+    "sql": "-- Problem: Ineffective use of UNION requiring temporary table\nSELECT id as item_id, 'post' as type, created_at\nFROM posts\nWHERE status = 'published'\nUNION\nSELECT id as item_id, 'comment' as type, created_at\nFROM comments\nWHERE post_id IN (\n    SELECT id FROM posts WHERE status = 'published'\n)\nORDER BY created_at;\n",
+    "explain": {
+        "query_block": {
+            "union_result": {
+                "using_temporary_table": true,
+                "select_id": 4,
+                "table_name": "<union1,2>",
+                "access_type": "ALL",
+                "using_filesort": true,
+                "query_specifications": [
+                    {
+                        "dependent": false,
+                        "cacheable": true,
+                        "query_block": {
+                            "select_id": 1,
+                            "cost_info": {
+                                "query_cost": "255.01"
+                            },
+                            "table": {
+                                "table_name": "posts",
+                                "access_type": "ref",
+                                "possible_keys": [
+                                    "idx_posts_status_created"
+                                ],
+                                "key": "idx_posts_status_created",
+                                "used_key_parts": [
+                                    "status"
+                                ],
+                                "key_length": "83",
+                                "ref": [
+                                    "const"
+                                ],
+                                "rows_examined_per_scan": 2478,
+                                "rows_produced_per_join": 2478,
+                                "filtered": "100.00",
+                                "using_index": true,
+                                "cost_info": {
+                                    "read_cost": "7.21",
+                                    "eval_cost": "247.80",
+                                    "prefix_cost": "255.01",
+                                    "data_read_per_join": "2M"
+                                },
+                                "used_columns": [
+                                    "id",
+                                    "status",
+                                    "created_at"
+                                ]
+                            }
+                        }
+                    },
+                    {
+                        "dependent": false,
+                        "cacheable": true,
+                        "query_block": {
+                            "select_id": 2,
+                            "cost_info": {
+                                "query_cost": "1439.05"
+                            },
+                            "nested_loop": [
+                                {
+                                    "table": {
+                                        "table_name": "posts",
+                                        "access_type": "ref",
+                                        "possible_keys": [
+                                            "PRIMARY",
+                                            "idx_posts_status_created"
+                                        ],
+                                        "key": "idx_posts_status_created",
+                                        "used_key_parts": [
+                                            "status"
+                                        ],
+                                        "key_length": "83",
+                                        "ref": [
+                                            "const"
+                                        ],
+                                        "rows_examined_per_scan": 2478,
+                                        "rows_produced_per_join": 2478,
+                                        "filtered": "100.00",
+                                        "using_index": true,
+                                        "cost_info": {
+                                            "read_cost": "7.21",
+                                            "eval_cost": "247.80",
+                                            "prefix_cost": "255.01",
+                                            "data_read_per_join": "2M"
+                                        },
+                                        "used_columns": [
+                                            "id",
+                                            "status"
+                                        ]
+                                    }
+                                },
+                                {
+                                    "table": {
+                                        "table_name": "comments",
+                                        "access_type": "ref",
+                                        "possible_keys": [
+                                            "idx_comments_post_id",
+                                            "idx_comments_post_created"
+                                        ],
+                                        "key": "idx_comments_post_created",
+                                        "used_key_parts": [
+                                            "post_id"
+                                        ],
+                                        "key_length": "5",
+                                        "ref": [
+                                            "test.posts.id"
+                                        ],
+                                        "rows_examined_per_scan": 2,
+                                        "rows_produced_per_join": 5631,
+                                        "filtered": "100.00",
+                                        "using_index": true,
+                                        "cost_info": {
+                                            "read_cost": "620.94",
+                                            "eval_cost": "563.10",
+                                            "prefix_cost": "1439.05",
+                                            "data_read_per_join": "615K"
+                                        },
+                                        "used_columns": [
+                                            "id",
+                                            "post_id",
+                                            "created_at"
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            }
+        }
+    },
+    "explain_analyze": "-> Sort: created_at  (cost=13950..13950 rows=8109) (actual time=15.9..16.4 rows=13409 loops=1)\n    -> Table scan on <union temporary>  (cost=2505..2609 rows=8109) (actual time=11.6..12.6 rows=13409 loops=1)\n        -> Union materialize with deduplication  (cost=2505..2505 rows=8109) (actual time=11.6..11.6 rows=13409 loops=1)\n            -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0252..1.06 rows=4500 loops=1)\n            -> Nested loop inner join  (cost=1439 rows=5631) (actual time=0.0301..7.21 rows=8909 loops=1)\n                -> Covering index lookup on posts using idx_posts_status_created (status='published')  (cost=255 rows=2478) (actual time=0.0245..1.01 rows=4500 loops=1)\n                -> Covering index lookup on comments using idx_comments_post_created (post_id=posts.id)  (cost=0.251 rows=2.27) (actual time=958e-6..0.00122 rows=1.98 loops=4500)\n",
+    "warnings": [],
+    "schema": {
+        "posts": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "user_id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "title",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "content",
+                    "DATA_TYPE": "text",
+                    "COLUMN_TYPE": "text",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": "draft",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "view_count",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_posts_status_created",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 3
+                },
+                {
+                    "INDEX_NAME": "idx_posts_status_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 988
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_id",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 990
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_status",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 990
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_status",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 1435
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 4956
+                }
+            ],
+            "status": {
+                "table_rows": 4956,
+                "data_length": 540672,
+                "index_length": 507904,
+                "auto_increment": null,
+                "create_time": "2026-09-23 00:49:27",
+                "update_time": "2026-09-23 00:49:28"
+            }
+        },
+        "comments": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "post_id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "user_id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "content",
+                    "DATA_TYPE": "text",
+                    "COLUMN_TYPE": "text",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "pending",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_comments_post_created",
+                    "COLUMN_NAME": "post_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 4317
+                },
+                {
+                    "INDEX_NAME": "idx_comments_post_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 9810
+                },
+                {
+                    "INDEX_NAME": "idx_comments_post_id",
+                    "COLUMN_NAME": "post_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 4317
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 9810
+                },
+                {
+                    "INDEX_NAME": "user_id",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 1000
+                }
+            ],
+            "status": {
+                "table_rows": 9810,
+                "data_length": 1589248,
+                "index_length": 835584,
+                "auto_increment": null,
+                "create_time": "2026-09-23 00:49:27",
+                "update_time": "2026-09-23 00:49:29"
+            }
+        }
+    }
+}
