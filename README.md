@@ -224,3 +224,31 @@ $analyzer = new SqlFileAnalyzer(
 ```
 
 This allows you to generate the entire analysis report in your preferred language. Both error messages and AI analysis results will be output in the specified language.
+
+## Writing a Detector
+
+A detector is a class in `src/Detector/` implementing `DetectorInterface`. `detect()` receives a `QueryContext` and returns a list of `Finding`, one per table or plan node it matched:
+
+```php
+final class FullTableScanDetector implements DetectorInterface
+{
+    /** @return list<Finding> */
+    public function detect(QueryContext $context): array
+    {
+        $findings = [];
+        foreach ($context->tables() as $table) {
+            if ($table['access_type'] === 'ALL') {
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'rows_examined_per_scan', 'possible_keys', 'key'])));
+            }
+        }
+
+        return $findings;
+    }
+}
+```
+
+`QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`) and `schema` (information_schema per table). `tables()`, `tableAccesses()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()` and `primaryKeyColumns()` read them.
+
+`Finding::$evidence` holds the values the detector based its decision on: use the EXPLAIN key names for values taken from the plan, and include `table_name` when the finding is about one table. It is reported as `evidence` on the issue. `severity`, `confidence` and `suggestion` are optional; when set they replace the defaults for the warning type.
+
+Test a detector against the recorded plans in `tests/fixtures/`: `Fixture::load('1_full_table_scan.sql')` returns the `QueryContext` for `tests/sql/1_full_table_scan.sql`, and `tests/fixtures/expected.php` lists the types every fixture must produce. To register a detector, add it to the `ExplainAnalyzer` constructor, its type to `WarningType` and `WarningMessages` in `src/Types.php`, its default message to `ExplainAnalyzer::DEFAULT_MESSAGES`, and its page to `docs/issues/`.
