@@ -9,7 +9,6 @@ use Override;
 
 use function abs;
 use function array_column;
-use function error_log;
 use function file_put_contents;
 use function implode;
 use function is_dir;
@@ -48,8 +47,6 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
         if (@file_put_contents($reportPath, $reportContent) === false) {
             throw new RuntimeException("Failed to save report to file: {$reportPath}");
         }
-
-        error_log("Report successfully saved to: {$reportPath}");
     }
 
     /** @param array<string, AnalysisResult> $queryResults */

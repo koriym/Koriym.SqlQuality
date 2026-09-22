@@ -28,7 +28,6 @@ use function microtime;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
-use function printf;
 use function sort;
 
 use const PATHINFO_FILENAME;
@@ -38,6 +37,7 @@ use const PATHINFO_FILENAME;
  * @psalm-import-type ExplainResult from Types
  * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type AnalysisRun from Types
  * @psalm-import-type AnalysisWithSettingsResult from Types
  * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
@@ -76,31 +76,18 @@ final class SqlFileAnalyzer
      */
     public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
     {
-        // 1) すべての SQL を分析
-        $results = $this->analyzeSQLFiles($sqlParams, $outputDir);
+        $results = $this->analyzeSQLFiles($sqlParams)['results'];
 
-        // 2) 解析結果を統計計算にかける
         $statistics = new QueryStatisticsCalculator();
         $statistics->calculate($results);
 
-        // 3) レベル分類クラスとレポート生成クラスを用意
         $classifier = new StatisticalQueryLevelClassifier();
         $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
 
-        // 4) それぞれの SQL に対応する Markdown レポート(= AI prompt)を出力
-        //    → ここでは SqlFileAnalyzer::savePromptToMarkdown を呼ぶ想定
-        //    （すでに内部で呼んでいる場合は省略可）
         foreach ($results as $sqlFile => $analysisResult) {
-            $this->savePromptToMarkdown(
-                $sqlFile,
-                $analysisResult['ai_suggestions'],
-                $analysisResult['issues'],
-                $outputDir,
-            );
+            $this->savePromptToMarkdown($sqlFile, $analysisResult['ai_suggestions'], $outputDir);
         }
 
-        // 5) まとめレポート（summary_report.md）を出力
-        //    デフォルトのファイル名を summary_report.md とする
         $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
 
         return $results;
@@ -109,25 +96,21 @@ final class SqlFileAnalyzer
     /**
      * @param SqlParams $sqlParams
      *
-     * @return array<string, AnalysisResult>
-     *
-     * @throws RuntimeException
+     * @return AnalysisRun
      */
-    public function analyzeSQLFiles(array $sqlParams, string $outputDir): array
+    public function analyzeSQLFiles(array $sqlParams): array
     {
         $results = [];
+        $skipped = [];
         foreach ($sqlParams as $sqlFile => $params) {
             try {
-                $result = $this->analyze($sqlFile, $params, $outputDir, $results);
-                $results[$sqlFile] = $result;
-                $cost = $result['cost'];
-                printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
+                $results[$sqlFile] = $this->analyze($sqlFile, $params);
             } catch (\RuntimeException $e) {
-                printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
+                $skipped[$sqlFile] = $e->getMessage();
             }
         }
 
-        return $results;
+        return ['results' => $results, 'skipped' => $skipped];
     }
 
     /** @param ExplainResult $explainResult */
@@ -276,12 +259,8 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
-    /**
-     * @param list<DetectedWarning> $issues
-     *
-     * @throws RuntimeException
-     */
-    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues, string $outputDir): void
+    /** @throws RuntimeException */
+    private function savePromptToMarkdown(string $sqlFile, string $prompt, string $outputDir): void
     {
         if (! is_dir($outputDir) && ! mkdir($outputDir, 0777, true)) {
             throw new RuntimeException("Failed to create directory: {$outputDir}");
@@ -304,32 +283,24 @@ final class SqlFileAnalyzer
     }
 
     /**
-     * @param array<string, mixed>          $params
-     * @param array<string, AnalysisResult> $results
+     * @param array<string, mixed> $params
      *
      * @return AnalysisResult
      */
-    public function analyze(
-        string $sqlFile,
-        array $params,
-        string $outputDir,
-        array $results
-    ): array {
+    public function analyze(string $sqlFile, array $params): array
+    {
         $sql = $this->readSqlFile($sqlFile);
 
-        // デフォルト（オプティマイザーあり）の分析を実行
-        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
 
-        // オプティマイザーを無効化して分析
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         try {
             $this->optimizerSettings->disableAll();
-            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
 
-        // 両方の結果を含めて返す
         $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
         if ($noOptimizerAnalysisCost === 0) {
             $noOptimizerAnalysisCost = 1;
@@ -356,12 +327,8 @@ final class SqlFileAnalyzer
      *
      * @return AnalysisWithSettingsResult
      */
-    private function analyzeWithSettings(
-        string $sql,
-        array $params,
-        string $sqlFile,
-        string $outputDir
-    ): array {
+    private function analyzeWithSettings(string $sql, array $params, string $sqlFile): array
+    {
         $classification = $this->sqlSafetyClassifier->classify($sql);
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
@@ -385,8 +352,6 @@ final class SqlFileAnalyzer
             $issues,
             $schemaInfo,
         );
-
-        $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
 
         return [
             'mode' => 'wd',

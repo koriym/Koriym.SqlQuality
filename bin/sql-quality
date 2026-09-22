@@ -221,7 +221,7 @@ USAGE;
             $results = $analyzer->analyzeSqlDirectory($sqlParams, (string) $outputDir);
             fwrite(STDERR, "Markdown reports saved to: {$outputDir}\n");
         } else {
-            $results = $analyzer->analyzeSQLFiles($sqlParams, $outputDir ?? '/tmp/sql-quality');
+            $results = $analyzer->analyzeSQLFiles($sqlParams)['results'];
         }
 
         // Output JSON

@@ -172,6 +172,10 @@ namespace Koriym\SqlQuality;
  *      }
  *   }
  * }
+ * @psalm-type AnalysisRun = array{
+ *   results: array<string, AnalysisResult>,
+ *   skipped: array<string, string>
+ * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,
  *   avg_cost: float,
