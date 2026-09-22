@@ -327,20 +327,60 @@ final class SqlFileAnalyzer
         $sql = $this->readSqlFile($sqlFile);
 
         $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
 
+        return $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis);
+    }
+
+    /**
+     * Analyzes one SQL file and returns the QueryContext built for the optimizer-enabled pass alongside
+     * the result, so a caller that needs both does not trigger a third EXPLAIN / EXPLAIN ANALYZE round trip.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array{result: AnalysisResult, context: QueryContext}
+     *
+     * @throws RuntimeException
+     */
+    public function explain(string $sqlFile, array $params): array
+    {
+        $sql = $this->readSqlFile($sqlFile);
+        $context = $this->buildQueryContext($sql, $params);
+
+        $defaultAnalysis = $this->analyzeContext($context, $sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
+
+        return [
+            'result' => $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis),
+            'context' => $context,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
+    private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile): array
+    {
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         try {
             $this->optimizerSettings->disableAll();
-            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
+
+            return $this->analyzeWithSettings($sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
+    }
 
-        $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
-        if ($noOptimizerAnalysisCost === 0) {
-            $noOptimizerAnalysisCost = 1;
-        }
-
+    /**
+     * @param AnalysisWithSettingsResult $defaultAnalysis
+     * @param AnalysisWithSettingsResult $noOptimizerAnalysis
+     *
+     * @return AnalysisResult
+     */
+    private function combineOptimizerComparison(array $defaultAnalysis, array $noOptimizerAnalysis): array
+    {
         $noOptimizerCost = (float) $noOptimizerAnalysis['cost'];
         $noOptimizerTime = (float) $noOptimizerAnalysis['execution_time'];
 
@@ -364,11 +404,20 @@ final class SqlFileAnalyzer
      */
     private function analyzeWithSettings(string $sql, array $params, string $sqlFile): array
     {
+        return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
+    private function analyzeContext(QueryContext $context, string $sql, array $params, string $sqlFile): array
+    {
         $classification = $this->sqlSafetyClassifier->classify($sql);
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
         $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
-        $context = $this->buildQueryContext($sql, $params);
         $issues = $this->analyzer->analyze($context);
         $cost = $this->calculateCost($context->explain);
 
