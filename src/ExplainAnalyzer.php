@@ -8,6 +8,7 @@ use Koriym\SqlQuality\Detector\CartesianProductDetector;
 use Koriym\SqlQuality\Detector\DeepOffsetDetector;
 use Koriym\SqlQuality\Detector\DependentSubqueryDetector;
 use Koriym\SqlQuality\Detector\DetectorInterface;
+use Koriym\SqlQuality\Detector\EstimateDivergenceDetector;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\Finding;
 use Koriym\SqlQuality\Detector\FullTableScanDetector;
@@ -42,6 +43,7 @@ final class ExplainAnalyzer
         'CartesianProduct'         => 'Cartesian product detected; the join has no key connecting it to the preceding table.',
         'DeepOffset'               => 'Deep OFFSET detected; MySQL scans and discards offset rows before the page starts.',
         'DependentSubquery'        => 'Dependent subquery detected; it runs once per outer row.',
+        'EstimateDivergence'       => "The optimizer's row estimate diverges from the actual row count.",
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
         'FullTableScan'            => 'Full table scan detected.',
@@ -76,6 +78,10 @@ final class ExplainAnalyzer
             'DependentSubquery' => [
                 'detector' => new DependentSubqueryDetector(),
                 'message' => $messages['DependentSubquery'],
+            ],
+            'EstimateDivergence' => [
+                'detector' => new EstimateDivergenceDetector(),
+                'message' => $messages['EstimateDivergence'],
             ],
             'ExcessiveDerivedTables' => [
                 'detector' => new ExcessiveDerivedTablesDetector(),
@@ -179,7 +185,7 @@ final class ExplainAnalyzer
     {
         return match ($warningType) {
             'FullTableScan', 'IneffectiveJoin' => 'Critical',
-            'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
+            'EstimateDivergence', 'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
             default => 'Warning',
         };
     }
@@ -192,7 +198,7 @@ final class ExplainAnalyzer
     private static function getConfidence(string $warningType): float
     {
         return match ($warningType) {
-            'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
+            'EstimateDivergence', 'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
             'DeepOffset', 'OrderByRand' => 1.0,
             default => 0.95,
         };

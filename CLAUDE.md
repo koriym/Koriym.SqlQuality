@@ -65,6 +65,7 @@ Existing detectors in `src/Detector/`:
 - CartesianProductDetector
 - DeepOffsetDetector
 - DependentSubqueryDetector
+- EstimateDivergenceDetector
 - ExcessiveDerivedTablesDetector
 - FullTableScanDetector
 - FunctionInvalidatesIndexDetector

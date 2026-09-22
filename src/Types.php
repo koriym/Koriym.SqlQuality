@@ -89,6 +89,7 @@ namespace Koriym\SqlQuality;
  * 'CartesianProduct'
  * | 'DeepOffset'
  * | 'DependentSubquery'
+ * | 'EstimateDivergence'
  * | 'ExcessiveDerivedTables'
  * | 'FunctionInvalidatesIndex'
  * | 'FullTableScan'
@@ -107,6 +108,7 @@ namespace Koriym\SqlQuality;
  *   CartesianProduct: string,
  *   DeepOffset: string,
  *   DependentSubquery: string,
+ *   EstimateDivergence: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
  *   FullTableScan: string,
