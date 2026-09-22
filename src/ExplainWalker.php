@@ -63,7 +63,7 @@ final class ExplainWalker
     /**
      * @param ExplainNode $node
      *
-     * @return list<array-key>|null path of the first node holding $key => $value, null when there is none
+     * @return list<array-key>|null path of the first node holding $key => $value
      *
      * @psalm-mutation-free
      */

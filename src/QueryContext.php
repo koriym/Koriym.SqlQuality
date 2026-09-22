@@ -27,7 +27,7 @@ final class QueryContext
 
     /**
      * @param ExplainResult             $explain
-     * @param ShowWarnings              $warnings       SHOW WARNINGS taken right after EXPLAIN
+     * @param ShowWarnings              $warnings
      * @param array<string, SchemaInfo> $schema         keyed by table name
      * @param string                    $sql            the statement as sent to MySQL, parameters interpolated
      * @param string|null               $explainAnalyze null unless the statement is a read-only SELECT
