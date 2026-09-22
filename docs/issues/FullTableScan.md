@@ -20,24 +20,23 @@ recommended: true
 {
   "query_block": {
     "table": {
-      "access_type": "ALL",              // フルテーブルスキャン
-      "possible_keys": null,             // 使用可能なインデックスなし
-      "rows": "large_number",            // 多数の行をスキャン
-      "filtered": "low_percentage",      // 低いフィルタ率
-      "using_where": true,              // WHERE句での評価
-      "cost_info": {
-        "read_cost": "high_value"       // 高い読み取りコスト
-      }
+      "table_name": "posts",
+      "access_type": "ALL",                  // フルテーブルスキャン
+      "possible_keys": null,                 // 使用可能なインデックスなし
+      "rows_examined_per_scan": "large_number", // 多数の行をスキャン
+      "filtered": "low_percentage",          // 低いフィルタ率
+      "attached_condition": "..."            // WHERE句の評価対象
     }
   }
 }
 ```
 
+`<derived2>` や `<union1,2>` のように `<` で始まる `table_name` はサブクエリ/UNION結果を保持する内部一時テーブルで、検出対象から除外されます。
+
 ### 主な検出条件
-1. WHERE句で使用されているカラムにインデックスがない
-2. インデックスが存在するが使用されていない
-3. テーブルの大部分のレコードにアクセスする必要がある
-4. 非選択的なインデックスのみが利用可能
+1. `access_type` が `ALL`（内部一時テーブルを除く）
+2. `rows_examined_per_scan` が100件未満なら重要度 `Info`、以上なら既定（`Critical`）
+3. `attached_condition` から等値・範囲条件のカラムが取れればインデックス作成（`index`）を提案。取れず `possible_keys` はあるが `key` が使われていなければレビュー（`review`）を提案
 
 ## パフォーマンスへの影響
 
@@ -142,6 +141,8 @@ LIMIT 100;
     - 必要リソース: 開発工数、メンテナンス
 
 ## 無視してよい場合
+
+`rows_examined_per_scan` が100件未満の場合は重要度 `Info` として自動的に区別されるため、以下は目安です。
 
 1. 小規模テーブル
     - 1,000行未満

@@ -259,15 +259,16 @@ TEMPLATE;
      */
     private function getColumnInfo(PDO $pdo, string $quotedTable): array
     {
+        // With derived_merge=off (the no-optimizer pass) information_schema returns these headers lower-cased; the aliases pin the SchemaColumn case.
         $sql = <<<SQL
             SELECT
-                column_name,
-                data_type,
-                column_type,
-                is_nullable,
-                column_key,
-                column_default,
-                extra
+                column_name AS COLUMN_NAME,
+                data_type AS DATA_TYPE,
+                column_type AS COLUMN_TYPE,
+                is_nullable AS IS_NULLABLE,
+                column_key AS COLUMN_KEY,
+                column_default AS COLUMN_DEFAULT,
+                extra AS EXTRA
             FROM information_schema.columns
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}
@@ -290,13 +291,14 @@ SQL;
      */
     private function getIndexInfo(PDO $pdo, string $quotedTable): array
     {
+        // Aliases pin the header case; see getColumnInfo().
         $sql = <<<SQL
             SELECT
-                index_name,
-                column_name,
-                non_unique,
-                seq_in_index,
-                cardinality
+                index_name AS INDEX_NAME,
+                column_name AS COLUMN_NAME,
+                non_unique AS NON_UNIQUE,
+                seq_in_index AS SEQ_IN_INDEX,
+                cardinality AS CARDINALITY
             FROM information_schema.statistics
             WHERE table_schema = DATABASE()
             AND table_name = {$quotedTable}

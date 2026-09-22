@@ -41,6 +41,12 @@ return [
         'target_count' => 2,
     ],
     '25_pass_the_with_clause.sql' => [],
+    '26_join_without_index.sql' => [],
+    '27_range_scan_low_filter.sql' => [
+        'min_post_id' => 1,
+        'max_post_id' => 1000,
+        'keyword' => '%rare%',
+    ],
     '28_cartesian_product.sql' => [
         'status_u' => 'active',
         'status_p' => 'published',

@@ -8,27 +8,26 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function array_flip;
-use function array_intersect_key;
 use function in_array;
+use function sprintf;
 
-/**
- * Detects index usage on low cardinality columns
- *
- * Low cardinality indexes (e.g., status, gender) often scan a large percentage
- * of table rows, making them inefficient compared to full table scans.
- *
- * @psalm-import-type ExplainTable from Types
- */
+/** @psalm-import-type ExplainTable from Types */
 final class LowCardinalityIndexDetector implements DetectorInterface
 {
+    /** Distinct values per row of the leading key column */
+    private const MAX_SELECTIVITY = 0.01;
+
+    /** Lookups examining fewer rows than this are not reported */
+    private const ROW_THRESHOLD = 500;
+
     #[Override]
     public function detect(QueryContext $context): array
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if ($this->checkTable($table)) {
-                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'access_type', 'key', 'rows_examined_per_scan', 'filtered'])));
+            $finding = $this->lowCardinalityLookup($context, $table);
+            if ($finding !== null) {
+                $findings[] = $finding;
             }
         }
 
@@ -36,27 +35,48 @@ final class LowCardinalityIndexDetector implements DetectorInterface
     }
 
     /** @param ExplainTable $table */
-    private function checkTable(array $table): bool
+    private function lowCardinalityLookup(QueryContext $context, array $table): Finding|null
     {
-        // Must be using an index (not full scan)
-        if (! isset($table['access_type']) || $table['access_type'] === 'ALL') {
-            return false;
+        if (! in_array($table['access_type'], ['ref', 'range'], true) || ! isset($table['key'], $table['used_key_parts'][0])) {
+            return null;
         }
 
-        // Must be ref or range (index access)
-        if (! in_array($table['access_type'], ['ref', 'range'], true)) {
-            return false;
+        $rowsExamined = (int) ($table['rows_examined_per_scan'] ?? 0);
+        if ($rowsExamined < self::ROW_THRESHOLD) {
+            return null;
         }
 
-        $rowsExamined = $table['rows_examined_per_scan'] ?? 0;
-        $filtered = (float) ($table['filtered'] ?? 100.0);
-
-        // If examining many rows with high filtered percentage, likely low cardinality
-        // This means the index isn't selective enough
-        if ($rowsExamined > 100 && $filtered > 80.0) {
-            return true;
+        $cardinality = $this->leadingColumnCardinality($context, $table['table_name'], $table['key']);
+        $tableRows = (int) ($context->schemaFor($table['table_name'])['status']['table_rows'] ?? 0);
+        if ($cardinality === null || $cardinality <= 0 || $tableRows <= 0 || $cardinality / $tableRows > self::MAX_SELECTIVITY) {
+            return null;
         }
 
-        return false;
+        $column = $table['used_key_parts'][0];
+
+        return new Finding(
+            evidence: [
+                'table_name' => $table['table_name'],
+                'key' => $table['key'],
+                'column' => $column,
+                'cardinality' => $cardinality,
+                'table_rows' => $tableRows,
+                'rows_examined_per_scan' => $rowsExamined,
+                'filtered' => $table['filtered'] ?? null,
+            ],
+            suggestion: ['kind' => 'review', 'description' => sprintf('%s leads with %s, which has %d distinct values over %d rows; consider a composite index led by a more selective column, or whether this index is needed.', $table['key'], $column, $cardinality, $tableRows)],
+        );
+    }
+
+    /** @return int|null CARDINALITY of the index's first column; null when the schema does not know the index */
+    private function leadingColumnCardinality(QueryContext $context, string $aliasOrTable, string $key): int|null
+    {
+        foreach ($context->schemaFor($aliasOrTable)['indexes'] ?? [] as $index) {
+            if ($index['INDEX_NAME'] === $key && $index['SEQ_IN_INDEX'] === 1) {
+                return $index['CARDINALITY'];
+            }
+        }
+
+        return null;
     }
 }

@@ -20,10 +20,9 @@ recommended: true
 {
   "query_block": {
     "table": {
-      "attached_condition": "cast_func_item",  // 型変換の存在
-      "possible_keys": "index_name",           // インデックスは存在するが
-      "key": null,                             // 使用されていない
-      "rows_examined_per_scan": "large_number" // 多数の行をスキャン
+      "table_name": "orders",
+      "access_type": "ALL",                                                // 列に index があっても使えない
+      "attached_condition": "(`test`.`orders`.`reference_code` = 12345)"  // 文字列型の列と数値リテラルの比較
     }
   }
 }
@@ -31,17 +30,14 @@ recommended: true
 
 ### SHOW WARNINGS出力
 ```
-SHOW WARNINGS の結果で以下のパターンを検出:
-- "Converting column 'X' from Y to Z"
-- "Implicit conversion of column 'X'"
-- "Type conversion encountered"
+Warning 1739: Cannot use ref access on index 'idx_orders_reference_code' due to type or collation conversion on field 'reference_code'
 ```
+この警告があれば confidence 0.95、無ければ 0.8 で報告します。
 
 ### 主な検出条件
-1. データ型の異なるカラム同士の比較
-2. 文字列と数値の比較
-3. 異なる文字セット間での比較
-4. JOIN条件での型の不一致
+1. `attached_condition` または `index_condition` に `` `db`.`table`.`col` <op> <数値> `` の比較がある（`=`, `<>`, `!=`, `<`, `>`, `<=`, `>=`, `IN (数値, ...)`, `BETWEEN 数値 AND 数値`）
+2. schema でその列の型が文字列型（char, varchar, text 系, enum, set）である
+3. 関数で包まれた列（`cast(col as date)` 等）は対象外（FunctionInvalidatesIndex の領分）
 
 ## パフォーマンスへの影響
 
@@ -148,13 +144,13 @@ FROM order_items;
 
 ## 無視してよい場合
 
-1. 開発・テスト環境
-    - パフォーマンスが重要でない
-    - データ量が少ない
+1. 列に index が無く、他の条件で十分に絞られている
+    - 型変換の有無で実行計画は変わらない
+    - 行ごとの変換コストは残る
 
 2. レガシーシステムとの互換性
-    - 型変更が困難な場合
-    - 一時的な統合期間
+    - 列の型変更が困難な場合
+    - リテラルを文字列にする書き換えだけなら可能なことが多い
 
 3. 一回限りの処理
     - データ移行スクリプト

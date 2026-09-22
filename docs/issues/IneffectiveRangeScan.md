@@ -20,24 +20,22 @@ recommended: true
 {
   "query_block": {
     "table": {
-      "access_type": "ALL",              // フルテーブルスキャン
-      "rows_examined_per_scan": "large",  // 多数の行の処理
-      "filtered": "low_value",           // 低い絞り込み効率
-      "attached_condition": "in (...)",   // IN句の使用
-      "possible_keys": ["multiple_keys"], // 複数のインデックス候補
-      "Using_filesort": "true"           // ファイルソートの使用
+      "table_name": "comments",
+      "access_type": "range",                                                // 範囲スキャン（index_merge も対象）
+      "key": "idx_comments_post_id",
+      "possible_keys": ["idx_comments_post_id", "idx_comments_post_created"],
+      "rows_examined_per_scan": 2003,                                        // 多数の行を読み
+      "filtered": "11.11",                                                   // その大半を捨てている
+      "attached_condition": "(`test`.`comments`.`content` like '%rare%')"
     }
   }
 }
 ```
 
 ### 主な検出条件
-1. IN句でのフルテーブルスキャン
-2. 低選択性（20%未満）での範囲スキャン
-3. OR条件での範囲スキャン
-4. 大量の行（1000行以上）を処理する範囲スキャン
-5. 複数のインデックス候補が存在する範囲スキャン
-6. インデックスマージが必要な範囲スキャン
+1. `access_type` が `index_merge`（常に報告）
+2. `access_type` が `range` で、`rows_examined_per_scan` が 1000 以上、かつ `filtered` が 20 未満
+3. `access_type` が `ALL` のテーブルは対象外（FullTableScan の領分）。内部一時テーブル（`<derived2>` 等）も対象外
 
 ## パフォーマンスへの影響
 
@@ -134,9 +132,8 @@ WHERE created_year = 2023;
 
 ## 無視してよい場合
 
-1. 小規模データ
-    - テーブルサイズが1,000行未満
-    - 結果セットが小さい
+1. 範囲条件だけで結果が決まる
+    - 範囲列の前に置ける等値条件が無く、複合 index にしても読む行数が変わらない
 
 2. バッチ処理
     - 夜間実行の集計処理

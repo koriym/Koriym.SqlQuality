@@ -24,12 +24,24 @@ recommended: true
 {
   "query_block": {
     "ordering_operation": {
-      "using_filesort": true,     -- ファイルソートの使用
-      "sort_key": "..."          -- ソートキーの情報
+      "using_filesort": true,            // ファイルソートの使用
+      "using_temporary_table": true,     // 一時テーブル経由（evidence に記録）
+      "table": {
+        "table_name": "orders",
+        "access_type": "ALL",            // フルスキャン、または
+        "rows_examined_per_scan": 2000   // 1000 行以上のインデックス参照
+      }
     }
   }
 }
 ```
+
+ツリー内の `ordering_operation` を全て見ます。ソート対象の表は `ordering_operation` 直下の `table`、無ければその配下で最初に現れる表です（`grouping_operation` や `duplicates_removal` の下にある場合）。`using_filesort` が `false` のもの（インデックス順で読めている）は対象外です。クエリコストや読み取りサイズの閾値はありません。
+
+### 主な検出条件
+1. `using_filesort` が `true` であること
+2. ソート対象の表の `access_type` が `ALL`、または `rows_examined_per_scan` が 1000 以上であること
+3. 提案は常にレビュー（`review`）。WHERE の等値列に ORDER BY の列を続けた複合インデックスの検討を促し、その列で始まるインデックスが既にある場合はその名前を示します
 
 ## 問題のあるクエリの例
 ```sql
@@ -89,15 +101,16 @@ ADD INDEX idx_covering (
 ## 例外ケース
 以下の場合は警告を無視できる可能性があります：
 
-1. 小規模なデータセット
-   - 1000行未満のテーブル
-   - メモリ内でソート可能なサイズ（< sort_buffer_size）
+1. 小規模なフルスキャン
+   - `access_type` が `ALL` でも数百行程度の表で、メモリ内でソートできる（< sort_buffer_size）
 
 2. LIMIT句での上位N件取得
-   - LIMIT <= 100 の場合
-   - ソート対象が結果セットの10%未満の場合
+   - 絞り込み後の行数が少なく、ソート対象が結果セットの10%未満の場合
 
-3. バッチ処理での非定期的な処理
+3. 集計結果でのソート
+   - `ORDER BY COUNT(*)` のようにインデックスでは順序を作れない場合（`TemporaryTableGrouping` と重複して報告されます）
+
+4. バッチ処理での非定期的な処理
    - 日次バッチなど、1日1回未満の実行
    - システムの非ピーク時に実行される場合
 

@@ -28,16 +28,20 @@ final class MultiTableUpdateDetector implements DetectorInterface
         }
 
         $updatedTables = [];
+        $rowsExaminedPerScan = 0;
         foreach ($context->tables() as $table) {
-            if (($table['update'] ?? false) === true) {
-                $updatedTables[] = $table['table_name'];
+            if (($table['update'] ?? false) !== true) {
+                continue;
             }
+
+            $updatedTables[] = $table['table_name'];
+            $rowsExaminedPerScan += (int) ($table['rows_examined_per_scan'] ?? 0);
         }
 
         if (count($updatedTables) < 2) {
             return [];
         }
 
-        return [new Finding(['tables' => $updatedTables])];
+        return [new Finding(['tables' => $updatedTables, 'rows_examined_per_scan' => $rowsExaminedPerScan])];
     }
 }
