@@ -5,10 +5,13 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use function array_values;
+use function explode;
 use function ksort;
+use function preg_match;
 use function preg_match_all;
 use function preg_replace;
 use function strtolower;
+use function trim;
 
 use const PREG_SET_ORDER;
 

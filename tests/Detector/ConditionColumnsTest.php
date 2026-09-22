@@ -24,7 +24,7 @@ final class ConditionColumnsTest extends TestCase
 
     public function testClassifiesEqualityAndInAsEquality(): void
     {
-        $groups = ConditionColumns::forAlias("(`test`.`orders`.`reference_code` = 12345)", 'orders');
+        $groups = ConditionColumns::forAlias('(`test`.`orders`.`reference_code` = 12345)', 'orders');
 
         $this->assertSame(['reference_code'], array_column($groups['equality'], 'column'));
     }

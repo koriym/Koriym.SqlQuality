@@ -19,6 +19,7 @@ use const PREG_SET_ORDER;
  * A condition joined by a top-level OR yields no columns in any group, since none of them hold on their own.
  *
  * @psalm-type ConditionColumnMatch = array{column: string, operator: string, literal: string|null, function: string|null}
+ * @psalm-type ConditionColumnGroups = array{equality: list<ConditionColumnMatch>, range: list<ConditionColumnMatch>, leadingWildcard: list<ConditionColumnMatch>, functionWrapped: list<ConditionColumnMatch>}
  */
 final class ConditionColumns
 {
@@ -26,7 +27,7 @@ final class ConditionColumns
     private const FUNCTION_WRAPPED = '/(?<function>\w+)\(\s*`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`/i';
     private const PREDICATE = '/`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*)/i';
 
-    /** @return array{equality: list<ConditionColumnMatch>, range: list<ConditionColumnMatch>, leadingWildcard: list<ConditionColumnMatch>, functionWrapped: list<ConditionColumnMatch>} */
+    /** @return ConditionColumnGroups */
     public static function forAlias(string $attachedCondition, string $aliasOrTable): array
     {
         $groups = ['equality' => [], 'range' => [], 'leadingWildcard' => [], 'functionWrapped' => []];
@@ -58,7 +59,7 @@ final class ConditionColumns
     }
 
     /**
-     * @param array{equality: list<ConditionColumnMatch>, range: list<ConditionColumnMatch>, leadingWildcard: list<ConditionColumnMatch>, functionWrapped: list<ConditionColumnMatch>} $groups
+     * @param ConditionColumnGroups $groups
      * @param array<string, string> $match
      */
     private static function classify(array &$groups, array $match): void

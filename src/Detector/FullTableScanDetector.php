@@ -13,9 +13,7 @@ use function array_flip;
 use function array_intersect_key;
 use function str_starts_with;
 
-/**
- * @psalm-import-type ExplainTable from Types
- */
+/** @psalm-import-type ExplainTable from Types */
 final class FullTableScanDetector implements DetectorInterface
 {
     /** Below this row count a full scan is cheap enough to report as Info rather than the default Critical */
