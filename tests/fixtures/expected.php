@@ -15,7 +15,7 @@ return [
     '20_multi_table_update.sql' => ['FullTableScan', 'MultiTableUpdate'],
     '21_low_cardinality_index.sql' => ['LowCardinalityIndex'],
     '22_excessive_derived_tables.sql' => ['LowCardinalityIndex'],
-    '23_ineffective_union.sql' => ['IneffectiveUnion', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
+    '23_ineffective_union.sql' => ['IneffectiveUnion', 'LowCardinalityIndex'],
     '24_grouping_operation.sql' => [],
     '25_pass_the_with_clause.sql' => ['LowCardinalityIndex'],
     '26_join_without_index.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveRangeScan'],

@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FullTableScan` and `IneffectiveJoin` are reported as `Critical`
 - `FullTableScanDetector` excludes internal temp tables (`<derived2>`, `<union1,2>`), reports `Info` below 100 rows examined, and suggests an index or review based on the attached condition
 - `IneffectiveSortDetector` reports every `ordering_operation` with `using_filesort` over a full scan or 1000+ examined rows, and drops the query-cost, data-size, and backward-scan rules
+- `TemporaryTableGroupingDetector` reports every `grouping_operation` (or the `ordering_operation` above one) that uses a temporary table, with the tables beneath it, and ignores `union_result` and `duplicates_removal` temporary tables
 - `IneffectiveJoinDetector` reports only inner tables of a `nested_loop` scanned in full (`ALL` / `index`) or joined through a join buffer, drops the row-count and cost thresholds, and suggests an index on the join column or a review
 - `DetectorInterface::detect()` takes a `QueryContext` and returns a list of `Finding` instead of a bool
 - Detected issues carry `detector`, `evidence` and `suggestion`; a detector reports each matching table separately
