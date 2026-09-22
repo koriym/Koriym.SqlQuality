@@ -14,10 +14,10 @@ use function sprintf;
 /** @psalm-import-type ExplainTable from Types */
 final class LowCardinalityIndexDetector implements DetectorInterface
 {
-    /** Distinct values per row of the leading key column; raising it reports lookups on more selective columns. */
+    /** Distinct values per row of the leading key column */
     private const MAX_SELECTIVITY = 0.01;
 
-    /** Lookups examining fewer rows than this are not reported; lowering it reports cheaper lookups on the same columns. */
+    /** Lookups examining fewer rows than this are not reported */
     private const ROW_THRESHOLD = 500;
 
     #[Override]

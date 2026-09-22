@@ -28,7 +28,7 @@ use function trim;
  */
 final class IneffectiveSortDetector implements DetectorInterface
 {
-    /** A filesort over an index lookup is reported from this many rows; lowering it reports sorts of smaller lookups. */
+    /** A filesort over an index lookup is reported from this many rows */
     private const ROW_THRESHOLD = 1000;
 
     #[Override]
