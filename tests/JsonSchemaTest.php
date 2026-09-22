@@ -123,7 +123,12 @@ final class JsonSchemaTest extends MySqlTestCase
      */
     private function runCli(array $args): array
     {
-        $command = array_merge([PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality'], $args);
+        ['dsn' => $dsn, 'user' => $user, 'password' => $password] = $this->connectionSettings();
+        $command = array_merge(
+            [PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality'],
+            $args,
+            ['--dsn=' . $dsn, '--user=' . $user, '--password=' . $password],
+        );
 
         $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if ($process === false) {
