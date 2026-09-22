@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `LowCardinalityIndexDetector` judges by the leading key column's `CARDINALITY` over `table_rows` (at most 1%) on lookups examining 500+ rows, instead of `filtered`, and suggests a review
 - `UnnecessaryDistinctDetector` checks the SELECT list of single-table `SELECT DISTINCT` statements against the table's primary key from the schema, instead of looking for a column named `id`, and suggests the statement without `DISTINCT`
 - `IneffectiveJoinDetector` reports only inner tables of a `nested_loop` scanned in full (`ALL` / `index`) or joined through a join buffer, drops the row-count and cost thresholds, and suggests an index on the join column or a review
+- `ImplicitTypeConversionDetector` reports a string-typed column (by schema) compared with a numeric literal in `attached_condition` or `index_condition`, at confidence 0.95 when MySQL warns 1739, and suggests quoting the literal
 - `DetectorInterface::detect()` takes a `QueryContext` and returns a list of `Finding` instead of a bool
 - Detected issues carry `detector`, `evidence` and `suggestion`; a detector reports each matching table separately
 - `ExplainAnalyzer::analyze()` takes a `QueryContext` instead of the EXPLAIN array

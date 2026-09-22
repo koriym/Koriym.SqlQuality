@@ -4,6 +4,9 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use function array_column;
+use function array_flip;
+use function explode;
 use function in_array;
 use function preg_match;
 use function preg_match_all;
@@ -26,6 +29,7 @@ final class ConditionColumns
     private const OR_JOINED = '/\)\s*or\s*\(/i';
     private const FUNCTION_WRAPPED = '/(?<function>\w+)\(\s*`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`/i';
     private const PREDICATE = '/`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*)/i';
+    private const NUMBER = '/^-?\d+(?:\.\d+)?$/';
 
     /** @return ConditionColumnGroups */
     public static function forAlias(string $attachedCondition, string $aliasOrTable): array
@@ -35,23 +39,8 @@ final class ConditionColumns
             return $groups;
         }
 
-        preg_match_all(self::FUNCTION_WRAPPED, $attachedCondition, $functionMatches, PREG_SET_ORDER);
-        $wrapped = [];
-        foreach ($functionMatches as $match) {
-            if ($match['qualifier'] !== $aliasOrTable) {
-                continue;
-            }
-
-            $wrapped[$match['column']] = true;
-            $groups['functionWrapped'][] = ['column' => $match['column'], 'operator' => '', 'literal' => null, 'function' => strtolower($match['function'])];
-        }
-
-        preg_match_all(self::PREDICATE, $attachedCondition, $matches, PREG_SET_ORDER);
-        foreach ($matches as $match) {
-            if ($match['qualifier'] !== $aliasOrTable || isset($wrapped[$match['column']])) {
-                continue;
-            }
-
+        $groups['functionWrapped'] = self::functionWrapped($attachedCondition, $aliasOrTable);
+        foreach (self::predicates($attachedCondition, $aliasOrTable) as $match) {
             self::classify($groups, $match);
         }
 
@@ -59,31 +48,101 @@ final class ConditionColumns
     }
 
     /**
+     * Predicates comparing a bare column of the alias with nothing but numbers. Unlike forAlias(), branches of a
+     * top-level OR are included: the conversion happens whether or not the branch holds on its own.
+     *
+     * @return list<ConditionColumnMatch>
+     */
+    public static function comparedToNumber(string $attachedCondition, string $aliasOrTable): array
+    {
+        $matches = [];
+        foreach (self::predicates($attachedCondition, $aliasOrTable) as $match) {
+            if (self::isNumber($match)) {
+                $matches[] = $match;
+            }
+        }
+
+        return $matches;
+    }
+
+    /** @return list<ConditionColumnMatch> */
+    private static function functionWrapped(string $attachedCondition, string $aliasOrTable): array
+    {
+        preg_match_all(self::FUNCTION_WRAPPED, $attachedCondition, $matches, PREG_SET_ORDER);
+        $wrapped = [];
+        foreach ($matches as $match) {
+            if ($match['qualifier'] !== $aliasOrTable) {
+                continue;
+            }
+
+            $wrapped[] = ['column' => $match['column'], 'operator' => '', 'literal' => null, 'function' => strtolower($match['function'])];
+        }
+
+        return $wrapped;
+    }
+
+    /** @return list<ConditionColumnMatch> predicates on a column of the alias that is not wrapped in a function */
+    private static function predicates(string $attachedCondition, string $aliasOrTable): array
+    {
+        $wrapped = array_flip(array_column(self::functionWrapped($attachedCondition, $aliasOrTable), 'column'));
+        preg_match_all(self::PREDICATE, $attachedCondition, $matches, PREG_SET_ORDER);
+        $predicates = [];
+        foreach ($matches as $match) {
+            if ($match['qualifier'] !== $aliasOrTable || isset($wrapped[$match['column']])) {
+                continue;
+            }
+
+            $literal = trim($match['literal']);
+            $predicates[] = ['column' => $match['column'], 'operator' => strtolower($match['operator']), 'literal' => $literal === '' ? null : $literal, 'function' => null];
+        }
+
+        return $predicates;
+    }
+
+    /**
      * @param ConditionColumnGroups $groups
-     * @param array<string, string> $match
+     * @param ConditionColumnMatch  $match
      */
     private static function classify(array &$groups, array $match): void
     {
-        $operator = strtolower($match['operator']);
-        $literal = trim($match['literal']) === '' ? null : trim($match['literal']);
-        $entry = ['column' => $match['column'], 'operator' => $operator, 'literal' => $literal, 'function' => null];
-
+        $operator = $match['operator'];
         if ($operator === '=' || str_starts_with($operator, 'in')) {
-            $groups['equality'][] = $entry;
+            $groups['equality'][] = $match;
 
             return;
         }
 
         if ($operator === 'like') {
-            if ($literal !== null && str_starts_with($literal, "'%")) {
-                $groups['leadingWildcard'][] = $entry;
+            if ($match['literal'] !== null && str_starts_with($match['literal'], "'%")) {
+                $groups['leadingWildcard'][] = $match;
             }
 
             return;
         }
 
         if (in_array($operator, ['>', '<', '>=', '<=', 'between'], true)) {
-            $groups['range'][] = $entry;
+            $groups['range'][] = $match;
         }
+    }
+
+    /** @param ConditionColumnMatch $match */
+    private static function isNumber(array $match): bool
+    {
+        if ($match['literal'] === null) {
+            return false;
+        }
+
+        $values = match (true) {
+            str_starts_with($match['operator'], 'in') => explode(',', $match['literal']),
+            $match['operator'] === 'between' => explode(' and ', $match['literal']),
+            default => [$match['literal']],
+        };
+        foreach ($values as $value) {
+            if (preg_match(self::NUMBER, trim($value)) !== 1) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }

@@ -51,4 +51,27 @@ final class ConditionColumnsTest extends TestCase
 
         $this->assertSame([], $groups['equality']);
     }
+
+    public function testComparedToNumberKeepsOnlyPredicatesWithNumericLiterals(): void
+    {
+        $matches = ConditionColumns::comparedToNumber(
+            "((`test`.`o`.`a` = 12345) and (`test`.`o`.`b` = 'x') and (`test`.`o`.`c` in (1,2)) and (`test`.`o`.`d` between 1 and 9) and (`test`.`o`.`e` in ('a','b')) and (`test`.`o`.`f` <> -1.5))",
+            'o',
+        );
+
+        $this->assertSame(['a', 'c', 'd', 'f'], array_column($matches, 'column'));
+        $this->assertSame(['12345', '1,2', '1 and 9', '-1.5'], array_column($matches, 'literal'));
+    }
+
+    public function testComparedToNumberIncludesEveryBranchOfAnOr(): void
+    {
+        $matches = ConditionColumns::comparedToNumber("((`test`.`o`.`a` = 1) or (`test`.`o`.`b` = 'x'))", 'o');
+
+        $this->assertSame(['a'], array_column($matches, 'column'));
+    }
+
+    public function testComparedToNumberSkipsColumnsWrappedInAFunction(): void
+    {
+        $this->assertSame([], ConditionColumns::comparedToNumber('(length(`test`.`o`.`a`) = 5)', 'o'));
+    }
 }

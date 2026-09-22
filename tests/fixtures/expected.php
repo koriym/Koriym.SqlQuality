@@ -26,6 +26,6 @@ return [
     '5_multiple_wildcard_like.sql' => ['FullTableScan', 'IneffectiveLikePattern'],
     '6_implicit_type_conversion.sql' => ['FullTableScan', 'ImplicitTypeConversion', 'IneffectiveRangeScan'],
     '7_temporary_table_grouping.sql' => ['IneffectiveSort', 'TemporaryTableGrouping'],
-    '8_suboptimal_or_condition.sql' => ['FullTableScan', 'ImplicitTypeConversion'],
+    '8_suboptimal_or_condition.sql' => ['FullTableScan'],
     '9_inefficient_in_query.sql' => ['FullTableScan', 'IneffectiveRangeScan', 'IneffectiveSort'],
 ];
