@@ -86,7 +86,8 @@ namespace Koriym\SqlQuality;
  *   never_executed: bool
  * }
  * @psalm-type WarningType =
- * 'ExcessiveDerivedTables'
+ * 'DependentSubquery'
+ * | 'ExcessiveDerivedTables'
  * | 'FunctionInvalidatesIndex'
  * | 'FullTableScan'
  * | 'ImplicitTypeConversion'
@@ -100,6 +101,7 @@ namespace Koriym\SqlQuality;
  * | 'TemporaryTableGrouping'
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
+ *   DependentSubquery: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
  *   FullTableScan: string,

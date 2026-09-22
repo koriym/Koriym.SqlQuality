@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 return [
-    '10_redundant_join.sql' => ['LowCardinalityIndex'],
+    '10_redundant_join.sql' => ['DependentSubquery', 'LowCardinalityIndex'],
     '11_nested_loop.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveRangeScan'],
     '12_select1.sql' => [],
-    '14_correlated_subquery.sql' => ['FullTableScan'],
+    '14_correlated_subquery.sql' => ['DependentSubquery', 'FullTableScan'],
     '15_listed_parameters.sql' => ['FullTableScan', 'IneffectiveRangeScan'],
     '16_ineffective_range_scan.sql' => ['FullTableScan', 'IneffectiveRangeScan', 'IneffectiveSort'],
     '18_select_distinct.sql' => ['UnnecessaryDistinct'],

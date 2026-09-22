@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\DependentSubqueryDetector;
 use Koriym\SqlQuality\Detector\DetectorInterface;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\Finding;
@@ -35,6 +36,7 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
+        'DependentSubquery'        => 'Dependent subquery detected; it runs once per outer row.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
         'FullTableScan'            => 'Full table scan detected.',
@@ -57,6 +59,10 @@ final class ExplainAnalyzer
     {
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
+            'DependentSubquery' => [
+                'detector' => new DependentSubqueryDetector(),
+                'message' => $messages['DependentSubquery'],
+            ],
             'ExcessiveDerivedTables' => [
                 'detector' => new ExcessiveDerivedTablesDetector(),
                 'message' => $messages['ExcessiveDerivedTables'],

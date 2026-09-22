@@ -91,6 +91,7 @@ Examples:
 USAGE;
 
     private const MESSAGES_EN = [
+        'DependentSubquery'        => 'Dependent subquery detected.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
         'FullTableScan'            => 'Full table scan detected.',
@@ -107,6 +108,7 @@ USAGE;
     ];
 
     private const MESSAGES_JA = [
+        'DependentSubquery'        => '依存サブクエリが検出されました。',
         'ExcessiveDerivedTables'    => '派生テーブルの過度な使用が検出されました。',
         'FunctionInvalidatesIndex'  => '関数の使用によりインデックスが無効化されています。',
         'FullTableScan'            => 'フルテーブルスキャンが検出されました。',
