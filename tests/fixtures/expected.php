@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 return [
-    '10_redundant_join.sql' => ['LowCardinalityIndex'],
+    '10_redundant_join.sql' => ['DependentSubquery', 'LowCardinalityIndex'],
     '11_nested_loop.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveRangeScan'],
     '12_select1.sql' => [],
-    '14_correlated_subquery.sql' => ['FullTableScan'],
+    '14_correlated_subquery.sql' => ['DependentSubquery', 'FullTableScan'],
     '15_listed_parameters.sql' => ['FullTableScan', 'IneffectiveRangeScan'],
     '16_ineffective_range_scan.sql' => ['FullTableScan', 'IneffectiveRangeScan', 'IneffectiveSort'],
     '18_select_distinct.sql' => ['UnnecessaryDistinct'],
@@ -18,7 +18,10 @@ return [
     '23_ineffective_union.sql' => ['FullTableScan', 'IneffectiveJoin', 'IneffectiveUnion', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
     '24_grouping_operation.sql' => [],
     '25_pass_the_with_clause.sql' => ['IneffectiveJoin', 'LowCardinalityIndex'],
+    '28_cartesian_product.sql' => ['CartesianProduct', 'IneffectiveJoin', 'LowCardinalityIndex'],
+    '29_deep_offset.sql' => ['DeepOffset', 'FullTableScan', 'IneffectiveSort'],
     '2_filesort.sql' => ['IneffectiveSort', 'LowCardinalityIndex'],
+    '30_order_by_rand.sql' => ['IneffectiveSort', 'LowCardinalityIndex', 'OrderByRand', 'TemporaryTableGrouping'],
     '3_function_on_indexed_column.sql' => ['FullTableScan', 'FunctionInvalidatesIndex'],
     '4_no_index_on_join.sql' => ['IneffectiveJoin', 'LowCardinalityIndex', 'TemporaryTableGrouping'],
     '5_multiple_wildcard_like.sql' => ['FullTableScan', 'IneffectiveLikePattern'],

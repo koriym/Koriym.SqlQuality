@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ReadOnlySession` guard around query timing and `EXPLAIN ANALYZE`
 - MySQL service and database-backed tests in CI
 - `SqlFileAnalyzer::queryContext()` returning the `QueryContext` the detectors receive
+- `ExplainAnalyzeParser` turning the text of `EXPLAIN ANALYZE` into a list of plan nodes
+- `DependentSubqueryDetector` detecting correlated subqueries that run once per outer row
+- `CartesianProductDetector` detecting joined tables with no key connecting them to the preceding tables
+- `DeepOffsetDetector` detecting `LIMIT`/`OFFSET` pagination that scans and discards a large number of rows
+- `OrderByRandDetector` detecting `ORDER BY RAND()` forcing a filesort over every matching row
+- `EstimateDivergenceDetector` detecting `EXPLAIN ANALYZE` nodes where the row estimate diverges from the actual row count
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress

@@ -41,4 +41,13 @@ return [
         'target_count' => 2,
     ],
     '25_pass_the_with_clause.sql' => [],
+    '28_cartesian_product.sql' => [
+        'status_u' => 'active',
+        'status_p' => 'published',
+    ],
+    '29_deep_offset.sql' => [
+        'offset' => 10000,
+        'limit' => 10,
+    ],
+    '30_order_by_rand.sql' => ['status' => 'published'],
 ];

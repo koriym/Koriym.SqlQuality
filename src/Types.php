@@ -74,8 +74,23 @@ namespace Koriym\SqlQuality;
  *   Message: string
  * }
  * @psalm-type ShowWarnings = list<ShowWarning>
+ * @psalm-type AnalyzeNode = array{
+ *   depth: int,
+ *   operation: string,
+ *   estimated_cost: float|null,
+ *   estimated_rows: float|null,
+ *   actual_time_first: float|null,
+ *   actual_time_last: float|null,
+ *   actual_rows: float|null,
+ *   loops: int|null,
+ *   never_executed: bool
+ * }
  * @psalm-type WarningType =
- * 'ExcessiveDerivedTables'
+ * 'CartesianProduct'
+ * | 'DeepOffset'
+ * | 'DependentSubquery'
+ * | 'EstimateDivergence'
+ * | 'ExcessiveDerivedTables'
  * | 'FunctionInvalidatesIndex'
  * | 'FullTableScan'
  * | 'ImplicitTypeConversion'
@@ -86,9 +101,14 @@ namespace Koriym\SqlQuality;
  * | 'IneffectiveUnion'
  * | 'LowCardinalityIndex'
  * | 'MultiTableUpdate'
+ * | 'OrderByRand'
  * | 'TemporaryTableGrouping'
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
+ *   CartesianProduct: string,
+ *   DeepOffset: string,
+ *   DependentSubquery: string,
+ *   EstimateDivergence: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
  *   FullTableScan: string,
@@ -100,6 +120,7 @@ namespace Koriym\SqlQuality;
  *   IneffectiveUnion: string,
  *   LowCardinalityIndex: string,
  *   MultiTableUpdate: string,
+ *   OrderByRand: string,
  *   TemporaryTableGrouping: string,
  *   UnnecessaryDistinct: string
  * }

@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Detector\CartesianProductDetector;
+use Koriym\SqlQuality\Detector\DeepOffsetDetector;
+use Koriym\SqlQuality\Detector\DependentSubqueryDetector;
 use Koriym\SqlQuality\Detector\DetectorInterface;
+use Koriym\SqlQuality\Detector\EstimateDivergenceDetector;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
 use Koriym\SqlQuality\Detector\Finding;
 use Koriym\SqlQuality\Detector\FullTableScanDetector;
@@ -17,6 +21,7 @@ use Koriym\SqlQuality\Detector\IneffectiveSortDetector;
 use Koriym\SqlQuality\Detector\IneffectiveUnionDetector;
 use Koriym\SqlQuality\Detector\LowCardinalityIndexDetector;
 use Koriym\SqlQuality\Detector\MultiTableUpdateDetector;
+use Koriym\SqlQuality\Detector\OrderByRandDetector;
 use Koriym\SqlQuality\Detector\TemporaryTableGroupingDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 
@@ -35,6 +40,10 @@ final class ExplainAnalyzer
     private const DOC_BASE_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues/';
 
     public const DEFAULT_MESSAGES = [
+        'CartesianProduct'         => 'Cartesian product detected; the join has no key connecting it to the preceding table.',
+        'DeepOffset'               => 'Deep OFFSET detected; MySQL scans and discards offset rows before the page starts.',
+        'DependentSubquery'        => 'Dependent subquery detected; it runs once per outer row.',
+        'EstimateDivergence'       => "The optimizer's row estimate diverges from the actual row count.",
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
         'FullTableScan'            => 'Full table scan detected.',
@@ -46,6 +55,7 @@ final class ExplainAnalyzer
         'IneffectiveUnion'         => 'Ineffective UNION usage detected; temporary table may be used.',
         'LowCardinalityIndex'      => 'Index on low cardinality column detected; this may cause inefficient scans.',
         'MultiTableUpdate'         => 'Multi-table update detected; this may lead to heavy table locking.',
+        'OrderByRand'              => 'ORDER BY RAND() detected; it forces a filesort over every matching row.',
         'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
         'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected on already unique columns.',
     ];
@@ -57,6 +67,22 @@ final class ExplainAnalyzer
     {
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
+            'CartesianProduct' => [
+                'detector' => new CartesianProductDetector(),
+                'message' => $messages['CartesianProduct'],
+            ],
+            'DeepOffset' => [
+                'detector' => new DeepOffsetDetector(),
+                'message' => $messages['DeepOffset'],
+            ],
+            'DependentSubquery' => [
+                'detector' => new DependentSubqueryDetector(),
+                'message' => $messages['DependentSubquery'],
+            ],
+            'EstimateDivergence' => [
+                'detector' => new EstimateDivergenceDetector(),
+                'message' => $messages['EstimateDivergence'],
+            ],
             'ExcessiveDerivedTables' => [
                 'detector' => new ExcessiveDerivedTablesDetector(),
                 'message' => $messages['ExcessiveDerivedTables'],
@@ -100,6 +126,10 @@ final class ExplainAnalyzer
             'MultiTableUpdate' => [
                 'message' => $messages['MultiTableUpdate'],
                 'detector' => new MultiTableUpdateDetector(),
+            ],
+            'OrderByRand' => [
+                'detector' => new OrderByRandDetector(),
+                'message' => $messages['OrderByRand'],
             ],
             'TemporaryTableGrouping' => [
                 'message' => $messages['TemporaryTableGrouping'],
@@ -155,7 +185,7 @@ final class ExplainAnalyzer
     {
         return match ($warningType) {
             'FullTableScan', 'IneffectiveJoin' => 'Critical',
-            'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
+            'EstimateDivergence', 'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
             default => 'Warning',
         };
     }
@@ -168,7 +198,8 @@ final class ExplainAnalyzer
     private static function getConfidence(string $warningType): float
     {
         return match ($warningType) {
-            'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
+            'EstimateDivergence', 'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
+            'DeepOffset', 'OrderByRand' => 1.0,
             default => 0.95,
         };
     }

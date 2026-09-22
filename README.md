@@ -128,7 +128,7 @@ When you trust this project folder, Claude Code will automatically prompt you to
 ### Features
 
 These AI-powered skills:
-- Detect performance issues (FullTableScan, IneffectiveJoin, etc.)
+- Detect performance issues (FullTableScan, IneffectiveJoin, CartesianProduct, EstimateDivergence, etc.)
 - Rewrite problematic SQL patterns (functions on columns, implicit conversions)
 - Create indexes and measure their impact in real-time
 - Roll back ineffective indexes automatically
