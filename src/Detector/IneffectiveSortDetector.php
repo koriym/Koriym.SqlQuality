@@ -8,149 +8,168 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function array_flip;
-use function array_intersect_key;
+use function array_column;
+use function array_slice;
+use function array_unique;
+use function array_values;
 use function count;
+use function implode;
 use function is_array;
-use function substr;
+use function preg_match;
+use function preg_match_all;
+use function preg_split;
+use function sprintf;
+use function trim;
 
-/** @psalm-import-type ExplainNode from Types */
+/**
+ * @psalm-import-type ExplainNode from Types
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type Suggestion from Types
+ */
 final class IneffectiveSortDetector implements DetectorInterface
 {
-    // 行数の閾値（これ以上の行数を処理する場合は非効率とみなす）
+    /** A filesort over an index lookup is reported from this many rows; lowering it reports sorts of smaller lookups. */
     private const ROW_THRESHOLD = 1000;
 
-    // コストの閾値（これ以上のコストの場合は非効率とみなす）
-    private const COST_THRESHOLD = 100.0;
-
-    /**
-     * 非効率なソート操作を検出します
-     *
-     * {@inheritDoc}
-     */
     #[Override]
     public function detect(QueryContext $context): array
     {
-        return $this->traverseQueryBlock($context->explain);
+        $findings = [];
+        foreach ($this->orderingOperations($context->explain['query_block'], []) as ['path' => $path, 'node' => $ordering]) {
+            if (($ordering['using_filesort'] ?? false) !== true) {
+                continue;
+            }
+
+            $table = $this->sortedTable($context, $path);
+            if ($table === null || ! $this->isLargeScan($table)) {
+                continue;
+            }
+
+            $key = $table['key'] ?? null;
+            $findings[] = new Finding(
+                evidence: [
+                    'table_name' => $table['table_name'],
+                    'access_type' => $table['access_type'],
+                    'rows_examined_per_scan' => $table['rows_examined_per_scan'] ?? null,
+                    'key' => $key,
+                    'used_key_parts' => $table['used_key_parts'] ?? [],
+                    'index_columns' => $key === null ? [] : $context->indexColumns($table['table_name'])[$key] ?? [],
+                    'using_filesort' => true,
+                    'using_temporary_table' => $ordering['using_temporary_table'] ?? false,
+                ],
+                suggestion: $this->suggest($context, $table),
+            );
+        }
+
+        return $findings;
     }
 
     /**
-     * クエリブロックを再帰的に探索して非効率なソート操作をチェックします
+     * @param ExplainNode     $node
+     * @param list<array-key> $path
      *
-     * @param ExplainNode $node 現在のノード
-     *
-     * @return list<Finding>
+     * @return list<array{path: list<array-key>, node: ExplainNode}>
      */
-    private function traverseQueryBlock(array $node): array
+    private function orderingOperations(array $node, array $path): array
     {
-        // ordering_operationの検査
-        if (isset($node['ordering_operation'])) {
-            $finding = $this->ineffectiveSort($node);
-
-            return $finding === null ? [] : [$finding];
-        }
-
-        // 子ノードの再帰的な探索
-        foreach ($node as $value) {
-            if (is_array($value)) {
-                $findings = $this->traverseQueryBlock($value);
-                if ($findings !== []) {
-                    return $findings;
-                }
+        $found = [];
+        foreach ($node as $key => $child) {
+            if (! is_array($child)) {
+                continue;
             }
+
+            $childPath = [...$path, $key];
+            if ($key === 'ordering_operation') {
+                $found[] = ['path' => $childPath, 'node' => $child];
+            }
+
+            $found = [...$found, ...$this->orderingOperations($child, $childPath)];
         }
 
-        return [];
+        return $found;
     }
 
     /**
-     * ソート操作が非効率かどうかを判定します
+     * @param list<array-key> $orderingPath
      *
-     * @param ExplainNode $node クエリブロックノード
+     * @return ExplainTable|null the table directly under the ordering_operation, else the first one beneath it
      */
-    private function ineffectiveSort(array $node): Finding|null
+    private function sortedTable(QueryContext $context, array $orderingPath): array|null
     {
-        $orderingOp = $node['ordering_operation'];
-        $table = $orderingOp['table'] ?? null;
-
-        if (! $table) {
-            return null;
-        }
-
-        // クエリのコストチェック
-        $queryCost = $node['cost_info']['query_cost'] ?? 0.0;
-        $evidence = array_intersect_key($table, array_flip(['table_name', 'rows_examined_per_scan', 'rows_produced_per_join', 'key', 'used_key_parts', 'backward_index_scan', 'cost_info'])) + ['query_cost' => $queryCost];
-        if ($queryCost > self::COST_THRESHOLD) {
-            return new Finding($evidence);
-        }
-
-        // 行数のチェック
-        if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > self::ROW_THRESHOLD) {
-            return new Finding($evidence);
-        }
-
-        // インデックスの部分使用チェック
-        if (
-            isset($table['key']) &&
-            isset($table['possible_keys']) &&
-            isset($table['used_key_parts']) &&
-            is_array($table['used_key_parts'])
-        ) {
-            $usedKeyParts = count($table['used_key_parts']);
-            // インデックスの一部のみ使用している場合
-            if ($usedKeyParts < $this->getIndexKeyParts($table['key'])) {
-                return new Finding($evidence);
+        $first = null;
+        foreach ($context->tableAccesses() as ['path' => $path, 'table' => $table]) {
+            if (array_slice($path, 0, count($orderingPath)) !== $orderingPath) {
+                continue;
             }
-        }
 
-        // バックワードインデックススキャンのチェック
-        if (isset($table['backward_index_scan']) && $table['backward_index_scan']) {
-            // 大量のデータを逆順にスキャンする場合
-            if (isset($table['rows_produced_per_join']) && $table['rows_produced_per_join'] > self::ROW_THRESHOLD) {
-                return new Finding($evidence);
+            if ($path === [...$orderingPath, 'table']) {
+                return $table;
             }
+
+            $first ??= $table;
         }
 
-        // データ読み取り量のチェック
-        if (
-            isset($table['cost_info']['data_read_per_join']) &&
-            $this->parseDataSize($table['cost_info']['data_read_per_join']) > 1024 * 1024 // 1MB以上
-        ) {
-            return new Finding($evidence);
+        return $first;
+    }
+
+    /** @param ExplainTable $table */
+    private function isLargeScan(array $table): bool
+    {
+        return $table['access_type'] === 'ALL' || (int) ($table['rows_examined_per_scan'] ?? 0) >= self::ROW_THRESHOLD;
+    }
+
+    /**
+     * @param ExplainTable $table
+     *
+     * @return Suggestion
+     */
+    private function suggest(QueryContext $context, array $table): array
+    {
+        $equality = array_column(ConditionColumns::forAlias($table['attached_condition'] ?? '', $table['table_name'])['equality'], 'column');
+        $columns = array_values(array_unique([...$equality, ...$this->orderByColumns($context, $table['table_name'])]));
+        if ($columns === []) {
+            return ['kind' => 'review', 'description' => 'Consider an index on the WHERE equality columns followed by the ORDER BY columns so rows are read in sorted order.'];
+        }
+
+        $tableName = $context->aliases()[$table['table_name']] ?? $table['table_name'];
+        $existing = $this->indexStartingWith($context, $table['table_name'], $columns);
+        if ($existing !== null) {
+            return ['kind' => 'review', 'description' => sprintf('%s already has %s starting with (%s) but the optimizer did not use it to order; review the filter selectivity and the LIMIT.', $tableName, $existing, implode(', ', $columns))];
+        }
+
+        return ['kind' => 'review', 'description' => sprintf('Consider an index on %s (%s), WHERE equality columns first and ORDER BY columns last, so rows are read in sorted order.', $tableName, implode(', ', $columns))];
+    }
+
+    /** @param list<string> $columns */
+    private function indexStartingWith(QueryContext $context, string $aliasOrTable, array $columns): string|null
+    {
+        foreach ($context->indexColumns($aliasOrTable) as $name => $indexColumns) {
+            if (array_slice($indexColumns, 0, count($columns)) === $columns) {
+                return $name;
+            }
         }
 
         return null;
     }
 
-    /**
-     * インデックスのキーパーツ数を取得します
-     * Note: 実際の実装では、INFORMATION_SCHEMAからインデックス情報を取得する必要があります
-     */
-    private function getIndexKeyParts(string $indexName): int
+    /** @return list<string> ORDER BY columns that exist on the table; [] unless the statement has exactly one ORDER BY */
+    private function orderByColumns(QueryContext $context, string $aliasOrTable): array
     {
-        // この実装はデモ用です。実際にはDBからインデックス情報を取得する必要があります
-        return match ($indexName) {
-            'idx_posts_status_created' => 2,  // status, created_atの2つのカラム
-            default => 1
-        };
-    }
+        if (preg_match_all('/\bORDER\s+BY\s+(?<list>.+?)(?=\s+LIMIT\b|\s*[;)]|\s*$)/is', $context->sql, $matches) !== 1) {
+            return [];
+        }
 
-    /**
-     * データサイズ文字列をバイト数に変換します
-     *
-     * @param string $size 例: "2M", "500K" など
-     */
-    private function parseDataSize(string $size): int
-    {
-        $units = [
-            'K' => 1024,
-            'M' => 1024 * 1024,
-            'G' => 1024 * 1024 * 1024,
-        ];
+        $columns = [];
+        foreach (preg_split('/\s*,\s*/', trim($matches['list'][0])) ?: [] as $item) {
+            if (preg_match('/^(?:`?\w+`?\.)*`?(?<column>\w+)`?(?:\s+(?:ASC|DESC))?$/i', trim($item), $match) !== 1) {
+                continue;
+            }
 
-        $unit = substr($size, -1);
-        $value = (int) $size;
+            if ($context->columnType($aliasOrTable, $match['column']) !== null) {
+                $columns[] = $match['column'];
+            }
+        }
 
-        return isset($units[$unit]) ? $value * $units[$unit] : $value;
+        return $columns;
     }
 }
