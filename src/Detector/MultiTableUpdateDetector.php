@@ -11,8 +11,6 @@ use Override;
 use function count;
 
 /**
- * Detects multi-table UPDATE plans.
- *
  * MySQL EXPLAIN FORMAT=JSON for UPDATE ... JOIN may mark each updated table
  * with "update": true rather than exposing update_operation: multi_table.
  */
