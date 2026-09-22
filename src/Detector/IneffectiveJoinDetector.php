@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\QueryContext;
+use Koriym\SqlQuality\Types;
 use Override;
 
 use function array_flip;
@@ -14,12 +15,19 @@ use function array_slice;
 use function count;
 use function implode;
 use function in_array;
-use function is_array;
 use function is_int;
-use function is_numeric;
+use function preg_match_all;
 
-class IneffectiveJoinDetector implements DetectorInterface
+use const PREG_SET_ORDER;
+
+/**
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type Suggestion from Types
+ */
+final class IneffectiveJoinDetector implements DetectorInterface
 {
+    private const JOIN_PREDICATE = '/`\w+`\.`(?<left>\w+)`\.`(?<leftColumn>\w+)`\s*=\s*`\w+`\.`(?<right>\w+)`\.`(?<rightColumn>\w+)`/';
+
     #[Override]
     public function detect(QueryContext $context): array
     {
@@ -34,15 +42,17 @@ class IneffectiveJoinDetector implements DetectorInterface
         }
 
         $findings = [];
-        foreach ($joinGroups as $joinAccesses) {
-            if (count($joinAccesses) < 2) {
-                continue;
-            }
-
-            foreach ($joinAccesses as $tableInfo) {
-                if ($this->isIneffectiveJoin($tableInfo)) {
-                    $findings[] = new Finding(array_intersect_key($tableInfo, array_flip(['table_name', 'access_type', 'rows_examined_per_scan', 'rows_produced_per_join', 'cost_info'])));
+        foreach ($joinGroups as $members) {
+            // The first member drives the loop; its full scan belongs to FullTableScanDetector.
+            foreach (array_slice($members, 1) as $table) {
+                if (! $this->isIneffectiveJoin($table)) {
+                    continue;
                 }
+
+                $findings[] = new Finding(
+                    evidence: array_intersect_key($table, array_flip(['table_name', 'access_type', 'using_join_buffer', 'rows_examined_per_scan', 'rows_produced_per_join', 'attached_condition', 'ref'])),
+                    suggestion: $this->suggest($context, $table),
+                );
             }
         }
 
@@ -76,54 +86,46 @@ class IneffectiveJoinDetector implements DetectorInterface
         return implode("\0", array_map(static fn (int|string $part): string => (string) $part, $groupPath));
     }
 
-    private function isIneffectiveJoin(array $tableInfo): bool
+    /** @param ExplainTable $table */
+    private function isIneffectiveJoin(array $table): bool
     {
-        // 非効率的なJOINの条件をチェック
-        $conditions = [
-            // 行数が多すぎる場合
-            $this->hasHighRowCount($tableInfo),
-            // インデックスが適切に使用されていない場合
-            $this->hasInappropriateIndexUsage($tableInfo),
-            // コストが高すぎる場合
-            $this->hasHighCost($tableInfo),
-        ];
-
-        return in_array(true, $conditions, true);
+        return in_array($table['access_type'], ['ALL', 'index'], true) || isset($table['using_join_buffer']);
     }
 
-    private function hasHighRowCount(array $tableInfo): bool
+    /**
+     * @param ExplainTable $table
+     *
+     * @return Suggestion
+     */
+    private function suggest(QueryContext $context, array $table): array
     {
-        $rowsExamined = $this->toFloat($tableInfo['rows_examined_per_scan'] ?? 0);
-        $rowsProduced = $this->toFloat($tableInfo['rows_produced_per_join'] ?? 0);
-
-        // 検査する行数と生成される行数に大きな差がある場合
-        return $rowsExamined > 1000 || ($rowsExamined > 0 && $rowsProduced / $rowsExamined < 0.1);
-    }
-
-    private function hasInappropriateIndexUsage(array $tableInfo): bool
-    {
-        $accessType = $tableInfo['access_type'] ?? '';
-
-        return $accessType === 'ALL' || $accessType === 'index';
-    }
-
-    private function hasHighCost(array $tableInfo): bool
-    {
-        $costInfo = $tableInfo['cost_info'] ?? [];
-        if (! is_array($costInfo)) {
-            return false;
+        $suggestion = IndexSuggestion::create($context, $table['table_name'], $this->joinColumns($table));
+        if ($suggestion !== null) {
+            return $suggestion;
         }
 
-        $readCost = $this->toFloat($costInfo['read_cost'] ?? 0);
-        $evalCost = $this->toFloat($costInfo['eval_cost'] ?? 0);
-
-        // コストが高すぎる場合
-        return $readCost + $evalCost > 1000;
+        return ['kind' => 'review', 'description' => 'No index is used for this join; check the join condition.'];
     }
 
-    /** @psalm-pure */
-    private function toFloat(mixed $value): float
+    /**
+     * @param ExplainTable $table
+     *
+     * @return list<string> this table's columns compared for equality with another table's columns
+     */
+    private function joinColumns(array $table): array
     {
-        return is_numeric($value) ? (float) $value : 0.0;
+        preg_match_all(self::JOIN_PREDICATE, $table['attached_condition'] ?? '', $matches, PREG_SET_ORDER);
+        $columns = [];
+        foreach ($matches as $match) {
+            if ($match['left'] === $table['table_name']) {
+                $columns[] = $match['leftColumn'];
+            }
+
+            if ($match['right'] === $table['table_name']) {
+                $columns[] = $match['rightColumn'];
+            }
+        }
+
+        return $columns;
     }
 }
