@@ -106,7 +106,7 @@ A file that cannot be analyzed does not change the exit code. It is listed with 
 
 ### JSON Schema
 
-Both commands' JSON output is validated against a schema in [`schema/`](schema/): [`analyze-report.schema.json`](schema/analyze-report.schema.json) for `analyze --format=json`, [`explain-report.schema.json`](schema/explain-report.schema.json) for `explain`. An agent can validate the CLI output against either schema before acting on it.
+Both commands' JSON output conforms to a schema in [`schema/`](schema/): [`analyze-report.schema.json`](schema/analyze-report.schema.json) for `analyze --format=json`, [`explain-report.schema.json`](schema/explain-report.schema.json) for `explain`. An agent can validate the CLI output against either schema before acting on it.
 
 ## Claude Code Skills
 
