@@ -48,6 +48,7 @@ final class SqlFileAnalyzer
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
     private readonly SqlSafetyClassifier $sqlSafetyClassifier;
+    private readonly ReadOnlySession $readOnlySession;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -58,6 +59,7 @@ final class SqlFileAnalyzer
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
         $this->sqlSafetyClassifier = new SqlSafetyClassifier();
+        $this->readOnlySession = new ReadOnlySession($pdo);
     }
 
     /**
@@ -186,14 +188,15 @@ final class SqlFileAnalyzer
             return [$explainJsonData, 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)'];
         }
 
-        // EXPLAIN ANALYZE を実行
-        $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
-        if ($analyzeStmt === false) {
-            throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
-        }
-
         /** @var array|false $analyzeResult */
-        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_NUM);
+        $analyzeResult = $this->readOnlySession->run(function () use ($interpolatedSql): mixed {
+            $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
+            if ($analyzeStmt === false) {
+                throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
+            }
+
+            return $analyzeStmt->fetch(PDO::FETCH_NUM);
+        });
         if ($analyzeResult === false || ! isset($analyzeResult[0])) {
             throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
         }
@@ -373,6 +376,12 @@ final class SqlFileAnalyzer
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+
+        return $this->readOnlySession->run(fn (): float => $this->measureExecution($interpolatedSql));
+    }
+
+    private function measureExecution(string $interpolatedSql): float
+    {
         // warm up the cache
         $warmupStmt = $this->pdo->query($interpolatedSql);
         if ($warmupStmt === false) {
