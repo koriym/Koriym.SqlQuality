@@ -300,7 +300,7 @@ USAGE;
 
         try {
             ['result' => $result, 'context' => $context] = $analyzer->explain($sqlFileName, $params);
-        } catch (RuntimeException $e) {
+        } catch (RuntimeException | PDOException $e) {
             fwrite(STDERR, "Error: {$e->getMessage()}\n");
 
             return 2;
