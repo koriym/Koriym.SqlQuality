@@ -63,6 +63,7 @@ interface DetectorInterface {
 
 Existing detectors in `src/Detector/`:
 - CartesianProductDetector
+- DeepOffsetDetector
 - DependentSubqueryDetector
 - ExcessiveDerivedTablesDetector
 - FullTableScanDetector

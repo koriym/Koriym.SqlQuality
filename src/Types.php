@@ -87,6 +87,7 @@ namespace Koriym\SqlQuality;
  * }
  * @psalm-type WarningType =
  * 'CartesianProduct'
+ * | 'DeepOffset'
  * | 'DependentSubquery'
  * | 'ExcessiveDerivedTables'
  * | 'FunctionInvalidatesIndex'
@@ -103,6 +104,7 @@ namespace Koriym\SqlQuality;
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
  *   CartesianProduct: string,
+ *   DeepOffset: string,
  *   DependentSubquery: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,

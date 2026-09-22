@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Detector\CartesianProductDetector;
+use Koriym\SqlQuality\Detector\DeepOffsetDetector;
 use Koriym\SqlQuality\Detector\DependentSubqueryDetector;
 use Koriym\SqlQuality\Detector\DetectorInterface;
 use Koriym\SqlQuality\Detector\ExcessiveDerivedTablesDetector;
@@ -38,6 +39,7 @@ final class ExplainAnalyzer
 
     public const DEFAULT_MESSAGES = [
         'CartesianProduct'         => 'Cartesian product detected; the join has no key connecting it to the preceding table.',
+        'DeepOffset'               => 'Deep OFFSET detected; MySQL scans and discards offset rows before the page starts.',
         'DependentSubquery'        => 'Dependent subquery detected; it runs once per outer row.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
@@ -64,6 +66,10 @@ final class ExplainAnalyzer
             'CartesianProduct' => [
                 'detector' => new CartesianProductDetector(),
                 'message' => $messages['CartesianProduct'],
+            ],
+            'DeepOffset' => [
+                'detector' => new DeepOffsetDetector(),
+                'message' => $messages['DeepOffset'],
             ],
             'DependentSubquery' => [
                 'detector' => new DependentSubqueryDetector(),
@@ -181,6 +187,7 @@ final class ExplainAnalyzer
     {
         return match ($warningType) {
             'LowCardinalityIndex', 'UnnecessaryDistinct' => 0.8,
+            'DeepOffset' => 1.0,
             default => 0.95,
         };
     }

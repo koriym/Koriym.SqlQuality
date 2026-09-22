@@ -19,6 +19,7 @@ return [
     '24_grouping_operation.sql' => [],
     '25_pass_the_with_clause.sql' => ['IneffectiveJoin', 'LowCardinalityIndex'],
     '28_cartesian_product.sql' => ['CartesianProduct', 'IneffectiveJoin', 'LowCardinalityIndex'],
+    '29_deep_offset.sql' => ['DeepOffset', 'FullTableScan', 'IneffectiveSort'],
     '2_filesort.sql' => ['IneffectiveSort', 'LowCardinalityIndex'],
     '3_function_on_indexed_column.sql' => ['FullTableScan', 'FunctionInvalidatesIndex'],
     '4_no_index_on_join.sql' => ['IneffectiveJoin', 'LowCardinalityIndex', 'TemporaryTableGrouping'],

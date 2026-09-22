@@ -92,6 +92,7 @@ USAGE;
 
     private const MESSAGES_EN = [
         'CartesianProduct'         => 'Cartesian product detected.',
+        'DeepOffset'               => 'Deep OFFSET detected.',
         'DependentSubquery'        => 'Dependent subquery detected.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
@@ -110,6 +111,7 @@ USAGE;
 
     private const MESSAGES_JA = [
         'CartesianProduct'         => 'カーテシアン積が検出されました。',
+        'DeepOffset'               => '大きなOFFSETが検出されました。',
         'DependentSubquery'        => '依存サブクエリが検出されました。',
         'ExcessiveDerivedTables'    => '派生テーブルの過度な使用が検出されました。',
         'FunctionInvalidatesIndex'  => '関数の使用によりインデックスが無効化されています。',
