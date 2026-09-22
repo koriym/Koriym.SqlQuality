@@ -28,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `ImplicitTypeConversionDetector` reports a string-typed column (by schema) compared with a numeric literal in `attached_condition` or `index_condition`, at confidence 0.95 when MySQL warns 1739, and suggests quoting the literal
 - `FunctionInvalidatesIndexDetector` reports a column wrapped in a function in `attached_condition` only when the column is in an index, names those indexes, and suggests a range rewrite for `DATE(col) = 'D'`
 - `IneffectiveLikePatternDetector` reports each column with a leading-wildcard `LIKE` (not only a both-sided one) when the table is fully scanned or filters below 25%, and suggests a review
+- `IneffectiveRangeScanDetector` reports only `index_merge` and `range` scans examining 1000+ rows with `filtered` below 20%, dropping the `ALL` + `IN`, `OR`, and multiple `possible_keys` rules
 - `DetectorInterface::detect()` takes a `QueryContext` and returns a list of `Finding` instead of a bool
 - Detected issues carry `detector`, `evidence` and `suggestion`; a detector reports each matching table separately
 - `ExplainAnalyzer::analyze()` takes a `QueryContext` instead of the EXPLAIN array
