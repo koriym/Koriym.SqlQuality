@@ -39,7 +39,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (count(0) = 2)  (cost=5.06 rows=16) (actual time=0.0118..0.0168 rows=3 loops=1)\n    -> Group aggregate: count(0)  (cost=5.06 rows=16) (actual time=0.00958..0.0161 rows=6 loops=1)\n        -> Filter: (comments.post_id in (375,376,377,388,389,390))  (cost=3.46 rows=16) (actual time=0.00588..0.0143 rows=16 loops=1)\n            -> Covering index range scan on comments using idx_comments_post_id over (post_id = 375) OR (post_id = 376) OR (4 more)  (cost=3.46 rows=16) (actual time=0.00533..0.0127 rows=16 loops=1)\n",
+    "explain_analyze": "-> Filter: (count(0) = 2)  (cost=5.06 rows=16) (actual time=0.0138..0.0189 rows=3 loops=1)\n    -> Group aggregate: count(0)  (cost=5.06 rows=16) (actual time=0.0115..0.0181 rows=6 loops=1)\n        -> Filter: (comments.post_id in (375,376,377,388,389,390))  (cost=3.46 rows=16) (actual time=0.00758..0.0164 rows=16 loops=1)\n            -> Covering index range scan on comments using idx_comments_post_id over (post_id = 375) OR (post_id = 376) OR (4 more)  (cost=3.46 rows=16) (actual time=0.00692..0.0147 rows=16 loops=1)\n",
     "warnings": [],
     "schema": {
         "comments": {

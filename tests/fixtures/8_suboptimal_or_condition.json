@@ -36,7 +36,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=504 rows=1655) (actual time=0.00383..2.22 rows=4500 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00246..1.62 rows=5000 loops=1)\n",
+    "explain_analyze": "-> Filter: ((posts.user_id = 1) or (posts.`status` = 'published'))  (cost=504 rows=1655) (actual time=0.00404..2.24 rows=4500 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00258..1.63 rows=5000 loops=1)\n",
     "warnings": [],
     "schema": {
         "posts": {

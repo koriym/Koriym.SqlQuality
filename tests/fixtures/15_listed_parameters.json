@@ -30,7 +30,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.0145..0.344 rows=2 loops=1)\n    -> Table scan on users  (cost=102 rows=1000) (actual time=0.0139..0.277 rows=1000 loops=1)\n",
+    "explain_analyze": "-> Filter: (users.`name` in ('User 1','User 10'))  (cost=102 rows=200) (actual time=0.0143..0.34 rows=2 loops=1)\n    -> Table scan on users  (cost=102 rows=1000) (actual time=0.0138..0.273 rows=1000 loops=1)\n",
     "warnings": [],
     "schema": {
         "users": {

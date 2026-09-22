@@ -84,7 +84,7 @@
             }
         }
     },
-    "explain_analyze": "-> Table scan on <temporary>  (actual time=16.1..16.6 rows=4500 loops=1)\n    -> Aggregate using temporary table  (actual time=16.1..16.1 rows=4500 loops=1)\n        -> Nested loop left join  (cost=1456 rows=5631) (actual time=0.00804..9.52 rows=9526 loops=1)\n            -> Index lookup on p using idx_posts_status_created (status='published')  (cost=273 rows=2478) (actual time=0.00471..3.4 rows=4500 loops=1)\n            -> Covering index lookup on c using idx_comments_post_id (post_id=p.id)  (cost=0.25 rows=2.27) (actual time=946e-6..0.0012 rows=1.98 loops=4500)\n",
+    "explain_analyze": "-> Table scan on <temporary>  (actual time=16.3..16.8 rows=4500 loops=1)\n    -> Aggregate using temporary table  (actual time=16.3..16.3 rows=4500 loops=1)\n        -> Nested loop left join  (cost=1456 rows=5631) (actual time=0.00808..9.59 rows=9526 loops=1)\n            -> Index lookup on p using idx_posts_status_created (status='published')  (cost=273 rows=2478) (actual time=0.00454..3.36 rows=4500 loops=1)\n            -> Covering index lookup on c using idx_comments_post_id (post_id=p.id)  (cost=0.25 rows=2.27) (actual time=965e-6..0.00122 rows=1.98 loops=4500)\n",
     "warnings": [],
     "schema": {
         "posts": {

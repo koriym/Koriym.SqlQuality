@@ -31,7 +31,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (posts.view_count > 1000)  (cost=504 rows=1652) (actual time=0.00479..1.84 rows=4518 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00454..1.61 rows=5000 loops=1)\n",
+    "explain_analyze": "-> Filter: (posts.view_count > 1000)  (cost=504 rows=1652) (actual time=0.005..1.89 rows=4518 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00471..1.66 rows=5000 loops=1)\n",
     "warnings": [],
     "schema": {
         "posts": {

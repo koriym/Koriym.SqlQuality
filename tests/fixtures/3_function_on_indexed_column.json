@@ -31,7 +31,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (cast(posts.created_at as date) = '2024-01-01')  (cost=504 rows=4956) (actual time=1.83..1.83 rows=0 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00446..1.61 rows=5000 loops=1)\n",
+    "explain_analyze": "-> Filter: (cast(posts.created_at as date) = '2024-01-01')  (cost=504 rows=4956) (actual time=1.88..1.88 rows=0 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00387..1.66 rows=5000 loops=1)\n",
     "warnings": [],
     "schema": {
         "posts": {

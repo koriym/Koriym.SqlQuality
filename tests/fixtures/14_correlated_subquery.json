@@ -66,7 +66,7 @@
             ]
         }
     },
-    "explain_analyze": "-> Table scan on u  (cost=102 rows=1000) (actual time=0.0131..0.167 rows=1000 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: max(o.created_at)  (cost=1.05 rows=1) (actual time=0.00239..0.00242 rows=1 loops=1000)\n        -> Index lookup on o using idx_orders_user_id (user_id=u.id)  (cost=0.819 rows=2.34) (actual time=0.00183..0.00214 rows=2 loops=1000)\n",
+    "explain_analyze": "-> Table scan on u  (cost=102 rows=1000) (actual time=0.0137..0.163 rows=1000 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: max(o.created_at)  (cost=1.05 rows=1) (actual time=0.00235..0.00237 rows=1 loops=1000)\n        -> Index lookup on o using idx_orders_user_id (user_id=u.id)  (cost=0.819 rows=2.34) (actual time=0.00182..0.0021 rows=2 loops=1000)\n",
     "warnings": [],
     "schema": {
         "orders": {

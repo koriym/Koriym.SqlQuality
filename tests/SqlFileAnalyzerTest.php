@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use function array_column;
+use function array_keys;
 use function file_exists;
 use function is_dir;
 use function mkdir;
@@ -59,6 +60,26 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertCount(2, $run['skipped']);
         $this->assertNotSame('', $run['skipped']['14_not_found.sql']);
         $this->assertNotSame('', $run['skipped']['17_empty_list.sql']);
+    }
+
+    public function testQueryContextCarriesInterpolatedSqlPlanAndSchema(): void
+    {
+        $context = $this->createAnalyzer()->queryContext('1_full_table_scan.sql', ['min_views' => 1000]);
+
+        $this->assertStringContainsString('view_count > 1000', $context->sql);
+        $this->assertSame('posts', $context->explain['query_block']['table']['table_name']);
+        $this->assertStringStartsWith('-> ', (string) $context->explainAnalyze);
+        $this->assertSame(['posts'], array_keys($context->schema));
+        $this->assertSame(['id'], $context->primaryKeyColumns('posts'));
+    }
+
+    public function testQueryContextSkipsExplainAnalyzeForDml(): void
+    {
+        $context = $this->createAnalyzer()->queryContext('20_multi_table_update.sql', []);
+
+        $this->assertNull($context->explainAnalyze);
+        $this->assertCount(1, $context->warningsWithCode(1003));
+        $this->assertSame(['p' => 'posts', 'c' => 'comments'], $context->aliases());
     }
 
     public function testAnalyzeSqlDirectoryWritesReportPerQueryAndSummary(): void

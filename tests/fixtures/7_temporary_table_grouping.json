@@ -42,7 +42,7 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: order_count DESC  (actual time=0.494..0.515 rows=855 loops=1)\n    -> Stream results  (cost=402 rows=855) (actual time=0.0374..0.376 rows=855 loops=1)\n        -> Group aggregate: count(0)  (cost=402 rows=855) (actual time=0.0367..0.32 rows=855 loops=1)\n            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.0347..0.228 rows=2000 loops=1)\n",
+    "explain_analyze": "-> Sort: order_count DESC  (actual time=0.486..0.508 rows=855 loops=1)\n    -> Stream results  (cost=402 rows=855) (actual time=0.0364..0.372 rows=855 loops=1)\n        -> Group aggregate: count(0)  (cost=402 rows=855) (actual time=0.0359..0.317 rows=855 loops=1)\n            -> Covering index scan on orders using idx_orders_user_id  (cost=202 rows=2000) (actual time=0.0345..0.224 rows=2000 loops=1)\n",
     "warnings": [],
     "schema": {
         "orders": {

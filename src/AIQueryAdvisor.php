@@ -159,8 +159,9 @@ TEMPLATE;
             "\n",
             array_map(
                 static fn (array $issue): string => sprintf(
-                    '- %s [Learn more](%s/%s)',
+                    '- %s%s [Learn more](%s/%s)',
                     $issue['message'],
+                    isset($issue['evidence']['table_name']) ? sprintf(' (table: %s)', (string) $issue['evidence']['table_name']) : '',
                     self::ISSUE_DOC_URL,
                     $issue['type'],
                 ),

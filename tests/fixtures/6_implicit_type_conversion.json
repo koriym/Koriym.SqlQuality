@@ -30,7 +30,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: (orders.reference_code = 12345)  (cost=202 rows=200) (actual time=0.908..0.908 rows=0 loops=1)\n    -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0405..0.494 rows=2000 loops=1)\n",
+    "explain_analyze": "-> Filter: (orders.reference_code = 12345)  (cost=202 rows=200) (actual time=0.871..0.871 rows=0 loops=1)\n    -> Table scan on orders  (cost=202 rows=2000) (actual time=0.0358..0.482 rows=2000 loops=1)\n",
     "warnings": [],
     "schema": {
         "orders": {

@@ -31,7 +31,7 @@
             }
         }
     },
-    "explain_analyze": "-> Filter: ((posts.title like '%keyword%') or (posts.content like '%keyword%'))  (cost=504 rows=1040) (actual time=2.85..2.85 rows=0 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00337..1.61 rows=5000 loops=1)\n",
+    "explain_analyze": "-> Filter: ((posts.title like '%keyword%') or (posts.content like '%keyword%'))  (cost=504 rows=1040) (actual time=2.87..2.87 rows=0 loops=1)\n    -> Table scan on posts  (cost=504 rows=4956) (actual time=0.00408..1.63 rows=5000 loops=1)\n",
     "warnings": [],
     "schema": {
         "posts": {

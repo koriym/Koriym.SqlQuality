@@ -45,7 +45,7 @@
             }
         }
     },
-    "explain_analyze": "-> Sort: orders.created_at  (cost=0.35 rows=1) (actual time=0.00283..0.00283 rows=0 loops=1)\n    -> Index lookup on orders using idx_orders_user_id (user_id=1)  (cost=0.35 rows=1) (actual time=0.00208..0.00208 rows=0 loops=1)\n",
+    "explain_analyze": "-> Sort: orders.created_at  (cost=0.35 rows=1) (actual time=0.00358..0.00358 rows=0 loops=1)\n    -> Index lookup on orders using idx_orders_user_id (user_id=1)  (cost=0.35 rows=1) (actual time=0.00246..0.00246 rows=0 loops=1)\n",
     "warnings": [],
     "schema": {
         "orders": {

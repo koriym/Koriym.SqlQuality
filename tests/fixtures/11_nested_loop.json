@@ -67,7 +67,7 @@
             ]
         }
     },
-    "explain_analyze": "-> Nested loop inner join  (cost=277 rows=501) (actual time=0.203..0.203 rows=0 loops=1)\n    -> Filter: (users.email = 'example@example.com')  (cost=102 rows=100) (actual time=0.203..0.203 rows=0 loops=1)\n        -> Table scan on users  (cost=102 rows=1000) (actual time=0.00979..0.165 rows=1000 loops=1)\n    -> Index lookup on posts using idx_posts_user_id (user_id=users.id)  (cost=1.26 rows=5.01) (never executed)\n",
+    "explain_analyze": "-> Nested loop inner join  (cost=277 rows=501) (actual time=0.208..0.208 rows=0 loops=1)\n    -> Filter: (users.email = 'example@example.com')  (cost=102 rows=100) (actual time=0.208..0.208 rows=0 loops=1)\n        -> Table scan on users  (cost=102 rows=1000) (actual time=0.011..0.171 rows=1000 loops=1)\n    -> Index lookup on posts using idx_posts_user_id (user_id=users.id)  (cost=1.26 rows=5.01) (never executed)\n",
     "warnings": [],
     "schema": {
         "posts": {

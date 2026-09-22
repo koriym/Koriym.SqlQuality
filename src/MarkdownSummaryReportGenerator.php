@@ -9,6 +9,7 @@ use Override;
 
 use function abs;
 use function array_column;
+use function array_unique;
 use function file_put_contents;
 use function implode;
 use function is_dir;
@@ -246,7 +247,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
     /** @param list<DetectedWarning> $issues */
     private function formatIssues(array $issues): string
     {
-        return empty($issues) ? '-' : implode(', ', array_column($issues, 'type'));
+        return empty($issues) ? '-' : implode(', ', array_unique(array_column($issues, 'type')));
     }
 
     private function formatReport(string $mainAnalysis, string $optimizerImpact, array $stats): string

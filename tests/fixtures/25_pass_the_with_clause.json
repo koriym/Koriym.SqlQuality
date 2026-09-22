@@ -77,7 +77,7 @@
             ]
         }
     },
-    "explain_analyze": "-> Nested loop inner join  (cost=2829 rows=7848) (actual time=0.0211..5.58 rows=7975 loops=1)\n    -> Covering index lookup on users using idx_users_status_created (status='active')  (cost=82.5 rows=800) (actual time=0.0139..0.183 rows=800 loops=1)\n    -> Index lookup on comments using user_id (user_id=users.id)  (cost=2.45 rows=9.81) (actual time=0.00105..0.00624 rows=9.97 loops=800)\n",
+    "explain_analyze": "-> Nested loop inner join  (cost=2829 rows=7848) (actual time=0.0193..5.42 rows=7975 loops=1)\n    -> Covering index lookup on users using idx_users_status_created (status='active')  (cost=82.5 rows=800) (actual time=0.013..0.177 rows=800 loops=1)\n    -> Index lookup on comments using user_id (user_id=users.id)  (cost=2.45 rows=9.81) (actual time=0.00101..0.00603 rows=9.97 loops=800)\n",
     "warnings": [],
     "schema": {
         "users": {

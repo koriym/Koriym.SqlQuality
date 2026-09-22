@@ -45,7 +45,7 @@
             }
         }
     },
-    "explain_analyze": "-> Limit: 10 row(s)  (cost=273 rows=10) (actual time=0.00625..0.0183 rows=10 loops=1)\n    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=273 rows=2478) (actual time=0.006..0.0177 rows=10 loops=1)\n",
+    "explain_analyze": "-> Limit: 10 row(s)  (cost=273 rows=10) (actual time=0.00629..0.018 rows=10 loops=1)\n    -> Index lookup on posts using idx_posts_status_created (status='published') (reverse)  (cost=273 rows=2478) (actual time=0.00596..0.0172 rows=10 loops=1)\n",
     "warnings": [],
     "schema": {
         "posts": {

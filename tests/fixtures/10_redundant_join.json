@@ -119,7 +119,7 @@
             ]
         }
     },
-    "explain_analyze": "-> Index lookup on u using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.0912..0.644 rows=800 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: count(0)  (cost=0.718 rows=1) (actual time=0.00141..0.00143 rows=1 loops=800)\n        -> Covering index lookup on orders using idx_orders_user_id (user_id=u.id)  (cost=0.484 rows=2.34) (actual time=990e-6..0.00123 rows=2.02 loops=800)\n-> Select #3 (subquery in projection; dependent)\n    -> Aggregate: count(0)  (cost=2.21 rows=1) (actual time=0.00239..0.00242 rows=1 loops=800)\n        -> Covering index lookup on comments using user_id (user_id=u.id)  (cost=1.23 rows=9.81) (actual time=0.00134..0.00202 rows=9.97 loops=800)\n",
+    "explain_analyze": "-> Index lookup on u using idx_users_status_created (status='active')  (cost=85.2 rows=800) (actual time=0.0848..0.633 rows=800 loops=1)\n-> Select #2 (subquery in projection; dependent)\n    -> Aggregate: count(0)  (cost=0.718 rows=1) (actual time=0.00141..0.00143 rows=1 loops=800)\n        -> Covering index lookup on orders using idx_orders_user_id (user_id=u.id)  (cost=0.484 rows=2.34) (actual time=992e-6..0.00123 rows=2.02 loops=800)\n-> Select #3 (subquery in projection; dependent)\n    -> Aggregate: count(0)  (cost=2.21 rows=1) (actual time=0.00246..0.00248 rows=1 loops=800)\n        -> Covering index lookup on comments using user_id (user_id=u.id)  (cost=1.23 rows=9.81) (actual time=0.00141..0.00209 rows=9.97 loops=800)\n",
     "warnings": [],
     "schema": {
         "orders": {

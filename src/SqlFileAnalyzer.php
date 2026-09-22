@@ -35,11 +35,9 @@ use const PATHINFO_FILENAME;
 /**
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
  * @psalm-import-type AnalysisRun from Types
  * @psalm-import-type AnalysisWithSettingsResult from Types
- * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
  */
@@ -150,18 +148,40 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
-     * @return ExplainWithSql
+     * @throws RuntimeException
+     */
+    public function queryContext(string $sqlFile, array $params): QueryContext
+    {
+        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params);
+    }
+
+    /**
+     * @param array<string, mixed> $params
      *
      * @throws RuntimeException
      */
-    private function executeExplain(string $sql, array $params, bool $executeAnalyze): array
+    private function buildQueryContext(string $sql, array $params): QueryContext
     {
         if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
             throw new RuntimeException('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+        $explain = $this->executeExplain($interpolatedSql);
+        $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
+        $warnings = $this->getWarnings();
+        $schema = $this->getSchemaInfo($sql);
 
+        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema);
+    }
+
+    /**
+     * @return ExplainResult
+     *
+     * @throws RuntimeException
+     */
+    private function executeExplain(string $interpolatedSql): array
+    {
         // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
@@ -193,10 +213,12 @@ final class SqlFileAnalyzer
         }
 
         /** @var ExplainResult $explainJsonData */
-        if (! $executeAnalyze) {
-            return [$explainJsonData, 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)'];
-        }
+        return $explainJsonData;
+    }
 
+    /** @throws RuntimeException */
+    private function executeExplainAnalyze(string $interpolatedSql): string
+    {
         /** @var array|false $analyzeResult */
         $analyzeResult = $this->readOnlySession->run(function () use ($interpolatedSql): mixed {
             $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
@@ -210,7 +232,7 @@ final class SqlFileAnalyzer
             throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
         }
 
-        return [$explainJsonData, $analyzeResult[0]];
+        return (string) $analyzeResult[0];
     }
 
     /**
@@ -345,30 +367,18 @@ final class SqlFileAnalyzer
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
         $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
-        /** @var ExplainResult $explainResult */
-        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params, $executed);
-        /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
-        $warnings = $this->getWarnings();
-        /** @var array<string, SchemaInfo> $schemaInfo */
-        $schemaInfo = $this->getSchemaInfo($sql);
-        $context = new QueryContext(
-            $this->interpolateQuery($sql, $params),
-            $explainResult,
-            $executed ? $explainAnalyze : null,
-            $warnings,
-            $schemaInfo,
-        );
+        $context = $this->buildQueryContext($sql, $params);
         $issues = $this->analyzer->analyze($context);
-        $cost = $this->calculateCost($explainResult);
+        $cost = $this->calculateCost($context->explain);
 
         $aiPrompt = $this->aiAdvisor->generatePrompt(
             $sqlFile,
             $sql,
-            $explainResult,
-            $explainAnalyze,
-            $warnings,
+            $context->explain,
+            $context->explainAnalyze ?? 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)',
+            $context->warnings,
             $issues,
-            $schemaInfo,
+            $context->schema,
         );
 
         return [
@@ -376,7 +386,7 @@ final class SqlFileAnalyzer
             'executed' => $executed,
             'skipped_reason' => $skippedReason,
             'issues' => $issues,
-            'explain_result' => $explainResult,
+            'explain_result' => $context->explain,
             'ai_suggestions' => $aiPrompt,
             'cost' => $cost,
             'execution_time' => $executionTime,
