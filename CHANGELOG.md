@@ -19,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `analyzeSQLFiles()` and `analyze()` no longer take an output directory
 - `--format=markdown` requires `--output`
 - `FullTableScan` and `IneffectiveJoin` are reported as `Critical`
+- `FullTableScanDetector` excludes internal temp tables (`<derived2>`, `<union1,2>`), reports `Info` below 100 rows examined, and suggests an index or review based on the attached condition
 - `DetectorInterface::detect()` takes a `QueryContext` and returns a list of `Finding` instead of a bool
 - Detected issues carry `detector`, `evidence` and `suggestion`; a detector reports each matching table separately
 - `ExplainAnalyzer::analyze()` takes a `QueryContext` instead of the EXPLAIN array
