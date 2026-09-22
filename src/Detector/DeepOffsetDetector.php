@@ -19,7 +19,6 @@ final class DeepOffsetDetector implements DetectorInterface
     private const MIN_OFFSET = 1000;
     private const CRITICAL_OFFSET = 100000;
 
-    // Matches both LIMIT forms; preg_match returns the leftmost occurrence, so subqueries earlier in the SQL win.
     private const LIMIT_OFFSET_PATTERN = '/LIMIT\s+(?:(\d+)\s*,\s*(\d+)|(\d+)\s+OFFSET\s+(\d+))/i';
 
     #[Override]
