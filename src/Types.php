@@ -176,6 +176,27 @@ namespace Koriym\SqlQuality;
  *   results: array<string, AnalysisResult>,
  *   skipped: array<string, string>
  * }
+ * @psalm-type JsonReportQuery = array{
+ *   mode: 'wd',
+ *   executed: bool,
+ *   skipped_reason: string|null,
+ *   cost: float,
+ *   execution_time_ms: float|null,
+ *   issues: list<DetectedWarning>,
+ *   optimizer_impact: array{cost_reduction_percent: float}
+ * }
+ * @psalm-type JsonReport = array{
+ *   summary: array{
+ *     total_queries: int,
+ *     analyzed: int,
+ *     skipped: int,
+ *     avg_cost: float,
+ *     total_issues: int,
+ *     issues_by_severity: array<WarningSeverity, int>
+ *   },
+ *   queries: array<string, JsonReportQuery>,
+ *   skipped: array<string, string>
+ * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,
  *   avg_cost: float,

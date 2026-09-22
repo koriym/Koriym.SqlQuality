@@ -63,6 +63,7 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```bash
 sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
 sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --output=build/sql-quality
+sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
 sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
 sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 ```
@@ -77,8 +78,19 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 | `--user=USER` | データベースユーザー | `root` |
 | `--password=PASS` | データベースパスワード | （空） |
 | `--format=FORMAT` | 出力フォーマット: `json`または`markdown` | `json` |
-| `--output=DIR` | Markdownレポートの出力ディレクトリ | |
+| `--output=DIR` | Markdownレポートの出力ディレクトリ（`--format=markdown`には必須） | |
+| `--fail-on=LEVEL` | `critical`・`warning`・`info`のいずれかを指定し、その水準以上の問題があれば1で終わる | なし |
 | `--lang=LANG` | メッセージの言語: `en`または`ja` | `en` |
+
+### 終了コード
+
+| コード | 意味 |
+|------|---------|
+| `0` | `--fail-on`の水準に達した問題がない |
+| `1` | `--fail-on`の水準に達した問題がある |
+| `2` | 使い方・データベース接続・パラメータファイルの誤り |
+
+分析できなかったファイルは終了コードを変えません。JSON出力の`skipped`に、ファイル名と理由が並びます。
 
 ## Claude Code Skills
 

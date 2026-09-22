@@ -241,6 +241,7 @@ final class ExplainAnalyzer
     private static function getSeverity(string $warningType): string
     {
         return match ($warningType) {
+            'FullTableScan', 'IneffectiveJoin' => 'Critical',
             'LowCardinalityIndex', 'UnnecessaryDistinct' => 'Info',
             default => 'Warning',
         };

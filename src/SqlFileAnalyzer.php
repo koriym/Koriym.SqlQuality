@@ -79,7 +79,18 @@ final class SqlFileAnalyzer
     public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
     {
         $results = $this->analyzeSQLFiles($sqlParams)['results'];
+        $this->saveReports($results, $outputDir);
 
+        return $results;
+    }
+
+    /**
+     * @param array<string, AnalysisResult> $results
+     *
+     * @throws RuntimeException
+     */
+    public function saveReports(array $results, string $outputDir): void
+    {
         $statistics = new QueryStatisticsCalculator();
         $statistics->calculate($results);
 
@@ -91,8 +102,6 @@ final class SqlFileAnalyzer
         }
 
         $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
-
-        return $results;
     }
 
     /**
