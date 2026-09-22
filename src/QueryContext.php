@@ -57,6 +57,12 @@ final class QueryContext
         return (new ExplainWalker())->tableAccesses($this->explain['query_block']);
     }
 
+    /** @return list<list<ExplainTable>> tables of each nested_loop in member order */
+    public function nestedLoops(): array
+    {
+        return (new ExplainWalker())->nestedLoops($this->explain['query_block']);
+    }
+
     /** @return list<ShowWarning> */
     public function warningsWithCode(int $code): array
     {

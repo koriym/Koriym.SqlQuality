@@ -6,6 +6,9 @@ namespace Koriym\SqlQuality;
 
 use PHPUnit\Framework\TestCase;
 
+use function array_column;
+use function array_map;
+
 final class ExplainWalkerTest extends TestCase
 {
     public function testCollectsTablesFromNestedLoopOrderingGroupingAndSubqueries(): void
@@ -45,6 +48,36 @@ final class ExplainWalkerTest extends TestCase
         $this->assertContains('ordering_operation', $accesses[1]['path']);
         $this->assertContains('grouping_operation', $accesses[2]['path']);
         $this->assertContains('select_list_subqueries', $accesses[3]['path']);
+    }
+
+    public function testNestedLoopsGroupTablesByLoopInMemberOrder(): void
+    {
+        $loops = (new ExplainWalker())->nestedLoops([
+            'query_block' => [
+                'nested_loop' => [
+                    ['table' => ['table_name' => 'users', 'access_type' => 'ALL']],
+                    ['table' => ['table_name' => 'posts', 'access_type' => 'ref']],
+                ],
+                'select_list_subqueries' => [
+                    [
+                        'query_block' => [
+                            'nested_loop' => [
+                                ['table' => ['table_name' => 'comments', 'access_type' => 'ref']],
+                                ['table' => ['table_name' => 'orders', 'access_type' => 'eq_ref']],
+                            ],
+                        ],
+                    ],
+                ],
+                'ordering_operation' => [
+                    'table' => ['table_name' => 'tags', 'access_type' => 'index'],
+                ],
+            ],
+        ]);
+
+        $this->assertSame([['users', 'posts'], ['comments', 'orders']], array_map(
+            static fn (array $loop): array => array_column($loop, 'table_name'),
+            $loops,
+        ));
     }
 
     public function testContainsFindsRecursiveKeyValuePair(): void

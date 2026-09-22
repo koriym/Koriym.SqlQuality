@@ -10,12 +10,8 @@ use Override;
 
 use function array_flip;
 use function array_intersect_key;
-use function array_map;
 use function array_slice;
-use function count;
-use function implode;
 use function in_array;
-use function is_int;
 use function preg_match_all;
 
 use const PREG_SET_ORDER;
@@ -31,18 +27,8 @@ final class IneffectiveJoinDetector implements DetectorInterface
     #[Override]
     public function detect(QueryContext $context): array
     {
-        $joinGroups = [];
-        foreach ($context->tableAccesses() as $access) {
-            $groupKey = $this->nestedLoopGroupKey($access['path']);
-            if ($groupKey === null) {
-                continue;
-            }
-
-            $joinGroups[$groupKey][] = $access['table'];
-        }
-
         $findings = [];
-        foreach ($joinGroups as $members) {
+        foreach ($context->nestedLoops() as $members) {
             // The first member drives the loop; its full scan belongs to FullTableScanDetector.
             foreach (array_slice($members, 1) as $table) {
                 if (! $this->isIneffectiveJoin($table)) {
@@ -57,33 +43,6 @@ final class IneffectiveJoinDetector implements DetectorInterface
         }
 
         return $findings;
-    }
-
-    /**
-     * @param list<array-key> $path
-     *
-     * @psalm-pure
-     */
-    private function nestedLoopGroupKey(array $path): string|null
-    {
-        if (count($path) < 3) {
-            return null;
-        }
-
-        $tableOffset = count($path) - 1;
-        $memberOffset = count($path) - 2;
-        $nestedLoopOffset = count($path) - 3;
-        if (
-            $path[$nestedLoopOffset] !== 'nested_loop' ||
-            ! is_int($path[$memberOffset]) ||
-            $path[$tableOffset] !== 'table'
-        ) {
-            return null;
-        }
-
-        $groupPath = array_slice($path, 0, $nestedLoopOffset + 1);
-
-        return implode("\0", array_map(static fn (int|string $part): string => (string) $part, $groupPath));
     }
 
     /** @param ExplainTable $table */

@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 use function array_column;
 use function array_keys;
+use function array_map;
 
 final class QueryContextTest extends TestCase
 {
@@ -17,6 +18,16 @@ final class QueryContextTest extends TestCase
 
         $this->assertSame(['p', 'c'], array_column($context->tables(), 'table_name'));
         $this->assertSame(['grouping_operation', 'nested_loop', 0, 'table'], $context->tableAccesses()[0]['path']);
+    }
+
+    public function testNestedLoopsListTablesOfEachLoopInMemberOrder(): void
+    {
+        $context = Fixture::load('4_no_index_on_join.sql');
+
+        $this->assertSame([['p', 'c']], array_map(
+            static fn (array $loop): array => array_column($loop, 'table_name'),
+            $context->nestedLoops(),
+        ));
     }
 
     public function testWarningsWithCodeFiltersByCode(): void

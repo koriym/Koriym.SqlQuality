@@ -8,19 +8,13 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function array_map;
 use function array_slice;
-use function array_values;
-use function count;
-use function implode;
-use function is_int;
 use function preg_match;
 use function preg_quote;
 
 /**
  * @psalm-immutable
  * @psalm-import-type ExplainTable from Types
- * @psalm-import-type ExplainTableAccess from Types
  */
 final class CartesianProductDetector implements DetectorInterface
 {
@@ -30,65 +24,22 @@ final class CartesianProductDetector implements DetectorInterface
     public function detect(QueryContext $context): array
     {
         $findings = [];
-        foreach ($this->nestedLoopGroups($context) as $group) {
-            foreach ($group as $offset => $access) {
-                if ($offset === 0 || ! $this->isCartesianProduct($access['table'], $group, $offset)) {
+        foreach ($context->nestedLoops() as $group) {
+            foreach ($group as $offset => $table) {
+                if ($offset === 0 || ! $this->isCartesianProduct($table, $group, $offset)) {
                     continue;
                 }
 
-                $findings[] = $this->finding($access['table'], $group, $offset);
+                $findings[] = $this->finding($table, $group, $offset);
             }
         }
 
         return $findings;
     }
 
-    /** @return list<list<ExplainTableAccess>> grouped in nested_loop member order */
-    private function nestedLoopGroups(QueryContext $context): array
-    {
-        $groups = [];
-        foreach ($context->tableAccesses() as $access) {
-            $key = $this->nestedLoopGroupKey($access['path']);
-            if ($key === null) {
-                continue;
-            }
-
-            $groups[$key][] = $access;
-        }
-
-        return array_values($groups);
-    }
-
     /**
-     * @param list<array-key> $path
-     *
-     * @psalm-pure
-     */
-    private function nestedLoopGroupKey(array $path): string|null
-    {
-        if (count($path) < 3) {
-            return null;
-        }
-
-        $tableOffset = count($path) - 1;
-        $memberOffset = count($path) - 2;
-        $nestedLoopOffset = count($path) - 3;
-        if (
-            $path[$nestedLoopOffset] !== 'nested_loop' ||
-            ! is_int($path[$memberOffset]) ||
-            $path[$tableOffset] !== 'table'
-        ) {
-            return null;
-        }
-
-        $groupPath = array_slice($path, 0, $nestedLoopOffset + 1);
-
-        return implode("\0", array_map(static fn (int|string $part): string => (string) $part, $groupPath));
-    }
-
-    /**
-     * @param ExplainTable             $table
-     * @param list<ExplainTableAccess> $group
+     * @param ExplainTable       $table
+     * @param list<ExplainTable> $group
      */
     private function isCartesianProduct(array $table, array $group, int $offset): bool
     {
@@ -114,8 +65,8 @@ final class CartesianProductDetector implements DetectorInterface
      * nested loop, so a match against a preceding alias is enough to rule out
      * a Cartesian product (a later alias could never appear here).
      *
-     * @param ExplainTable             $table
-     * @param list<ExplainTableAccess> $group
+     * @param ExplainTable       $table
+     * @param list<ExplainTable> $group
      */
     private function attachedConditionReferencesPreceding(array $table, array $group, int $offset): bool
     {
@@ -134,23 +85,23 @@ final class CartesianProductDetector implements DetectorInterface
     }
 
     /**
-     * @param list<ExplainTableAccess> $group
+     * @param list<ExplainTable> $group
      *
      * @return list<string>
      */
     private function precedingTables(array $group, int $offset): array
     {
         $tables = [];
-        foreach (array_slice($group, 0, $offset) as $access) {
-            $tables[] = $access['table']['table_name'];
+        foreach (array_slice($group, 0, $offset) as $member) {
+            $tables[] = $member['table_name'];
         }
 
         return $tables;
     }
 
     /**
-     * @param ExplainTable             $table
-     * @param list<ExplainTableAccess> $group
+     * @param ExplainTable       $table
+     * @param list<ExplainTable> $group
      */
     private function finding(array $table, array $group, int $offset): Finding
     {

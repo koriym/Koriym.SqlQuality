@@ -4,7 +4,13 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function array_map;
+use function array_slice;
+use function array_values;
+use function count;
+use function implode;
 use function is_array;
+use function is_int;
 
 /**
  * Traverses MySQL EXPLAIN FORMAT=JSON structures.
@@ -48,6 +54,28 @@ final class ExplainWalker
         }
 
         return $tables;
+    }
+
+    /**
+     * @param ExplainNode $explainResult
+     *
+     * @return list<list<ExplainTable>> tables of each nested_loop in member order
+     *
+     * @psalm-mutation-free
+     */
+    public function nestedLoops(array $explainResult): array
+    {
+        $loops = [];
+        foreach ($this->tableAccesses($explainResult) as $access) {
+            $key = $this->nestedLoopKey($access['path']);
+            if ($key === null) {
+                continue;
+            }
+
+            $loops[$key][] = $access['table'];
+        }
+
+        return array_values($loops);
     }
 
     /**
@@ -132,5 +160,22 @@ final class ExplainWalker
         }
 
         return $accesses;
+    }
+
+    /**
+     * @param list<array-key> $path
+     *
+     * @return string|null the nested_loop a path of the form [..., 'nested_loop', int, 'table'] belongs to
+     *
+     * @psalm-mutation-free
+     */
+    private function nestedLoopKey(array $path): string|null
+    {
+        $depth = count($path);
+        if ($depth < 3 || $path[$depth - 3] !== 'nested_loop' || ! is_int($path[$depth - 2]) || $path[$depth - 1] !== 'table') {
+            return null;
+        }
+
+        return implode("\0", array_map(static fn (int|string $part): string => (string) $part, array_slice($path, 0, $depth - 2)));
     }
 }
