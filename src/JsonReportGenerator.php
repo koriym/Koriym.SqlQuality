@@ -45,7 +45,7 @@ final class JsonReportGenerator
                 'execution_time_ms' => $result['executed'] ? $result['execution_time'] * 1000 : null,
                 'issues' => $result['issues'],
                 'optimizer_impact' => [
-                    'cost_reduction_percent' => round(-$result['optimizer_comparison']['difference']['cost_percent'], 2),
+                    'cost_reduction_percent' => self::costReductionPercent($result['optimizer_comparison']['difference']['cost_percent']),
                 ],
             ];
         }
@@ -65,5 +65,17 @@ final class JsonReportGenerator
             'queries' => $queries === [] ? new stdClass() : $queries,
             'skipped' => $run['skipped'] === [] ? new stdClass() : $run['skipped'],
         ];
+    }
+
+    /**
+     * A reduction is reported positive; cost_percent is default-minus-no-optimizer, so it is negated.
+     * round() of a value that negates to zero produces float -0.0, which json_encode() renders as the
+     * literal "-0" — not wrong, but confusing in a report read by humans and AI; normalized to 0.0 here.
+     */
+    public static function costReductionPercent(float $costPercentDifference): float
+    {
+        $percent = round(-$costPercentDifference, 2);
+
+        return $percent === -0.0 ? 0.0 : $percent;
     }
 }
