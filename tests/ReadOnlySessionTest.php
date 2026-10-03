@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -34,6 +35,19 @@ final class ReadOnlySessionTest extends MySqlTestCase
         }
 
         $this->assertSame('0', $this->scalar($pdo, 'SELECT COUNT(*) FROM users WHERE id = ' . self::PROBE_ID));
+    }
+
+    public function testRunRejectsAnAlreadyOpenTransaction(): void
+    {
+        $pdo = $this->connect();
+        $pdo->beginTransaction();
+
+        try {
+            $this->expectException(ActiveTransactionRejected::class);
+            (new ReadOnlySession($pdo))->run(static fn (): string => 'unreachable');
+        } finally {
+            $pdo->rollBack();
+        }
     }
 
     public function testRunAllowsSelect(): void
