@@ -23,6 +23,7 @@ use function json_decode;
 use function json_encode;
 use function preg_match;
 use function round;
+use function str_ends_with;
 use function str_starts_with;
 
 use const JSON_PRETTY_PRINT;
@@ -422,8 +423,12 @@ USAGE;
     /** @param array<array-key, mixed> $decoded */
     private function isKeyedBySqlFile(array $decoded): bool
     {
-        foreach ($decoded as $value) {
-            if (! is_array($value)) {
+        if ($decoded === []) {
+            return false;
+        }
+
+        foreach ($decoded as $key => $value) {
+            if (! is_string($key) || ! str_ends_with($key, '.sql') || ! is_array($value)) {
                 return false;
             }
         }

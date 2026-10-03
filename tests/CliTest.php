@@ -99,6 +99,28 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('--output', $stderr);
     }
 
+    public function testExplainWithFlatListParamsFileInterpolatesTheList(): void
+    {
+        $this->connect();
+
+        $paramsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_flat_params_', true) . '.php';
+        file_put_contents($paramsFile, "<?php\nreturn ['listed_params' => ['Alice', 'Bob']];\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/15_listed_parameters.sql',
+            '--params=' . $paramsFile,
+        ]);
+
+        unlink($paramsFile);
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+
+        $report = json_decode($stdout, true);
+        $this->assertIsArray($report);
+        $this->assertStringContainsString("IN ('Alice','Bob')", $report['sql']);
+    }
+
     /**
      * @param list<string> $args
      *
@@ -112,6 +134,28 @@ final class CliTest extends MySqlTestCase
         }
 
         $process = proc_open(array_merge($command, $args), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if ($process === false) {
+            $this->fail('Failed to start the CLI');
+        }
+
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [proc_close($process), $stdout, $stderr];
+    }
+
+    /**
+     * @param list<string> $args
+     *
+     * @return array{0: int, 1: string, 2: string}
+     */
+    private function runExplainCli(array $args): array
+    {
+        $command = array_merge([PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality', 'explain'], $args);
+
+        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if ($process === false) {
             $this->fail('Failed to start the CLI');
         }
