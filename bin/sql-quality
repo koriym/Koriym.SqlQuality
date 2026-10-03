@@ -247,6 +247,14 @@ USAGE;
             return 2;
         }
 
+        foreach ($sqlParams as $sqlFile => $params) {
+            if (! is_string($sqlFile) || ! is_array($params)) {
+                fwrite(STDERR, "Error: Params file entry for '{$sqlFile}' must map a SQL file name to an array: {$paramsFile}\n");
+
+                return 2;
+            }
+        }
+
         $messages = $lang === 'ja' ? self::MESSAGES_JA : self::MESSAGES_EN;
         $instruction = $lang === 'ja'
             ? '以上の分析を日本語で記述してください。'
