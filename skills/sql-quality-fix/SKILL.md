@@ -63,7 +63,8 @@ For each suggested index:
 
 3. **Evaluate impact**
    - Compare `cost` against the file's cost before this index, and check
-     whether `context.explain`'s `access_type` / `key` now show the new
+     whether the table node under `context.explain.query_block.table` (or
+     `nested_loop[*].table`)'s `access_type` / `key` now show the new
      index being used
    - Cost improved ≥ 5% → Keep index
    - Cost not improved → Rollback
