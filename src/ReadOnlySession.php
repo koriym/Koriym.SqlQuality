@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\ReadOnlySessionUnavailable;
 use PDO;
+use Throwable;
 
 final class ReadOnlySession
 {
@@ -25,10 +26,25 @@ final class ReadOnlySession
         $saved = $this->readOnlyFlag();
         $this->pdo->exec('SET SESSION TRANSACTION READ ONLY');
 
+        $original = null;
+
         try {
             return $fn();
+        } catch (Throwable $e) {
+            $original = $e;
+
+            throw $e;
         } finally {
-            $this->pdo->exec('SET SESSION transaction_read_only = ' . $saved);
+            try {
+                $this->pdo->exec('SET SESSION transaction_read_only = ' . $saved);
+            } catch (Throwable $restoreError) {
+                if ($original === null) {
+                    throw $restoreError;
+                }
+
+                // $fn() already failed; a restore failure here is secondary and must not
+                // replace the original exception the caller is already handling.
+            }
         }
     }
 

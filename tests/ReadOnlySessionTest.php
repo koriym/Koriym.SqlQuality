@@ -6,6 +6,8 @@ namespace Koriym\SqlQuality;
 
 use PDO;
 use PDOException;
+use PDOStatement;
+use RuntimeException;
 
 use function count;
 
@@ -67,6 +69,58 @@ final class ReadOnlySessionTest extends MySqlTestCase
         } catch (PDOException) {
             $this->assertSame($flag, $this->scalar($pdo, 'SELECT @@session.transaction_read_only'));
         }
+    }
+
+    public function testOriginalExceptionPropagatesWhenRestoreFails(): void
+    {
+        $statement = $this->createMock(PDOStatement::class);
+        $statement->method('fetchColumn')->willReturn('0');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->method('query')->willReturn($statement);
+
+        $execCalls = 0;
+        $pdo->method('exec')->willReturnCallback(static function () use (&$execCalls): int {
+            $execCalls++;
+            if ($execCalls === 2) {
+                throw new PDOException('restore failed');
+            }
+
+            return 0;
+        });
+
+        try {
+            (new ReadOnlySession($pdo))->run(static function (): never {
+                throw new RuntimeException('original failure');
+            });
+            $this->fail('Expected exception was not thrown');
+        } catch (RuntimeException $e) {
+            $this->assertSame('original failure', $e->getMessage());
+        }
+    }
+
+    public function testRestoreFailurePropagatesWhenThereIsNoOriginalException(): void
+    {
+        $statement = $this->createMock(PDOStatement::class);
+        $statement->method('fetchColumn')->willReturn('0');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->method('query')->willReturn($statement);
+
+        $execCalls = 0;
+        $pdo->method('exec')->willReturnCallback(static function () use (&$execCalls): int {
+            $execCalls++;
+            if ($execCalls === 2) {
+                throw new PDOException('restore failed');
+            }
+
+            return 0;
+        });
+
+        $this->expectException(PDOException::class);
+        $this->expectExceptionMessage('restore failed');
+
+        (new ReadOnlySession($pdo))->run(static fn (): string => 'returned');
     }
 
     private function scalar(PDO $pdo, string $sql): string
