@@ -51,6 +51,14 @@ final class FunctionInvalidatesIndexDetectorTest extends TestCase
         $this->assertSame([], (new FunctionInvalidatesIndexDetector())->detect(Fixture::load('9_inefficient_in_query.sql')));
     }
 
+    public function testDedupesRepeatedFunctionCallsOnTheSameColumn(): void
+    {
+        $findings = (new FunctionInvalidatesIndexDetector())->detect(self::condition("((cast(`test`.`posts`.`created_at` as date) = '2024-01-01') or (cast(`test`.`posts`.`created_at` as date) = '2024-01-02'))"));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('created_at', $findings[0]->evidence['column']);
+    }
+
     private static function condition(string $attachedCondition): QueryContext
     {
         return new QueryContext(
