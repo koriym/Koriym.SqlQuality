@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use PHPUnit\Framework\TestCase;
+use stdClass;
+
+use function json_decode;
+use function json_encode;
+
+use const JSON_THROW_ON_ERROR;
 
 final class JsonReportGeneratorTest extends TestCase
 {
@@ -23,6 +29,19 @@ final class JsonReportGeneratorTest extends TestCase
         $this->assertSame(1, $report['summary']['skipped']);
         $this->assertSame(300.0, $report['summary']['avg_cost']);
         $this->assertSame(['14_not_found.sql' => 'SQL file not found: /tmp/14_not_found.sql'], $report['skipped']);
+    }
+
+    public function testEmptyQueriesAndSkippedSerializeAsJsonObjects(): void
+    {
+        $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([], []));
+
+        $this->assertInstanceOf(stdClass::class, $report['queries']);
+        $this->assertInstanceOf(stdClass::class, $report['skipped']);
+
+        $decoded = json_decode(json_encode($report, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertInstanceOf(stdClass::class, $decoded->queries);
+        $this->assertInstanceOf(stdClass::class, $decoded->skipped);
     }
 
     public function testAvgCostIsZeroWhenEveryQueryIsSkipped(): void
