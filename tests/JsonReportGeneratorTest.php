@@ -103,4 +103,16 @@ final class JsonReportGeneratorTest extends TestCase
 
         $this->assertSame(-10.0, $query['optimizer_impact']['cost_reduction_percent']);
     }
+
+    public function testCostReductionPercentIsPositiveZeroNotNegativeZeroWhenCostIsUnchanged(): void
+    {
+        $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
+            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592, 0.0),
+        ]));
+
+        $query = $report['queries']['1_full_table_scan.sql'];
+
+        $this->assertSame(0.0, $query['optimizer_impact']['cost_reduction_percent']);
+        $this->assertStringNotContainsString('-0', json_encode($query['optimizer_impact'], JSON_THROW_ON_ERROR));
+    }
 }
