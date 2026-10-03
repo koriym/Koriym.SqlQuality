@@ -44,12 +44,10 @@ final class ReadOnlySession
             try {
                 $this->pdo->exec('SET SESSION ' . $this->variableName . ' = ' . $saved);
             } catch (Throwable $restoreError) {
+                // A failed restore must not mask the exception $fn() threw.
                 if ($original === null) {
                     throw $restoreError;
                 }
-
-                // $fn() already failed; a restore failure here is secondary and must not
-                // replace the original exception the caller is already handling.
             }
         }
     }
