@@ -5,6 +5,12 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use PHPUnit\Framework\TestCase;
+use stdClass;
+
+use function json_decode;
+use function json_encode;
+
+use const JSON_THROW_ON_ERROR;
 
 final class JsonReportGeneratorTest extends TestCase
 {
@@ -23,6 +29,19 @@ final class JsonReportGeneratorTest extends TestCase
         $this->assertSame(1, $report['summary']['skipped']);
         $this->assertSame(300.0, $report['summary']['avg_cost']);
         $this->assertSame(['14_not_found.sql' => 'SQL file not found: /tmp/14_not_found.sql'], $report['skipped']);
+    }
+
+    public function testEmptyQueriesAndSkippedSerializeAsJsonObjects(): void
+    {
+        $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([], []));
+
+        $this->assertInstanceOf(stdClass::class, $report['queries']);
+        $this->assertInstanceOf(stdClass::class, $report['skipped']);
+
+        $decoded = json_decode(json_encode($report, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
+
+        $this->assertInstanceOf(stdClass::class, $decoded->queries);
+        $this->assertInstanceOf(stdClass::class, $decoded->skipped);
     }
 
     public function testAvgCostIsZeroWhenEveryQueryIsSkipped(): void
@@ -71,6 +90,17 @@ final class JsonReportGeneratorTest extends TestCase
         $query = $report['queries']['1_full_table_scan.sql'];
 
         $this->assertSame(5.92, $query['execution_time_ms']);
-        $this->assertSame(-44.91, $query['optimizer_impact']['cost_reduction_percent']);
+        $this->assertSame(44.91, $query['optimizer_impact']['cost_reduction_percent']);
+    }
+
+    public function testCostReductionPercentIsNegativeWhenOptimizerCostIncreases(): void
+    {
+        $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
+            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592, 10.0),
+        ]));
+
+        $query = $report['queries']['1_full_table_scan.sql'];
+
+        $this->assertSame(-10.0, $query['optimizer_impact']['cost_reduction_percent']);
     }
 }

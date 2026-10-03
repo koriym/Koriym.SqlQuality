@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use stdClass;
+
 use function count;
 use function round;
 
@@ -43,7 +45,7 @@ final class JsonReportGenerator
                 'execution_time_ms' => $result['executed'] ? $result['execution_time'] * 1000 : null,
                 'issues' => $result['issues'],
                 'optimizer_impact' => [
-                    'cost_reduction_percent' => round($result['optimizer_comparison']['difference']['cost_percent'], 2),
+                    'cost_reduction_percent' => round(-$result['optimizer_comparison']['difference']['cost_percent'], 2),
                 ],
             ];
         }
@@ -60,8 +62,8 @@ final class JsonReportGenerator
                 'total_issues' => $totalIssues,
                 'issues_by_severity' => $issuesBySeverity,
             ],
-            'queries' => $queries,
-            'skipped' => $run['skipped'],
+            'queries' => $queries === [] ? new stdClass() : $queries,
+            'skipped' => $run['skipped'] === [] ? new stdClass() : $run['skipped'],
         ];
     }
 }

@@ -8,12 +8,14 @@ namespace Koriym\SqlQuality;
 use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 use PDO;
 use PDOException;
+use RuntimeException;
 
 use function array_slice;
 use function count;
 use function file_exists;
 use function fwrite;
 use function in_array;
+use function ini_set;
 use function is_array;
 use function is_string;
 use function json_encode;
@@ -25,6 +27,9 @@ use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
 use const STDERR;
 use const STDOUT;
+
+// Warnings and fatal errors must never land on stdout: that stream is reserved for the JSON report.
+ini_set('display_errors', 'stderr');
 
 // Find autoloader
 $autoloadPaths = [
@@ -156,7 +161,13 @@ USAGE;
         // Parse options manually from argv
         $options = $this->parseOptions(array_slice($argv, 2));
 
-        return $this->analyze($options);
+        try {
+            return $this->analyze($options);
+        } catch (RuntimeException $e) {
+            fwrite(STDERR, "Error: {$e->getMessage()}\n");
+
+            return 2;
+        }
     }
 
     /**
@@ -201,6 +212,12 @@ USAGE;
         }
 
         $format = (string) ($options['format'] ?? 'json');
+        if ($format !== 'json' && $format !== 'markdown') {
+            fwrite(STDERR, "Error: --format accepts json or markdown, not: {$format}\n");
+
+            return 2;
+        }
+
         $outputDir = $options['output'] ?? null;
         if ($format === 'markdown' && ! is_string($outputDir)) {
             fwrite(STDERR, "Error: --output=DIR is required with --format=markdown.\n");
@@ -238,6 +255,14 @@ USAGE;
             fwrite(STDERR, "Error: Params file must return an array: {$paramsFile}\n");
 
             return 2;
+        }
+
+        foreach ($sqlParams as $sqlFile => $params) {
+            if (! is_string($sqlFile) || ! is_array($params)) {
+                fwrite(STDERR, "Error: Params file entry for '{$sqlFile}' must map a SQL file name to an array: {$paramsFile}\n");
+
+                return 2;
+            }
         }
 
         $messages = $lang === 'ja' ? self::MESSAGES_JA : self::MESSAGES_EN;
