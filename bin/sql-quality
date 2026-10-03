@@ -9,6 +9,7 @@ use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 use PDOException;
+use stdClass;
 
 use function array_slice;
 use function basename;
@@ -309,6 +310,11 @@ USAGE;
 
         $exitCode = $threshold !== null && $threshold->isMetBy(['results' => [$sqlFileName => $result], 'skipped' => []]) ? 1 : 0;
 
+        // context.schema is an associative array keyed by table name; a table-free query leaves it
+        // empty, and json_encode() would emit [] there instead of the {} the schema requires.
+        $contextData = $context->toArray();
+        $contextData['schema'] = $contextData['schema'] === [] ? new stdClass() : $contextData['schema'];
+
         $report = [
             'file' => $sqlFileName,
             'sql' => $context->sql,
@@ -318,7 +324,7 @@ USAGE;
             'execution_time_ms' => $result['executed'] ? $result['execution_time'] * 1000 : null,
             'issues' => $result['issues'],
             'optimizer_impact' => ['cost_reduction_percent' => round($result['optimizer_comparison']['difference']['cost_percent'], 2)],
-            'context' => $context->toArray(),
+            'context' => $contextData,
         ];
 
         fwrite(STDOUT, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
