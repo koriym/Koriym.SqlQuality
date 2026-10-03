@@ -30,7 +30,12 @@ Exit 2 means the run failed (usage, connection or params file) — stop there.
 
 Total cost is the sum of `queries[].cost`; the report itself carries only
 `summary.avg_cost`. Files in `skipped` have no cost and stay out of every
-total, so each step compares the same set of queries. Record as baseline.
+total, so each step compares the same set of queries. Record as baseline,
+including the set of analyzed file names (the keys of `queries`). If a later
+step's analyzed file names differ from the baseline — for example because a
+fix made a query become `skipped` — the comparison is invalid: stop and
+report instead of computing an improvement, since a query dropping out would
+fake one.
 
 ### Step 1: Fix SQL Files
 
