@@ -6,7 +6,6 @@ namespace Koriym\SqlQuality;
 
 use PDO;
 use PDOException;
-use PDOStatement;
 use RuntimeException;
 
 use function count;
@@ -74,21 +73,18 @@ final class ReadOnlySessionTest extends MySqlTestCase
 
     public function testOriginalExceptionPropagatesWhenRestoreFails(): void
     {
-        $statement = $this->createMock(PDOStatement::class);
-        $statement->method('fetchColumn')->willReturn('0');
-
-        $pdo = $this->createMock(PDO::class);
-        $pdo->method('query')->willReturn($statement);
-
         $execCalls = 0;
-        $pdo->method('exec')->willReturnCallback(static function () use (&$execCalls): int {
-            $execCalls++;
-            if ($execCalls === 2) {
-                throw new PDOException('restore failed');
-            }
+        $pdo = new FakePdo(
+            query: static fn (): FakeStatement => new FakeStatement('0'),
+            exec: static function () use (&$execCalls): int {
+                $execCalls++;
+                if ($execCalls === 2) {
+                    throw new PDOException('restore failed');
+                }
 
-            return 0;
-        });
+                return 0;
+            },
+        );
 
         try {
             (new ReadOnlySession($pdo))->run(static function (): never {
@@ -102,21 +98,18 @@ final class ReadOnlySessionTest extends MySqlTestCase
 
     public function testRestoreFailurePropagatesWhenThereIsNoOriginalException(): void
     {
-        $statement = $this->createMock(PDOStatement::class);
-        $statement->method('fetchColumn')->willReturn('0');
-
-        $pdo = $this->createMock(PDO::class);
-        $pdo->method('query')->willReturn($statement);
-
         $execCalls = 0;
-        $pdo->method('exec')->willReturnCallback(static function () use (&$execCalls): int {
-            $execCalls++;
-            if ($execCalls === 2) {
-                throw new PDOException('restore failed');
-            }
+        $pdo = new FakePdo(
+            query: static fn (): FakeStatement => new FakeStatement('0'),
+            exec: static function () use (&$execCalls): int {
+                $execCalls++;
+                if ($execCalls === 2) {
+                    throw new PDOException('restore failed');
+                }
 
-            return 0;
-        });
+                return 0;
+            },
+        );
 
         $this->expectException(PDOException::class);
         $this->expectExceptionMessage('restore failed');
@@ -126,24 +119,21 @@ final class ReadOnlySessionTest extends MySqlTestCase
 
     public function testFallsBackToTxReadOnlyWhenTransactionReadOnlyIsUnavailable(): void
     {
-        $statement = $this->createMock(PDOStatement::class);
-        $statement->method('fetchColumn')->willReturn('0');
-
-        $pdo = $this->createMock(PDO::class);
-        $pdo->method('query')->willReturnCallback(static function (string $sql) use ($statement) {
-            if (str_contains($sql, 'tx_read_only')) {
-                return $statement;
-            }
-
-            throw new PDOException("Unknown system variable 'transaction_read_only'");
-        });
-
         $execCalls = [];
-        $pdo->method('exec')->willReturnCallback(static function (string $sql) use (&$execCalls): int {
-            $execCalls[] = $sql;
+        $pdo = new FakePdo(
+            query: static function (string $sql): FakeStatement {
+                if (str_contains($sql, 'tx_read_only')) {
+                    return new FakeStatement('0');
+                }
 
-            return 0;
-        });
+                throw new PDOException("Unknown system variable 'transaction_read_only'");
+            },
+            exec: static function (string $sql) use (&$execCalls): int {
+                $execCalls[] = $sql;
+
+                return 0;
+            },
+        );
 
         $returned = (new ReadOnlySession($pdo))->run(static fn (): string => 'returned');
 
