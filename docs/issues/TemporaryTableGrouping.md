@@ -1,6 +1,6 @@
 ---
 title: "一時テーブルを必要とするグループ化"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "一時テーブルを必要とする非効率なグループ化操作を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # TemporaryTableGrouping
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: 一時テーブルを必要とする非効率なグループ化操作を検出します
 

@@ -9,6 +9,7 @@ use Koriym\SqlQuality\Types;
 use Override;
 
 use function array_slice;
+use function in_array;
 use function preg_match;
 use function preg_quote;
 
@@ -45,7 +46,20 @@ final class CartesianProductDetector implements DetectorInterface
     {
         return $this->refIsMissingOrConst($table)
             && ! $this->attachedConditionReferencesPreceding($table, $group, $offset)
-            && $table['access_type'] !== 'eq_ref';
+            && ! in_array($table['access_type'], ['eq_ref', 'const', 'system'], true)
+            && ! $this->allPrecedingAreConstOrSystem($group, $offset);
+    }
+
+    /** @param list<ExplainTable> $group */
+    private function allPrecedingAreConstOrSystem(array $group, int $offset): bool
+    {
+        foreach (array_slice($group, 0, $offset) as $member) {
+            if (! in_array($member['access_type'], ['const', 'system'], true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /** @param ExplainTable $table */

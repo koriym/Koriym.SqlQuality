@@ -152,14 +152,65 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('PDOException: SQLSTATE', $stderr);
     }
 
+    public function testUnwritableOutputDirExitsWithTwo(): void
+    {
+        $this->connect();
+
+        $blocker = sys_get_temp_dir() . '/' . uniqid('sqlquality_blocker_', true);
+        file_put_contents($blocker, '');
+
+        try {
+            [$exitCode, $stdout, $stderr] = $this->runCli(['--format=markdown', '--output=' . $blocker . '/sub']);
+
+            $this->assertSame(2, $exitCode);
+            $this->assertSame('', $stdout);
+            $this->assertStringContainsString('Failed to create directory', $stderr);
+        } finally {
+            unlink($blocker);
+        }
+    }
+
+    public function testUnsupportedFormatExitsWithTwo(): void
+    {
+        [$exitCode, $stdout, $stderr] = $this->runCli(['--format=yaml']);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('--format', $stderr);
+    }
+
+    public function testInvalidParamsEntryExitsWithTwo(): void
+    {
+        $this->connect();
+
+        $badParamsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_badparams_', true) . '.php';
+        file_put_contents($badParamsFile, <<<'PARAMS'
+        <?php
+
+        return [
+            'query.sql' => 'invalid',
+        ];
+        PARAMS);
+
+        try {
+            [$exitCode, $stdout, $stderr] = $this->runCli(['--format=json'], true, $badParamsFile);
+
+            $this->assertSame(2, $exitCode);
+            $this->assertSame('', $stdout);
+            $this->assertStringContainsString('query.sql', $stderr);
+        } finally {
+            unlink($badParamsFile);
+        }
+    }
+
     /**
      * @param list<string> $args
      *
      * @return array{0: int, 1: string, 2: string}
      */
-    private function runCli(array $args, bool $withSqlDir = true): array
+    private function runCli(array $args, bool $withSqlDir = true, string|null $paramsFile = null): array
     {
-        $command = [PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality', 'analyze', '--params=' . $this->paramsFile];
+        $command = [PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality', 'analyze', '--params=' . ($paramsFile ?? $this->paramsFile)];
         if ($withSqlDir) {
             $command[] = '--sql-dir=' . __DIR__ . '/sql';
         }

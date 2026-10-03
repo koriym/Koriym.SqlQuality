@@ -32,12 +32,18 @@ final class FunctionInvalidatesIndexDetector implements DetectorInterface
             }
 
             $condition = $table['attached_condition'];
+            $reported = [];
             foreach (ConditionColumns::inAnyBranch($condition, $table['table_name'])['functionWrapped'] as $match) {
+                if (isset($reported[$match['column']])) {
+                    continue;
+                }
+
                 $indexes = $this->indexesContaining($context, $table['table_name'], $match['column']);
                 if ($indexes === []) {
                     continue;
                 }
 
+                $reported[$match['column']] = true;
                 $findings[] = new Finding(
                     evidence: [
                         'table_name' => $table['table_name'],

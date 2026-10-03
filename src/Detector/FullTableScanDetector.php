@@ -24,7 +24,7 @@ final class FullTableScanDetector implements DetectorInterface
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if ($table['access_type'] !== 'ALL' || str_starts_with($table['table_name'], '<')) {
+            if ($table['access_type'] !== 'ALL' || str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery'])) {
                 continue;
             }
 

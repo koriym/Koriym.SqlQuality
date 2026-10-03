@@ -1,6 +1,6 @@
 ---
 title: "Low Cardinality Index"
-severity: "MEDIUM"
+severity: "LOW"
 category: "Performance"
 description: "カーディナリティの低いカラムへのインデックス使用を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # LowCardinalityIndex
 
 ## 概要
-- 重要度: MEDIUM
+- 重要度: LOW
 - カテゴリ: Performance
 - 説明: 選択性の低いインデックスを使用することで、テーブルの大部分をスキャンする非効率な状態を検出します
 

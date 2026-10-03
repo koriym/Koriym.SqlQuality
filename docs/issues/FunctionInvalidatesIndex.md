@@ -1,6 +1,6 @@
 ---
 title: "関数によるインデックス無効化"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "関数使用によりインデックスが無効化される状況を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # FunctionInvalidatesIndex
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: インデックス列に対する関数の使用によりインデックスが無効化される状況を検出します
 

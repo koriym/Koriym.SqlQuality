@@ -45,12 +45,18 @@ final class ImplicitTypeConversionDetectorTest extends TestCase
         $this->assertSame(self::REF_ACCESS_WARNING, $findings[0]->evidence['warning']);
     }
 
-    public function testReportsAnInListAndABetweenOfNumbers(): void
+    public function testReportsAnInListOfNumbersButNotAnEnumBetween(): void
     {
         $findings = (new ImplicitTypeConversionDetector())->detect(self::comparison('((`test`.`orders`.`reference_code` in (1,2)) and (`test`.`orders`.`status` between 1 and 9))'));
 
-        $this->assertSame(['reference_code', 'status'], [$findings[0]->evidence['column'], $findings[1]->evidence['column']]);
+        $this->assertCount(1, $findings);
+        $this->assertSame('reference_code', $findings[0]->evidence['column']);
         $this->assertStringContainsString("('1','2')", $findings[0]->suggestion['description'] ?? '');
+    }
+
+    public function testIgnoresAnEnumColumnComparedWithANumber(): void
+    {
+        $this->assertSame([], (new ImplicitTypeConversionDetector())->detect(self::comparison('(`test`.`orders`.`status` = 1)')));
     }
 
     public function testReportsEachBranchOfAnOr(): void

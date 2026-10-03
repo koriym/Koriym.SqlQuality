@@ -145,12 +145,16 @@ final class DependentSubqueryDetector implements DetectorInterface
     private function warning(QueryContext $context, int|null $selectId): string|null
     {
         $messages = array_column($context->warningsWithCode(1276), 'Message');
+        if ($selectId === null) {
+            return $messages[0] ?? null;
+        }
+
         foreach ($messages as $message) {
-            if ($selectId !== null && str_contains($message, "of SELECT #{$selectId} ")) {
+            if (str_contains($message, "of SELECT #{$selectId} ")) {
                 return $message;
             }
         }
 
-        return $messages[0] ?? null;
+        return null;
     }
 }

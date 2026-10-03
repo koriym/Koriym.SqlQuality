@@ -1,6 +1,6 @@
 ---
 title: "非効率なLIKE検索パターン"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "インデックスを使用できないLIKE検索パターンを検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # IneffectiveLikePattern
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: インデックスを使用できないLIKE検索パターンを検出します
 

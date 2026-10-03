@@ -33,6 +33,11 @@ final class FullTableScanDetectorTest extends TestCase
         $this->assertSame([], $findings);
     }
 
+    public function testExcludesAnAliasedMaterializedDerivedTable(): void
+    {
+        $this->assertSame([], (new FullTableScanDetector())->detect(Fixture::load('32_materialized_derived.sql')));
+    }
+
     public function testSuggestsAnIndexWhenTheAttachedConditionNamesAnUnindexedColumn(): void
     {
         $findings = (new FullTableScanDetector())->detect(Fixture::load('1_full_table_scan.sql'));

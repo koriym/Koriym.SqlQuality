@@ -1,6 +1,6 @@
 ---
 title: "非効率なソート操作"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "インデックスを使用しない非効率なソート操作を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # IneffectiveSort
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: インデックスを使用しない、または非効率なソート操作を検出します
 

@@ -56,4 +56,6 @@ return [
         'limit' => 10,
     ],
     '30_order_by_rand.sql' => ['status' => 'published'],
+    '31_const_join.sql' => ['post_id' => 5],
+    '32_materialized_derived.sql' => ['min_count' => 3],
 ];

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use stdClass;
+
 /**
  * @psalm-type ExplainCostInfo = array{
  *   query_cost?: float,
@@ -31,7 +33,8 @@ namespace Koriym\SqlQuality;
  *   using_filesort?: bool,
  *   using_index?: bool,
  *   update?: bool,
- *   used_columns?: list<string>
+ *   used_columns?: list<string>,
+ *   materialized_from_subquery?: array<string, mixed>
  * }
  * @psalm-type DuplicatesRemovalOperation = array{
  *   using_temporary_table?: bool,
@@ -217,8 +220,8 @@ namespace Koriym\SqlQuality;
  *     total_issues: int,
  *     issues_by_severity: array<WarningSeverity, int>
  *   },
- *   queries: array<string, JsonReportQuery>,
- *   skipped: array<string, string>
+ *   queries: array<string, JsonReportQuery>|stdClass,
+ *   skipped: array<string, string>|stdClass
  * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,

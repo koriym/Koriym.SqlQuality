@@ -25,7 +25,7 @@ final class IneffectiveRangeScanDetector implements DetectorInterface
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if (str_starts_with($table['table_name'], '<') || ! $this->isIneffective($table)) {
+            if (str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery']) || ! $this->isIneffective($table)) {
                 continue;
             }
 

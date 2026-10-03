@@ -1,0 +1,302 @@
+{
+    "sql": "-- Problem: A const-propagated join key is not a Cartesian product\nSELECT u.id, u.name, p.title\nFROM posts p\nJOIN users u ON u.id = p.user_id\nWHERE p.id = 5;\n",
+    "explain": {
+        "query_block": {
+            "select_id": 1,
+            "cost_info": {
+                "query_cost": "1.00"
+            },
+            "nested_loop": [
+                {
+                    "table": {
+                        "table_name": "p",
+                        "access_type": "const",
+                        "possible_keys": [
+                            "PRIMARY",
+                            "idx_posts_user_id",
+                            "idx_posts_user_status"
+                        ],
+                        "key": "PRIMARY",
+                        "used_key_parts": [
+                            "id"
+                        ],
+                        "key_length": "4",
+                        "ref": [
+                            "const"
+                        ],
+                        "rows_examined_per_scan": 1,
+                        "rows_produced_per_join": 1,
+                        "filtered": "100.00",
+                        "cost_info": {
+                            "read_cost": "0.00",
+                            "eval_cost": "0.10",
+                            "prefix_cost": "0.00",
+                            "data_read_per_join": "1K"
+                        },
+                        "used_columns": [
+                            "id",
+                            "user_id",
+                            "title"
+                        ]
+                    }
+                },
+                {
+                    "table": {
+                        "table_name": "u",
+                        "access_type": "const",
+                        "possible_keys": [
+                            "PRIMARY",
+                            "idx_users_id"
+                        ],
+                        "key": "PRIMARY",
+                        "used_key_parts": [
+                            "id"
+                        ],
+                        "key_length": "4",
+                        "ref": [
+                            "const"
+                        ],
+                        "rows_examined_per_scan": 1,
+                        "rows_produced_per_join": 1,
+                        "filtered": "100.00",
+                        "cost_info": {
+                            "read_cost": "0.00",
+                            "eval_cost": "0.10",
+                            "prefix_cost": "0.00",
+                            "data_read_per_join": "2K"
+                        },
+                        "used_columns": [
+                            "id",
+                            "name"
+                        ]
+                    }
+                }
+            ]
+        }
+    },
+    "explain_analyze": "-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=167e-6..250e-6 rows=1 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select '542' AS `id`,'User 542' AS `name`,'Post Title 5' AS `title` from `test`.`posts` `p` join `test`.`users` `u` where true"
+        }
+    ],
+    "schema": {
+        "posts": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "user_id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "title",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "content",
+                    "DATA_TYPE": "text",
+                    "COLUMN_TYPE": "text",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": "draft",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "view_count",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_posts_status_created",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 3
+                },
+                {
+                    "INDEX_NAME": "idx_posts_status_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 1145
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_id",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 995
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_status",
+                    "COLUMN_NAME": "user_id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 995
+                },
+                {
+                    "INDEX_NAME": "idx_posts_user_status",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 1428
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 4952
+                }
+            ],
+            "status": {
+                "table_rows": 4952,
+                "data_length": 540672,
+                "index_length": 524288,
+                "auto_increment": null,
+                "create_time": "2026-09-26 20:09:48",
+                "update_time": "2026-09-26 20:09:50"
+            }
+        },
+        "users": {
+            "columns": [
+                {
+                    "COLUMN_NAME": "id",
+                    "DATA_TYPE": "int",
+                    "COLUMN_TYPE": "int",
+                    "IS_NULLABLE": "NO",
+                    "COLUMN_KEY": "PRI",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "name",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "email",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(255)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": null,
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "status",
+                    "DATA_TYPE": "varchar",
+                    "COLUMN_TYPE": "varchar(20)",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "MUL",
+                    "COLUMN_DEFAULT": "active",
+                    "EXTRA": ""
+                },
+                {
+                    "COLUMN_NAME": "created_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED"
+                },
+                {
+                    "COLUMN_NAME": "updated_at",
+                    "DATA_TYPE": "datetime",
+                    "COLUMN_TYPE": "datetime",
+                    "IS_NULLABLE": "YES",
+                    "COLUMN_KEY": "",
+                    "COLUMN_DEFAULT": "CURRENT_TIMESTAMP",
+                    "EXTRA": "DEFAULT_GENERATED on update CURRENT_TIMESTAMP"
+                }
+            ],
+            "indexes": [
+                {
+                    "INDEX_NAME": "idx_users_id",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 1000
+                },
+                {
+                    "INDEX_NAME": "idx_users_status_created",
+                    "COLUMN_NAME": "status",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 3
+                },
+                {
+                    "INDEX_NAME": "idx_users_status_created",
+                    "COLUMN_NAME": "created_at",
+                    "NON_UNIQUE": 1,
+                    "SEQ_IN_INDEX": 2,
+                    "CARDINALITY": 487
+                },
+                {
+                    "INDEX_NAME": "PRIMARY",
+                    "COLUMN_NAME": "id",
+                    "NON_UNIQUE": 0,
+                    "SEQ_IN_INDEX": 1,
+                    "CARDINALITY": 1000
+                }
+            ],
+            "status": {
+                "table_rows": 1000,
+                "data_length": 114688,
+                "index_length": 65536,
+                "auto_increment": null,
+                "create_time": "2026-09-26 20:09:48",
+                "update_time": "2026-09-26 20:09:49"
+            }
+        }
+    }
+}
