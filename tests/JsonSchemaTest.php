@@ -14,8 +14,6 @@ use function fclose;
 use function file_get_contents;
 use function file_put_contents;
 use function implode;
-use function is_array;
-use function is_object;
 use function json_decode;
 use function json_encode;
 use function mkdir;
@@ -145,7 +143,7 @@ final class JsonSchemaTest extends MySqlTestCase
         rmdir($sqlDir);
 
         $this->assertSame(0, $exitCode);
-        $this->skipIfProducerStillEmitsArrayFor($stdout, 'queries');
+        $this->assertIsObject(json_decode($stdout)->queries, 'queries must serialize as {} when every file is skipped, not []');
         $this->assertValidJsonAgainstSchema($stdout, 'analyze-report.schema.json');
     }
 
@@ -170,21 +168,10 @@ final class JsonSchemaTest extends MySqlTestCase
         rmdir($sqlDir);
 
         $this->assertSame(0, $exitCode);
-        $this->skipIfProducerStillEmitsArrayFor($stdout, 'queries');
-        $this->skipIfProducerStillEmitsArrayFor($stdout, 'skipped');
+        $decoded = json_decode($stdout);
+        $this->assertIsObject($decoded->queries, 'queries must serialize as {} over an empty sql-dir, not []');
+        $this->assertIsObject($decoded->skipped, 'skipped must serialize as {} over an empty sql-dir, not []');
         $this->assertValidJsonAgainstSchema($stdout, 'analyze-report.schema.json');
-    }
-
-    /**
-     * JsonReportGenerator (agent-ready-1) still emits [] for an empty map until its own CodeRabbit fix
-     * lands and is merged up; skip rather than fail so this test turns green automatically once it does.
-     */
-    private function skipIfProducerStillEmitsArrayFor(string $json, string $key): void
-    {
-        $data = json_decode($json);
-        if (is_object($data) && isset($data->{$key}) && is_array($data->{$key}) && $data->{$key} === []) {
-            self::markTestSkipped("needs JsonReportGenerator empty-map cast from agent-ready-1 ({$key})");
-        }
     }
 
     private function assertValidJsonAgainstSchema(string $json, string $schemaFile): void
