@@ -155,7 +155,7 @@ final class IneffectiveSortDetector implements DetectorInterface
     /** @return list<string> ORDER BY columns that exist on the table; [] unless the statement has exactly one ORDER BY */
     private function orderByColumns(QueryContext $context, string $aliasOrTable): array
     {
-        if (preg_match_all('/\bORDER\s+BY\s+(?<list>.+?)(?=\s+LIMIT\b|\s*[;)]|\s*$)/is', $context->sql, $matches) !== 1) {
+        if (preg_match_all('/\bORDER\s+BY\s+(?<list>.+?)(?=\s+LIMIT\b|\s*[;)]|\s*$)/is', $context->sqlWithoutComments(), $matches) !== 1) {
             return [];
         }
 

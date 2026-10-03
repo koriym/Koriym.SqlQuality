@@ -34,6 +34,20 @@ final class IneffectiveSortDetectorTest extends TestCase
         $this->assertStringContainsString('orders (created_at)', $findings[0]->suggestion['description'] ?? '');
     }
 
+    public function testUsesTheRealOrderByNotAMentionInAComment(): void
+    {
+        $findings = (new IneffectiveSortDetector())->detect(new QueryContext(
+            sql: "-- Sort users by ORDER BY name for display\nSELECT * FROM posts WHERE status = 'published' ORDER BY created_at",
+            explain: ['query_block' => ['select_id' => 1, 'ordering_operation' => ['using_filesort' => true, 'table' => ['table_name' => 'posts', 'access_type' => 'ALL', 'rows_examined_per_scan' => 2000]]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: ['posts' => ['columns' => [['COLUMN_NAME' => 'created_at', 'DATA_TYPE' => 'datetime']], 'indexes' => []]],
+        ));
+
+        $this->assertCount(1, $findings);
+        $this->assertStringContainsString('posts (created_at)', $findings[0]->suggestion['description'] ?? '');
+    }
+
     public function testNamesAnExistingIndexTheOptimizerDidNotUse(): void
     {
         $findings = (new IneffectiveSortDetector())->detect(Fixture::load('9_inefficient_in_query.sql'));

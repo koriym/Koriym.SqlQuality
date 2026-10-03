@@ -9,7 +9,6 @@ use function explode;
 use function ksort;
 use function preg_match;
 use function preg_match_all;
-use function preg_replace;
 use function strtolower;
 use function trim;
 
@@ -98,10 +97,16 @@ final class QueryContext
         return $columns;
     }
 
+    /** @return string the statement with line (--) and block comments removed */
+    public function sqlWithoutComments(): string
+    {
+        return SqlSafetyClassifier::stripComments($this->sql);
+    }
+
     /** @return array<string, string> alias => table name; a table without alias maps to itself. Derived tables are not included */
     public function aliases(): array
     {
-        $sql = (string) preg_replace('/--.*$/m', '', $this->sql);
+        $sql = $this->sqlWithoutComments();
         preg_match_all(self::TABLE_REFERENCE_LIST, $sql, $matches, PREG_SET_ORDER);
 
         $aliases = [];

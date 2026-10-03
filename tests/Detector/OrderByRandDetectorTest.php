@@ -33,6 +33,17 @@ final class OrderByRandDetectorTest extends TestCase
         )));
     }
 
+    public function testIgnoresOrderByRandMentionedOnlyInAComment(): void
+    {
+        $this->assertSame([], (new OrderByRandDetector())->detect(new QueryContext(
+            sql: "-- Problem: ORDER BY RAND() was considered and rejected here\nSELECT * FROM posts ORDER BY created_at DESC LIMIT 5",
+            explain: ['query_block' => ['select_id' => 1]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        )));
+    }
+
     public function testRowsExaminedAtCriticalThresholdIsCritical(): void
     {
         $findings = (new OrderByRandDetector())->detect(new QueryContext(

@@ -19,12 +19,12 @@ final class DeepOffsetDetector implements DetectorInterface
     private const MIN_OFFSET = 1000;
     private const CRITICAL_OFFSET = 100000;
 
-    private const LIMIT_OFFSET_PATTERN = '/LIMIT\s+(?:(\d+)\s*,\s*(\d+)|(\d+)\s+OFFSET\s+(\d+))/i';
+    private const LIMIT_OFFSET_PATTERN = '/\bLIMIT\s+(?:(\d+)\s*,\s*(\d+)|(\d+)\s+OFFSET\s+(\d+))/i';
 
     #[Override]
     public function detect(QueryContext $context): array
     {
-        $offsetLimit = $this->offsetAndLimit($context->sql);
+        $offsetLimit = $this->offsetAndLimit($context->sqlWithoutComments());
         if ($offsetLimit === null || $offsetLimit['offset'] < self::MIN_OFFSET) {
             return [];
         }

@@ -22,7 +22,7 @@ final class OrderByRandDetector implements DetectorInterface
     #[Override]
     public function detect(QueryContext $context): array
     {
-        if (preg_match(self::ORDER_BY_RAND_PATTERN, $context->sql) !== 1) {
+        if (preg_match(self::ORDER_BY_RAND_PATTERN, $context->sqlWithoutComments()) !== 1) {
             return [];
         }
 
