@@ -66,7 +66,26 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
         );
 
         $this->expectException(NotExplainable::class);
+        $this->expectExceptionMessage('DDL statement is not explainable in WD mode');
 
         $analyzer->analyze('ddl.sql', []);
+    }
+
+    public function testAnalyzeSqlFilesPrefixesSkippedReasonWithExceptionClassNameAndClassifierReason(): void
+    {
+        $this->tempSqlDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_safety_', true);
+        mkdir($this->tempSqlDir);
+        file_put_contents($this->tempSqlDir . '/ddl.sql', 'CREATE TABLE users (id INT PRIMARY KEY)');
+
+        $analyzer = new SqlFileAnalyzer(
+            new PDO('sqlite::memory:'),
+            new ExplainAnalyzer(),
+            $this->tempSqlDir,
+            new AIQueryAdvisor(''),
+        );
+
+        $run = $analyzer->analyzeSQLFiles(['ddl.sql' => []]);
+
+        $this->assertSame('NotExplainable: DDL statement is not explainable in WD mode', $run['skipped']['ddl.sql']);
     }
 }

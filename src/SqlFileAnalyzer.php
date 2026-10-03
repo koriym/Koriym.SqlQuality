@@ -33,6 +33,8 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function sort;
+use function strrpos;
+use function substr;
 use function var_export;
 
 use const PATHINFO_FILENAME;
@@ -120,11 +122,20 @@ final class SqlFileAnalyzer
             try {
                 $results[$sqlFile] = $this->analyze($sqlFile, $params);
             } catch (\RuntimeException $e) {
-                $skipped[$sqlFile] = $e->getMessage();
+                $skipped[$sqlFile] = self::exceptionLabel($e) . ': ' . $e->getMessage();
             }
         }
 
         return ['results' => $results, 'skipped' => $skipped];
+    }
+
+    /** short class name, so a skipped-file reason or stderr line reads e.g. "NotExplainable: …" rather than a bare message */
+    private static function exceptionLabel(\RuntimeException $e): string
+    {
+        $class = $e::class;
+        $separator = strrpos($class, '\\');
+
+        return $separator === false ? $class : substr($class, $separator + 1);
     }
 
     /** @param ExplainResult $explainResult */
@@ -167,8 +178,9 @@ final class SqlFileAnalyzer
      */
     private function buildQueryContext(string $sql, array $params): QueryContext
     {
-        if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
-            throw new NotExplainable($sql);
+        $classification = $this->sqlSafetyClassifier->classify($sql);
+        if (! $classification['is_explainable']) {
+            throw new NotExplainable($classification['reason']);
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);

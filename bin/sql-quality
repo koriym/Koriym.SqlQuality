@@ -26,6 +26,8 @@ use function preg_match;
 use function round;
 use function str_ends_with;
 use function str_starts_with;
+use function strrpos;
+use function substr;
 
 use const JSON_PRETTY_PRINT;
 use const JSON_UNESCAPED_SLASHES;
@@ -303,7 +305,7 @@ USAGE;
         try {
             ['result' => $result, 'context' => $context] = $analyzer->explain($sqlFileName, $params);
         } catch (RuntimeException | PDOException $e) {
-            fwrite(STDERR, "Error: {$e->getMessage()}\n");
+            fwrite(STDERR, 'Error: ' . self::exceptionLabel($e) . ": {$e->getMessage()}\n");
 
             return 2;
         }
@@ -330,6 +332,15 @@ USAGE;
         fwrite(STDOUT, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
 
         return $exitCode;
+    }
+
+    /** short class name, so stderr reads e.g. "Error: NotExplainable: …" rather than a bare message */
+    private static function exceptionLabel(RuntimeException|PDOException $e): string
+    {
+        $class = $e::class;
+        $separator = strrpos($class, '\\');
+
+        return $separator === false ? $class : substr($class, $separator + 1);
     }
 
     /**

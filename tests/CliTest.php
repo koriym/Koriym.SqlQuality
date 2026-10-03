@@ -121,6 +121,37 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString("IN ('Alice','Bob')", $report['sql']);
     }
 
+    public function testExplainOfDdlStatementExitsWithTwoAndReportsClassifierReason(): void
+    {
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_ddl_', true) . '.sql';
+        file_put_contents($sqlFile, 'CREATE TABLE sqlquality_probe (id INT PRIMARY KEY)');
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('NotExplainable: DDL statement is not explainable in WD mode', $stderr);
+        $this->assertStringNotContainsString('CREATE TABLE', $stderr);
+    }
+
+    public function testExplainOfMissingTableExitsWithTwoAndReportsPdoException(): void
+    {
+        $this->connect();
+
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_missing_table_', true) . '.sql';
+        file_put_contents($sqlFile, 'SELECT * FROM sqlquality_table_that_does_not_exist');
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('PDOException: SQLSTATE', $stderr);
+    }
+
     /**
      * @param list<string> $args
      *
