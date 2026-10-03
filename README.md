@@ -100,9 +100,9 @@ Analyzes one SQL file and prints a single structured JSON report, instead of sca
 |------|---------|
 | `0` | No issue reached the `--fail-on` level |
 | `1` | An issue reached the `--fail-on` level |
-| `2` | Usage, database connection or params file error |
+| `2` | Usage, database connection, params file, or unknown `--format` error; for `explain`, also a query that cannot be explained (e.g. DDL) or that MySQL rejects (e.g. a missing table) |
 
-A file that cannot be analyzed does not change the exit code. It is listed with its reason under `skipped` in the JSON output.
+For `analyze`, a file that cannot be analyzed does not change the exit code — it is listed with its reason under `skipped` in the JSON output. For `explain`, the same kind of failure has no file to skip into, so it exits with code `2` and prints the reason to stderr instead.
 
 ### JSON Schema
 
