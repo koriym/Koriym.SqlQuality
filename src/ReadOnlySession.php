@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\ReadOnlySessionUnavailable;
 use PDO;
 use PDOException;
@@ -29,6 +30,10 @@ final class ReadOnlySession
      */
     public function run(callable $fn): mixed
     {
+        if ($this->pdo->inTransaction()) {
+            throw new ActiveTransactionRejected();
+        }
+
         $saved = $this->readOnlyFlag();
         $this->pdo->exec('SET SESSION TRANSACTION READ ONLY');
 

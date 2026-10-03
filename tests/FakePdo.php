@@ -23,6 +23,11 @@ final class FakePdo extends PDO
         return ($this->query)($query);
     }
 
+    public function inTransaction(): bool
+    {
+        return false;
+    }
+
     public function exec(string $statement): int
     {
         return ($this->exec)($statement);
