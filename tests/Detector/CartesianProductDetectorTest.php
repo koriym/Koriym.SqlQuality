@@ -31,6 +31,11 @@ final class CartesianProductDetectorTest extends TestCase
         $this->assertSame([], (new CartesianProductDetector())->detect(Fixture::load('20_multi_table_update.sql')));
     }
 
+    public function testConstPropagatedJoinKeyIsNotCartesian(): void
+    {
+        $this->assertSame([], (new CartesianProductDetector())->detect(Fixture::load('31_const_join.sql')));
+    }
+
     public function testOnlyMembersWithoutARealJoinConditionAreFlagged(): void
     {
         $findings = (new CartesianProductDetector())->detect(new QueryContext(
