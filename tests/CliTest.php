@@ -121,6 +121,24 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString("IN ('Alice','Bob')", $report['sql']);
     }
 
+    public function testExplainCostReductionPercentIsPositiveZeroNotNegativeZeroWhenCostIsUnchanged(): void
+    {
+        $this->connect();
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/12_select1.sql',
+            '--params={}',
+        ]);
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+
+        $report = json_decode($stdout, true);
+        $this->assertIsArray($report);
+        $this->assertSame(0, $report['optimizer_impact']['cost_reduction_percent']);
+        $this->assertStringNotContainsString('-0', $stdout);
+    }
+
     public function testExplainOfDdlStatementExitsWithTwoAndReportsClassifierReason(): void
     {
         $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_ddl_', true) . '.sql';

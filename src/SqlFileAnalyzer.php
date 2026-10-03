@@ -10,6 +10,7 @@ use Koriym\SqlQuality\Exception\NotReadOnlySelect;
 use Koriym\SqlQuality\Exception\QueryFailed;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
+use Throwable;
 
 use function array_keys;
 use function array_map;
@@ -130,7 +131,7 @@ final class SqlFileAnalyzer
     }
 
     /** short class name, so a skipped-file reason or stderr line reads e.g. "NotExplainable: …" rather than a bare message */
-    private static function exceptionLabel(\RuntimeException $e): string
+    public static function exceptionLabel(Throwable $e): string
     {
         $class = $e::class;
         $separator = strrpos($class, '\\');
