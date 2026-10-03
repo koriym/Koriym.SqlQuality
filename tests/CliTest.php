@@ -99,6 +99,24 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('--output', $stderr);
     }
 
+    public function testUnwritableOutputDirExitsWithTwo(): void
+    {
+        $this->connect();
+
+        $blocker = sys_get_temp_dir() . '/' . uniqid('sqlquality_blocker_', true);
+        file_put_contents($blocker, '');
+
+        try {
+            [$exitCode, $stdout, $stderr] = $this->runCli(['--format=markdown', '--output=' . $blocker . '/sub']);
+
+            $this->assertSame(2, $exitCode);
+            $this->assertSame('', $stdout);
+            $this->assertStringContainsString('Failed to create directory', $stderr);
+        } finally {
+            unlink($blocker);
+        }
+    }
+
     /**
      * @param list<string> $args
      *
