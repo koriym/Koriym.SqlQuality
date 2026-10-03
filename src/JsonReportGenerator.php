@@ -45,7 +45,7 @@ final class JsonReportGenerator
                 'execution_time_ms' => $result['executed'] ? $result['execution_time'] * 1000 : null,
                 'issues' => $result['issues'],
                 'optimizer_impact' => [
-                    'cost_reduction_percent' => round($result['optimizer_comparison']['difference']['cost_percent'], 2),
+                    'cost_reduction_percent' => round(-$result['optimizer_comparison']['difference']['cost_percent'], 2),
                 ],
             ];
         }
