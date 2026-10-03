@@ -19,8 +19,8 @@ use function str_contains;
  */
 final class ImplicitTypeConversionDetector implements DetectorInterface
 {
-    /** information_schema DATA_TYPE values that MySQL converts to a number when compared with a numeric literal */
-    private const STRING_TYPES = ['char', 'varchar', 'text', 'tinytext', 'mediumtext', 'longtext', 'enum', 'set'];
+    /** information_schema DATA_TYPE values that MySQL converts to a number when compared with a numeric literal; enum/set are excluded because MySQL compares them by index/bitmask, not by string value */
+    private const STRING_TYPES = ['char', 'varchar', 'text', 'tinytext', 'mediumtext', 'longtext'];
 
     /** MySQL warning "Cannot use ref access on index ... due to type or collation conversion on field ..." */
     private const REF_ACCESS_LOST = 1739;
