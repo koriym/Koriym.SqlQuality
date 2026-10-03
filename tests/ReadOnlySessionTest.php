@@ -10,6 +10,7 @@ use PDOStatement;
 use RuntimeException;
 
 use function count;
+use function str_contains;
 
 final class ReadOnlySessionTest extends MySqlTestCase
 {
@@ -121,6 +122,33 @@ final class ReadOnlySessionTest extends MySqlTestCase
         $this->expectExceptionMessage('restore failed');
 
         (new ReadOnlySession($pdo))->run(static fn (): string => 'returned');
+    }
+
+    public function testFallsBackToTxReadOnlyWhenTransactionReadOnlyIsUnavailable(): void
+    {
+        $statement = $this->createMock(PDOStatement::class);
+        $statement->method('fetchColumn')->willReturn('0');
+
+        $pdo = $this->createMock(PDO::class);
+        $pdo->method('query')->willReturnCallback(static function (string $sql) use ($statement) {
+            if (str_contains($sql, 'tx_read_only')) {
+                return $statement;
+            }
+
+            throw new PDOException("Unknown system variable 'transaction_read_only'");
+        });
+
+        $execCalls = [];
+        $pdo->method('exec')->willReturnCallback(static function (string $sql) use (&$execCalls): int {
+            $execCalls[] = $sql;
+
+            return 0;
+        });
+
+        $returned = (new ReadOnlySession($pdo))->run(static fn (): string => 'returned');
+
+        $this->assertSame('returned', $returned);
+        $this->assertSame(['SET SESSION TRANSACTION READ ONLY', 'SET SESSION tx_read_only = 0'], $execCalls);
     }
 
     private function scalar(PDO $pdo, string $sql): string
