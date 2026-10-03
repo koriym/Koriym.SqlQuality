@@ -25,6 +25,7 @@ return [
     '2_filesort.sql' => ['LowCardinalityIndex'],
     '30_order_by_rand.sql' => ['IneffectiveSort', 'LowCardinalityIndex', 'OrderByRand'],
     '31_const_join.sql' => [],
+    '32_materialized_derived.sql' => [],
     '3_function_on_indexed_column.sql' => ['FullTableScan', 'FunctionInvalidatesIndex'],
     '4_no_index_on_join.sql' => ['LowCardinalityIndex', 'TemporaryTableGrouping'],
     '5_multiple_wildcard_like.sql' => ['FullTableScan', 'IneffectiveLikePattern'],

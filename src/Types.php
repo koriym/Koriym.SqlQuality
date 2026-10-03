@@ -31,7 +31,8 @@ namespace Koriym\SqlQuality;
  *   using_filesort?: bool,
  *   using_index?: bool,
  *   update?: bool,
- *   used_columns?: list<string>
+ *   used_columns?: list<string>,
+ *   materialized_from_subquery?: array<string, mixed>
  * }
  * @psalm-type DuplicatesRemovalOperation = array{
  *   using_temporary_table?: bool,

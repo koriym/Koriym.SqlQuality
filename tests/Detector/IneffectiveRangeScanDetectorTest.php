@@ -52,6 +52,19 @@ final class IneffectiveRangeScanDetectorTest extends TestCase
         $this->assertSame([], (new IneffectiveRangeScanDetector())->detect(self::scan('range', 2000, 20.0)));
     }
 
+    public function testIgnoresAMaterializedDerivedTable(): void
+    {
+        $context = new QueryContext(
+            sql: '',
+            explain: ['query_block' => ['select_id' => 1, 'table' => ['table_name' => 'd', 'access_type' => 'range', 'possible_keys' => ['idx'], 'key' => 'idx', 'rows_examined_per_scan' => 2000, 'filtered' => 10.0, 'materialized_from_subquery' => ['using_temporary_table' => true]]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        );
+
+        $this->assertSame([], (new IneffectiveRangeScanDetector())->detect($context));
+    }
+
     private static function scan(string $accessType, int $rowsExamined, float $filtered): QueryContext
     {
         return new QueryContext(
