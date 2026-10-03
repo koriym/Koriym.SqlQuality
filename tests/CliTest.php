@@ -117,6 +117,15 @@ final class CliTest extends MySqlTestCase
         }
     }
 
+    public function testUnsupportedFormatExitsWithTwo(): void
+    {
+        [$exitCode, $stdout, $stderr] = $this->runCli(['--format=yaml']);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('--format', $stderr);
+    }
+
     /**
      * @param list<string> $args
      *

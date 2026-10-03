@@ -202,6 +202,12 @@ USAGE;
         }
 
         $format = (string) ($options['format'] ?? 'json');
+        if ($format !== 'json' && $format !== 'markdown') {
+            fwrite(STDERR, "Error: --format accepts json or markdown, not: {$format}\n");
+
+            return 2;
+        }
+
         $outputDir = $options['output'] ?? null;
         if ($format === 'markdown' && ! is_string($outputDir)) {
             fwrite(STDERR, "Error: --output=DIR is required with --format=markdown.\n");
