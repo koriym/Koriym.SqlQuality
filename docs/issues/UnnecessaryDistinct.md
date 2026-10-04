@@ -20,12 +20,11 @@ recommended: true
 {
   "query_block": {
     "ordering_operation": {
-      "duplicates_removal": {
+      "duplicates_removal": {        // DISTINCT の重複除去
         "using_filesort": false,
         "table": {
           "table_name": "orders",
-          "access_type": "ref",
-          "used_columns": ["id", "created_at"]  // idは主キー
+          "access_type": "ref"
         }
       }
     }
@@ -33,10 +32,13 @@ recommended: true
 }
 ```
 
+判定は EXPLAIN と SQL 文と schema で行います。`SELECT DISTINCT` で始まり FROM が単一テーブル（JOIN やカンマ区切りなし）の文で、SELECT リストに主キー（`information_schema` の `COLUMN_KEY = 'PRI'`）の全列が含まれていれば、各行は主キーで既に一意なので DISTINCT は不要です。`*` は全列を含むとみなします。SELECT リストに関数呼び出しがある場合は判定しません。
+
 ### 主な検出条件
-1. SELECT句に主キー（通常は`id`カラム）が含まれている
-2. DISTINCT演算が実行されている（`duplicates_removal`の存在）
-3. 結果セットが本質的にユニークである
+1. SQL が `SELECT DISTINCT` で始まり、FROM が単一テーブルであること
+2. EXPLAIN に `duplicates_removal` があること
+3. SELECT リストに主キーの全列（複合主キーならその全て）が含まれること
+4. 提案は書き換え（`rewrite`）。`DISTINCT` を除いた文を `sql` に含む
 
 ## パフォーマンスへの影響
 
@@ -108,17 +110,12 @@ WHERE u.status = 'active';
 
 ## 無視してよい場合
 
-1. 意図的な重複除去
-    - 非正規化されたデータ
-    - 外部データソース
-
-2. ドキュメント目的
+1. ドキュメント目的
     - 意図を明示するため
     - チーム規約
 
-3. 将来の拡張性
-    - スキーマ変更予定
-    - マイグレーション中
+2. 将来の拡張性
+    - JOIN の追加やスキーマ変更の予定があり、主キーによる一意性が保てなくなる
 
 ## トラブルシューティング
 

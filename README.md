@@ -128,7 +128,7 @@ When you trust this project folder, Claude Code will automatically prompt you to
 ### Features
 
 These AI-powered skills:
-- Detect performance issues (FullTableScan, IneffectiveJoin, etc.)
+- Detect performance issues (FullTableScan, IneffectiveJoin, CartesianProduct, EstimateDivergence, etc.)
 - Rewrite problematic SQL patterns (functions on columns, implicit conversions)
 - Create indexes and measure their impact in real-time
 - Roll back ineffective indexes automatically
@@ -247,7 +247,7 @@ final class FullTableScanDetector implements DetectorInterface
 }
 ```
 
-`QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`) and `schema` (information_schema per table). `tables()`, `tableAccesses()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()` and `primaryKeyColumns()` read them.
+`QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`) and `schema` (information_schema per table). `tables()`, `tableAccesses()`, `nestedLoops()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()` and `primaryKeyColumns()` read them.
 
 `Finding::$evidence` holds the values the detector based its decision on: use the EXPLAIN key names for values taken from the plan, and include `table_name` when the finding is about one table. It is reported as `evidence` on the issue. `severity`, `confidence` and `suggestion` are optional; when set they replace the defaults for the warning type.
 

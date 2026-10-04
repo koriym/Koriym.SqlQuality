@@ -33,7 +33,8 @@ use stdClass;
  *   using_filesort?: bool,
  *   using_index?: bool,
  *   update?: bool,
- *   used_columns?: list<string>
+ *   used_columns?: list<string>,
+ *   materialized_from_subquery?: array<string, mixed>
  * }
  * @psalm-type DuplicatesRemovalOperation = array{
  *   using_temporary_table?: bool,
@@ -76,8 +77,23 @@ use stdClass;
  *   Message: string
  * }
  * @psalm-type ShowWarnings = list<ShowWarning>
+ * @psalm-type AnalyzeNode = array{
+ *   depth: int,
+ *   operation: string,
+ *   estimated_cost: float|null,
+ *   estimated_rows: float|null,
+ *   actual_time_first: float|null,
+ *   actual_time_last: float|null,
+ *   actual_rows: float|null,
+ *   loops: int|null,
+ *   never_executed: bool
+ * }
  * @psalm-type WarningType =
- * 'ExcessiveDerivedTables'
+ * 'CartesianProduct'
+ * | 'DeepOffset'
+ * | 'DependentSubquery'
+ * | 'EstimateDivergence'
+ * | 'ExcessiveDerivedTables'
  * | 'FunctionInvalidatesIndex'
  * | 'FullTableScan'
  * | 'ImplicitTypeConversion'
@@ -88,9 +104,14 @@ use stdClass;
  * | 'IneffectiveUnion'
  * | 'LowCardinalityIndex'
  * | 'MultiTableUpdate'
+ * | 'OrderByRand'
  * | 'TemporaryTableGrouping'
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
+ *   CartesianProduct: string,
+ *   DeepOffset: string,
+ *   DependentSubquery: string,
+ *   EstimateDivergence: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
  *   FullTableScan: string,
@@ -102,6 +123,7 @@ use stdClass;
  *   IneffectiveUnion: string,
  *   LowCardinalityIndex: string,
  *   MultiTableUpdate: string,
+ *   OrderByRand: string,
  *   TemporaryTableGrouping: string,
  *   UnnecessaryDistinct: string
  * }

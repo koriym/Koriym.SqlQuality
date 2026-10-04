@@ -188,7 +188,7 @@ final class SqlSafetyClassifier
     }
 
     /** @psalm-pure */
-    private static function stripComments(string $sql): string
+    public static function stripComments(string $sql): string
     {
         $result = '';
         $quote = null;

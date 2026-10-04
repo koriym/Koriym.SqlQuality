@@ -5,49 +5,44 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\QueryContext;
-use Koriym\SqlQuality\Types;
 use Override;
 
-use function array_flip;
-use function array_intersect_key;
-use function preg_match;
+use function sprintf;
 
-/** @psalm-import-type ExplainTable from Types */
 final class IneffectiveLikePatternDetector implements DetectorInterface
 {
-    /**
-     * 非効率なLIKEパターンを検出します
-     */
+    /** Below this filtered ratio a leading-wildcard LIKE is reported even when the table is not fully scanned */
+    private const MAX_FILTERED = 25.0;
+
     #[Override]
     public function detect(QueryContext $context): array
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if ($this->isIneffectiveLikePattern($table)) {
-                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'access_type', 'filtered', 'attached_condition'])));
+            if (! isset($table['attached_condition'])) {
+                continue;
+            }
+
+            $fullScanOrLowFilter = $table['access_type'] === 'ALL' || (float) ($table['filtered'] ?? 100) < self::MAX_FILTERED;
+            if (! $fullScanOrLowFilter) {
+                continue;
+            }
+
+            foreach (ConditionColumns::inAnyBranch($table['attached_condition'], $table['table_name'])['leadingWildcard'] as $match) {
+                $pattern = (string) $match['literal'];
+                $findings[] = new Finding(
+                    evidence: [
+                        'table_name' => $table['table_name'],
+                        'column' => $match['column'],
+                        'pattern' => $pattern,
+                        'access_type' => $table['access_type'],
+                        'filtered' => $table['filtered'] ?? null,
+                    ],
+                    suggestion: ['kind' => 'review', 'description' => sprintf('LIKE %s on %s.%s cannot use an index because the pattern starts with a wildcard; consider a FULLTEXT index on %s or a prefix match.', $pattern, $table['table_name'], $match['column'], $match['column'])],
+                );
             }
         }
 
         return $findings;
-    }
-
-    /**
-     * テーブル情報から非効率なLIKEパターンを判定します
-     *
-     * @param ExplainTable $table テーブル情報
-     */
-    private function isIneffectiveLikePattern(array $table): bool
-    {
-        // attached_conditionが存在し、%で囲まれたLIKEパターンを含む
-        if (
-            isset($table['attached_condition'])
-            && preg_match("/like\s+['\"]\%.*\%['\"]/i", $table['attached_condition'])
-        ) {
-            // フルテーブルスキャンまたはフィルタリング率が低い場合
-            return ($table['access_type'] ?? '') === 'ALL'
-                || (float) ($table['filtered'] ?? 100) < 25.0;
-        }
-
-        return false;
     }
 }

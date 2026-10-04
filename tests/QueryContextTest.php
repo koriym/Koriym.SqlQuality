@@ -8,6 +8,7 @@ use PHPUnit\Framework\TestCase;
 
 use function array_column;
 use function array_keys;
+use function array_map;
 
 final class QueryContextTest extends TestCase
 {
@@ -17,6 +18,16 @@ final class QueryContextTest extends TestCase
 
         $this->assertSame(['p', 'c'], array_column($context->tables(), 'table_name'));
         $this->assertSame(['grouping_operation', 'nested_loop', 0, 'table'], $context->tableAccesses()[0]['path']);
+    }
+
+    public function testNestedLoopsListTablesOfEachLoopInMemberOrder(): void
+    {
+        $context = Fixture::load('4_no_index_on_join.sql');
+
+        $this->assertSame([['p', 'c']], array_map(
+            static fn (array $loop): array => array_column($loop, 'table_name'),
+            $context->nestedLoops(),
+        ));
     }
 
     public function testWarningsWithCodeFiltersByCode(): void
@@ -45,6 +56,13 @@ final class QueryContextTest extends TestCase
         $this->assertSame(['p' => 'posts', 'c' => 'comments'], Fixture::load('4_no_index_on_join.sql')->aliases());
         $this->assertSame(['posts' => 'posts'], Fixture::load('1_full_table_scan.sql')->aliases());
         $this->assertSame(['p' => 'posts', 'c' => 'comments'], Fixture::load('20_multi_table_update.sql')->aliases());
+    }
+
+    public function testAliasesResolveEveryMemberOfACommaSeparatedFromList(): void
+    {
+        $context = new QueryContext('SELECT * FROM users u, posts p WHERE u.id = p.user_id', ['query_block' => [], 'analyze_result' => []], null, [], []);
+
+        $this->assertSame(['u' => 'users', 'p' => 'posts'], $context->aliases());
     }
 
     public function testAliasesExcludeDerivedTables(): void

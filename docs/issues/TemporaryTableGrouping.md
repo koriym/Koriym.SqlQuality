@@ -1,6 +1,6 @@
 ---
 title: "一時テーブルを必要とするグループ化"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "一時テーブルを必要とする非効率なグループ化操作を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # TemporaryTableGrouping
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: 一時テーブルを必要とする非効率なグループ化操作を検出します
 
@@ -24,13 +24,23 @@ recommended: true
 ```
 {
   "query_block": {
-    "grouping_operation": {
-      "using_temporary_table": true,  -- 一時テーブルの使用
-      "using_filesort": true         -- ファイルソートも必要
+    "ordering_operation": {
+      "using_temporary_table": true,   // 一時テーブルの使用
+      "using_filesort": true,
+      "grouping_operation": {          // 配下に grouping がある ordering、または
+        "nested_loop": [ ... ]         // 一時テーブルを使う grouping_operation 自身が対象
+      }
     }
   }
 }
 ```
+
+`using_temporary_table` が `true` のノードのうち、`grouping_operation` 自身と、配下（同じ query_block 内）に `grouping_operation` を持つ `ordering_operation` を報告します。`union_result`、`duplicates_removal`、`materialized_from_subquery`、配下に grouping の無い `ordering_operation` の一時テーブルは対象外です（それぞれ `IneffectiveUnion`、`UnnecessaryDistinct`、`IneffectiveSort` の領域）。
+
+### 主な検出条件
+1. `using_temporary_table` が `true` であること
+2. そのノードが `grouping_operation` であるか、`grouping_operation` を配下に持つ `ordering_operation` であること
+3. evidence にノードの位置（`path`）、種別（`node`）、配下の表ごとの `rows_examined_per_scan`（`tables`）を記録し、レビュー（`review`）を提案
 
 ## 問題のあるクエリの例
 ```sql
@@ -108,8 +118,9 @@ JOIN users u ON oc.customer_id = u.id;
 以下の場合は警告を無視できる可能性があります：
 
 1. レポート生成などの非リアルタイム処理
-2. データ量が少ない場合
+2. 配下の表の `rows_examined_per_scan` が小さく、一時テーブルがメモリ（`tmp_table_size`）に収まる場合
 3. 実行頻度が低い管理用クエリ
+4. `ORDER BY COUNT(*)` のように集計値で並べ替える場合（インデックスでは順序を作れず、一時テーブルを避けられない）
 
 ## 参考
 - [MySQL: GROUP BY Optimization](https://dev.mysql.com/doc/refman/8.0/en/group-by-optimization.html)

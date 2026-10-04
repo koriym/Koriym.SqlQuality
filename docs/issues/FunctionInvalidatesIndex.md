@@ -1,6 +1,6 @@
 ---
 title: "関数によるインデックス無効化"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "関数使用によりインデックスが無効化される状況を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # FunctionInvalidatesIndex
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: インデックス列に対する関数の使用によりインデックスが無効化される状況を検出します
 
@@ -20,25 +20,19 @@ recommended: true
 {
   "query_block": {
     "table": {
-      "attached_condition": "function_call",  // 関数使用
-      "possible_keys": "index_name",          // インデックスは存在するが
-      "key": null,                            // 使用されていない
-      "rows": "large_number",                 // 多数の行をスキャン
-      "filtered": "low_percentage",           // 低いフィルタ率
-      "using_where": true,                    // WHERE句での評価
-      "cost_info": {
-        "read_cost": "high_value"            // 高い読み取りコスト
-      }
+      "table_name": "posts",
+      "access_type": "ALL",                                                               // index があっても使えない
+      "attached_condition": "(cast(`test`.`posts`.`created_at` as date) = '2024-01-01')"  // index 列が関数の引数になっている
     }
   }
 }
 ```
+SQL の `DATE(created_at)` は、EXPLAIN では `cast(created_at as date)` に書き換えられて現れます。
 
 ### 主な検出条件
-1. WHERE句でのカラムに対する関数使用
-2. インデックス列に対する演算
-3. 日付/時刻関数の使用（YEAR, MONTH, DATEなど）
-4. 文字列関数の使用（LOWER, UPPER, CONCATなど）
+1. `attached_condition` で列が関数の引数になっている（`cast(col as date)`, `year(col)`, `lower(col)` 等。`IN (...)` は関数ではない）
+2. schema でその列がいずれかの index に含まれている（先頭列でなくてもよい）。index に無い列は報告しない
+3. `DATE(col) = '日付'` の形なら `col >= '日付' AND col < '日付' + INTERVAL 1 DAY` を `suggestion.sql` に付ける
 
 ## パフォーマンスへの影響
 
@@ -150,17 +144,16 @@ WHERE total_price > 1000;
 
 ## 無視してよい場合
 
-1. 小規模データ
-    - テーブルサイズが1,000行未満
-    - クエリの実行頻度が低い
+1. 関数の結果に index がある
+    - 生成列（generated column）に index を張っている
+    - 関数 index（MySQL 8.0.13 以降）を使っている
 
-2. データ分析用クエリ
-    - バッチ処理
-    - レポート生成
+2. その列を含む index が別の条件で既に使われている
+    - `key` にその index があり、`rows_examined_per_scan` が小さい
 
-3. 一時的な集計
-    - 管理機能での使用
-    - 非リアルタイム処理
+3. 小規模データ・一時的な処理
+    - テーブルサイズが 1,000 行未満
+    - データ移行やレポート生成
 
 ## トラブルシューティング
 

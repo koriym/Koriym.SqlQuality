@@ -1,6 +1,6 @@
 ---
 title: "Low Cardinality Index"
-severity: "MEDIUM"
+severity: "LOW"
 category: "Performance"
 description: "カーディナリティの低いカラムへのインデックス使用を検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # LowCardinalityIndex
 
 ## 概要
-- 重要度: MEDIUM
+- 重要度: LOW
 - カテゴリ: Performance
 - 説明: 選択性の低いインデックスを使用することで、テーブルの大部分をスキャンする非効率な状態を検出します
 
@@ -22,20 +22,23 @@ recommended: true
     "ordering_operation": {
       "table": {
         "table_name": "users",
-        "access_type": "ref",           // インデックスを使用
-        "key": "idx_users_status",      // 低カーディナリティインデックス
-        "rows_examined_per_scan": 800,  // 大量の行をスキャン
-        "filtered": 100.0               // ほぼ全行が該当
+        "access_type": "ref",               // ref または range
+        "key": "idx_users_status_created",  // 先頭列 status: CARDINALITY 3 / table_rows 1000
+        "used_key_parts": ["status"],
+        "rows_examined_per_scan": 800       // 500 行以上
       }
     }
   }
 }
 ```
 
+判定は `filtered` ではなく schema（`information_schema`）のインデックス統計で行います。使ったインデックスの先頭列の `CARDINALITY` を `table_rows` で割り、1% 以下なら低カーディナリティとみなします。どちらかが不明（null / 0）なら報告しません。
+
 ### 主な検出条件
-1. `access_type`が`ref`または`range`（インデックス使用）
-2. `rows_examined_per_scan` > 100 かつ `filtered` > 80%
-3. テーブルの大部分（50%以上）をスキャンしている
+1. `access_type` が `ref` または `range` で、`key` があること
+2. `used_key_parts` の先頭列の `CARDINALITY / table_rows` が 0.01 以下であること
+3. `rows_examined_per_scan` が 500 以上であること
+4. 提案はレビュー（`review`）: 選択性の高い列を先頭にした複合インデックス、またはこのインデックスの要否
 
 ## パフォーマンスへの影響
 
@@ -140,21 +143,19 @@ WHERE created_at > '2024-01-01'
 
 ## 無視してよい場合
 
-1. 小規模テーブル
-    - 1,000行未満
-    - インデックスオーバーヘッドが問題にならない
+1. 少数派の値を検索
+    - 判定は列全体のカーディナリティで行うため、`status = 'deleted'`（全体の 5%）のような検索でも報告される
+    - 実際の参照行数（`rows_examined_per_scan`）と実行時間で判断する
 
-2. 少数派の値を検索
-    - 5-10%程度の行のみ該当
-    - 例: is_deleted = 1（削除済み5%）
-
-3. カバリングインデックス
+2. カバリングインデックス
     - 全カラムがインデックスに含まれる
     - テーブルアクセス不要
 
-4. 複合インデックスの後方カラム
-    - 前方の高カーディナリティで絞り込み済み
-    - 追加の絞り込み効果がある
+3. 複合インデックスの後方カラム
+    - 先頭列で絞り込んだ上で、後続列（`created_at` など）が範囲や並び順に効いている
+
+4. 統計が古い
+    - `ANALYZE TABLE` の前は `CARDINALITY` が実態と異なることがある
 
 ## トラブルシューティング
 

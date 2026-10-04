@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use function array_values;
+use function explode;
 use function ksort;
+use function preg_match;
 use function preg_match_all;
-use function preg_replace;
 use function strtolower;
+use function trim;
 
 use const PREG_SET_ORDER;
 
@@ -23,7 +25,8 @@ use const PREG_SET_ORDER;
  */
 final class QueryContext
 {
-    private const TABLE_REFERENCE = '/\b(?:FROM|JOIN|UPDATE)\s+`?(\w+)`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?(\w+)`?)?/i';
+    private const TABLE_REFERENCE_LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?(?:\s*,\s*`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?)*)/i';
+    private const TABLE_REFERENCE_ITEM = '/^`?(\w+)`?(?:\s+(?:AS\s+)?`?(\w+)`?)?$/i';
 
     /**
      * @param ExplainResult             $explain
@@ -51,6 +54,12 @@ final class QueryContext
     public function tableAccesses(): array
     {
         return (new ExplainWalker())->tableAccesses($this->explain['query_block']);
+    }
+
+    /** @return list<list<ExplainTable>> tables of each nested_loop in member order */
+    public function nestedLoops(): array
+    {
+        return (new ExplainWalker())->nestedLoops($this->explain['query_block']);
     }
 
     /** @return list<ShowWarning> */
@@ -88,17 +97,29 @@ final class QueryContext
         return $columns;
     }
 
+    /** @return string the statement with line (--) and block comments removed */
+    public function sqlWithoutComments(): string
+    {
+        return SqlSafetyClassifier::stripComments($this->sql);
+    }
+
     /** @return array<string, string> alias => table name; a table without alias maps to itself. Derived tables are not included */
     public function aliases(): array
     {
-        $sql = (string) preg_replace('/--.*$/m', '', $this->sql);
-        preg_match_all(self::TABLE_REFERENCE, $sql, $matches, PREG_SET_ORDER);
+        $sql = $this->sqlWithoutComments();
+        preg_match_all(self::TABLE_REFERENCE_LIST, $sql, $matches, PREG_SET_ORDER);
 
         $aliases = [];
         foreach ($matches as $match) {
-            $table = $match[1];
-            $alias = ($match[2] ?? '') === '' ? $table : $match[2];
-            $aliases[$alias] = $table;
+            foreach (explode(',', $match[1]) as $reference) {
+                if (preg_match(self::TABLE_REFERENCE_ITEM, trim($reference), $item) !== 1) {
+                    continue;
+                }
+
+                $table = $item[1];
+                $alias = ($item[2] ?? '') === '' ? $table : $item[2];
+                $aliases[$alias] = $table;
+            }
         }
 
         return $aliases;

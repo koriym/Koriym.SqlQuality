@@ -16,14 +16,15 @@ final class MultiTableUpdateDetectorTest extends TestCase
         $findings = $detector->detect(self::context([
             'query_block' => [
                 'nested_loop' => [
-                    ['table' => ['update' => true, 'table_name' => 'comments', 'access_type' => 'ALL']],
-                    ['table' => ['update' => true, 'table_name' => 'posts', 'access_type' => 'eq_ref']],
+                    ['table' => ['update' => true, 'table_name' => 'comments', 'access_type' => 'ALL', 'rows_examined_per_scan' => 9810]],
+                    ['table' => ['update' => true, 'table_name' => 'posts', 'access_type' => 'eq_ref', 'rows_examined_per_scan' => 1]],
                 ],
             ],
         ]));
 
         $this->assertCount(1, $findings);
         $this->assertSame(['comments', 'posts'], $findings[0]->evidence['tables']);
+        $this->assertSame(9811, $findings[0]->evidence['rows_examined_per_scan']);
     }
 
     public function testDoesNotDetectSingleTableUpdate(): void

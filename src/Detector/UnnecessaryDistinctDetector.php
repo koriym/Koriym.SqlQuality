@@ -8,57 +8,82 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function in_array;
+use function array_diff;
+use function array_key_first;
+use function count;
 use function is_array;
+use function preg_match;
+use function preg_replace;
+use function preg_split;
+use function trim;
 
-/**
- * Detects unnecessary DISTINCT operations
- *
- * @psalm-import-type DuplicatesRemovalOperation from Types
- */
+/** @psalm-import-type ExplainNode from Types */
 final class UnnecessaryDistinctDetector implements DetectorInterface
 {
+    private const SELECT_DISTINCT = '/^SELECT\s+DISTINCT\s+(?<list>.+?)\s+FROM\b/is';
+    private const SELECT_ITEM = '/^(?:`?\w+`?\.)?(?:`?(?<column>\w+)`?|(?<star>\*))(?:\s+(?:AS\s+)?`?\w+`?)?$/i';
+
     #[Override]
     public function detect(QueryContext $context): array
     {
-        $queryBlock = $context->explain['query_block'];
-        // Check for duplicates_removal in ordering_operation
-        if (isset($queryBlock['ordering_operation']['duplicates_removal'])) {
-            return $this->primaryKeyFindings($queryBlock['ordering_operation']['duplicates_removal']);
+        $aliases = $context->aliases();
+        $sql = trim($context->sqlWithoutComments());
+        if (count($aliases) !== 1 || preg_match(self::SELECT_DISTINCT, $sql, $match) !== 1 || ! $this->hasDuplicatesRemoval($context->explain['query_block'])) {
+            return [];
         }
 
-        // Check for duplicates_removal at query_block level
-        if (isset($queryBlock['duplicates_removal'])) {
-            return $this->primaryKeyFindings($queryBlock['duplicates_removal']);
+        $alias = array_key_first($aliases);
+        $primaryKey = $context->primaryKeyColumns($alias);
+        $selectList = preg_split('/\s*,\s*/', trim($match['list'])) ?: [];
+        if ($primaryKey === [] || ! $this->selectsAll($selectList, $primaryKey)) {
+            return [];
         }
 
-        return [];
+        return [
+            new Finding(
+                evidence: ['table_name' => $alias, 'primary_key' => $primaryKey, 'select_list' => $selectList],
+                suggestion: [
+                    'kind' => 'rewrite',
+                    'description' => 'Every row is already unique by its primary key; DISTINCT only adds a duplicate-removal pass.',
+                    'sql' => (string) preg_replace('/^SELECT\s+DISTINCT\b/i', 'SELECT', $sql, 1),
+                ],
+            ),
+        ];
+    }
+
+    /** @param ExplainNode $node */
+    private function hasDuplicatesRemoval(array $node): bool
+    {
+        foreach ($node as $key => $child) {
+            if ($key === 'duplicates_removal' || (is_array($child) && $this->hasDuplicatesRemoval($child))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**
-     * Check if used_columns likely contains a primary key (column named 'id')
+     * @param list<string> $selectList
+     * @param list<string> $primaryKey
      *
-     * @param DuplicatesRemovalOperation $duplicatesRemoval
-     *
-     * @return list<Finding>
+     * @return bool false also when an item is not a plain column or star, such as a function call
      */
-    private function primaryKeyFindings(array $duplicatesRemoval): array
+    private function selectsAll(array $selectList, array $primaryKey): bool
     {
-        if (! isset($duplicatesRemoval['table']['used_columns'])) {
-            return [];
+        $columns = [];
+        foreach ($selectList as $item) {
+            if (preg_match(self::SELECT_ITEM, $item, $match) !== 1) {
+                return false;
+            }
+
+            if (($match['star'] ?? '') === '*') {
+                return true;
+            }
+
+            $columns[] = $match['column'];
         }
 
-        $usedColumns = $duplicatesRemoval['table']['used_columns'];
-        if (! is_array($usedColumns)) {
-            return [];
-        }
-
-        // If 'id' column is in used_columns, it's likely a primary key making DISTINCT unnecessary
-        // This is a heuristic - ideally we'd check schema info
-        if (! in_array('id', $usedColumns, true)) {
-            return [];
-        }
-
-        return [new Finding(['table_name' => $duplicatesRemoval['table']['table_name'], 'used_columns' => $usedColumns])];
+        return array_diff($primaryKey, $columns) === [];
     }
 }

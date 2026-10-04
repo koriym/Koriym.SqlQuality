@@ -97,6 +97,10 @@ Examples:
 USAGE;
 
     private const MESSAGES_EN = [
+        'CartesianProduct'         => 'Cartesian product detected.',
+        'DeepOffset'               => 'Deep OFFSET detected.',
+        'DependentSubquery'        => 'Dependent subquery detected.',
+        'EstimateDivergence'       => 'Row estimate diverges from the actual row count.',
         'ExcessiveDerivedTables'    => 'Excessive use of derived tables detected.',
         'FunctionInvalidatesIndex'  => 'Function invalidates index.',
         'FullTableScan'            => 'Full table scan detected.',
@@ -108,11 +112,16 @@ USAGE;
         'IneffectiveUnion'         => 'Ineffective UNION usage detected.',
         'LowCardinalityIndex'      => 'Index on low cardinality column detected.',
         'MultiTableUpdate'         => 'Multi-table update detected.',
+        'OrderByRand'              => 'ORDER BY RAND() detected.',
         'TemporaryTableGrouping'   => 'Temporary table required for grouping.',
         'UnnecessaryDistinct'      => 'Unnecessary DISTINCT detected.',
     ];
 
     private const MESSAGES_JA = [
+        'CartesianProduct'         => 'カーテシアン積が検出されました。',
+        'DeepOffset'               => '大きなOFFSETが検出されました。',
+        'DependentSubquery'        => '依存サブクエリが検出されました。',
+        'EstimateDivergence'       => '見積もり行数と実際の行数に乖離があります。',
         'ExcessiveDerivedTables'    => '派生テーブルの過度な使用が検出されました。',
         'FunctionInvalidatesIndex'  => '関数の使用によりインデックスが無効化されています。',
         'FullTableScan'            => 'フルテーブルスキャンが検出されました。',
@@ -124,6 +133,7 @@ USAGE;
         'IneffectiveUnion'         => '非効率的なUNIONの使用が検出されました。',
         'LowCardinalityIndex'      => 'カーディナリティの低い列にインデックスが設定されています。',
         'MultiTableUpdate'         => '複数テーブルの更新が検出されました。',
+        'OrderByRand'              => 'ORDER BY RAND()が検出されました。',
         'TemporaryTableGrouping'   => 'グループ化のために一時テーブルが必要です。',
         'UnnecessaryDistinct'      => '不必要なDISTINCTが検出されました。',
     ];

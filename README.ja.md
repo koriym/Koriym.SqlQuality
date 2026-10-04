@@ -126,7 +126,7 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 ### 機能
 
 これらのAI駆動型スキルは以下を実現します：
-- パフォーマンス問題の検出（FullTableScan、IneffectiveJoinなど）
+- パフォーマンス問題の検出（FullTableScan、IneffectiveJoin、CartesianProduct、EstimateDivergenceなど）
 - 問題のあるSQLパターンの書き換え（カラムの関数使用、暗黙的な型変換など）
 - インデックスの作成とリアルタイムでの影響測定
 - 効果のないインデックスの自動ロールバック
@@ -245,7 +245,7 @@ final class FullTableScanDetector implements DetectorInterface
 }
 ```
 
-`QueryContext`には、パラメータを埋めた`sql`、`explain`（`EXPLAIN FORMAT=JSON`）、`explainAnalyze`、`warnings`（`SHOW WARNINGS`）、テーブルごとの`schema`（information_schema）が入っています。`tables()`、`tableAccesses()`、`warningsWithCode()`、`indexColumns()`、`aliases()`、`schemaFor()`、`columnType()`、`primaryKeyColumns()`で読み出します。
+`QueryContext`には、パラメータを埋めた`sql`、`explain`（`EXPLAIN FORMAT=JSON`）、`explainAnalyze`、`warnings`（`SHOW WARNINGS`）、テーブルごとの`schema`（information_schema）が入っています。`tables()`、`tableAccesses()`、`nestedLoops()`、`warningsWithCode()`、`indexColumns()`、`aliases()`、`schemaFor()`、`columnType()`、`primaryKeyColumns()`で読み出します。
 
 `Finding::$evidence`にはDetectorが判定の根拠にした値を入れます。実行計画から取った値はEXPLAINのキー名のまま、1つのテーブルについてのfindingなら`table_name`も含めます。この値はissueの`evidence`としてそのまま報告されます。`severity`、`confidence`、`suggestion`は省略でき、指定するとそのtypeの既定値に代わって使われます。
 

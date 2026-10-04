@@ -8,80 +8,63 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
-use function array_flip;
-use function array_intersect_key;
-use function is_string;
-use function str_contains;
-use function substr_count;
+use function sprintf;
+use function str_starts_with;
 
 /** @psalm-import-type ExplainTable from Types */
 final class IneffectiveRangeScanDetector implements DetectorInterface
 {
-    /**
-     * 非効率的な範囲スキャンを検出します
-     */
+    /** A range scan examining fewer rows than this is not reported */
+    private const MIN_ROWS_EXAMINED = 1000;
+
+    /** A range scan keeping this ratio of the examined rows or more is not reported */
+    private const MAX_FILTERED = 20.0;
+
     #[Override]
     public function detect(QueryContext $context): array
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if ($this->isIneffectiveTableAccess($table)) {
-                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'access_type', 'rows_examined_per_scan', 'possible_keys', 'filtered', 'attached_condition'])));
+            if (str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery']) || ! $this->isIneffective($table)) {
+                continue;
             }
+
+            $findings[] = new Finding(
+                evidence: [
+                    'table_name' => $table['table_name'],
+                    'access_type' => $table['access_type'],
+                    'key' => $table['key'] ?? null,
+                    'possible_keys' => $table['possible_keys'] ?? [],
+                    'rows_examined_per_scan' => (int) ($table['rows_examined_per_scan'] ?? 0),
+                    'filtered' => $table['filtered'] ?? null,
+                    'attached_condition' => $table['attached_condition'] ?? null,
+                ],
+                suggestion: ['kind' => 'review', 'description' => $this->description($table)],
+            );
         }
 
         return $findings;
     }
 
-    /**
-     * テーブルアクセスが非効率的かどうかを判定します
-     *
-     * @param ExplainTable $table テーブルアクセス情報
-     */
-    private function isIneffectiveTableAccess(array $table): bool
+    /** @param ExplainTable $table */
+    private function isIneffective(array $table): bool
     {
-        // フルテーブルスキャンでIN句を使用している場合
-        if (
-            isset($table['access_type']) &&
-            $table['access_type'] === 'ALL' &&
-            isset($table['attached_condition']) &&
-            str_contains($table['attached_condition'], ' in (')
-        ) {
+        if ($table['access_type'] === 'index_merge') {
             return true;
         }
 
-        // 非効率的な範囲スキャン条件のチェック
-        if (isset($table['access_type']) && $table['access_type'] === 'range') {
-            // 大量の行数を処理する範囲スキャン
-            if (isset($table['rows_examined_per_scan']) && $table['rows_examined_per_scan'] > 1000) {
-                return true;
-            }
-
-            // 複数のインデックス候補がある場合
-            if ($this->hasMultipleIndexCandidates($table['possible_keys'] ?? null)) {
-                return true;
-            }
-        }
-
-        // ORを使用した条件
-        if (isset($table['attached_condition']) && str_contains($table['attached_condition'], ' OR ')) {
-            return true;
-        }
-
-        // インデックスマージが必要な場合
-        if (isset($table['access_type']) && $table['access_type'] === 'index_merge') {
-            return true;
-        }
-
-        // 選択性の低いインデックススキャン
-        return isset($table['filtered']) &&
-            isset($table['rows_examined_per_scan']) &&
-            (float) $table['filtered'] < 20.00 &&
-            $table['rows_examined_per_scan'] > 100;
+        return $table['access_type'] === 'range'
+            && (int) ($table['rows_examined_per_scan'] ?? 0) >= self::MIN_ROWS_EXAMINED
+            && (float) ($table['filtered'] ?? 100) < self::MAX_FILTERED;
     }
 
-    private function hasMultipleIndexCandidates(mixed $possibleKeys): bool
+    /** @param ExplainTable $table */
+    private function description(array $table): string
     {
-        return is_string($possibleKeys) && substr_count($possibleKeys, ',') > 0;
+        if ($table['access_type'] === 'index_merge') {
+            return sprintf('%s is read by merging %s; a composite index over the compared columns would serve the query with one index.', $table['table_name'], $table['key'] ?? 'several indexes');
+        }
+
+        return sprintf('The range scan on %s examines %d rows and keeps %s%%; a composite index with the equality columns first and the range column last would narrow the scan.', $table['key'] ?? $table['table_name'], (int) ($table['rows_examined_per_scan'] ?? 0), (string) ($table['filtered'] ?? '?'));
     }
 }

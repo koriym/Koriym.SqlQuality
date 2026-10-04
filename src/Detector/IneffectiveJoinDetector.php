@@ -5,125 +5,86 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\QueryContext;
+use Koriym\SqlQuality\Types;
 use Override;
 
 use function array_flip;
 use function array_intersect_key;
-use function array_map;
 use function array_slice;
-use function count;
-use function implode;
 use function in_array;
-use function is_array;
-use function is_int;
-use function is_numeric;
+use function preg_match_all;
 
-class IneffectiveJoinDetector implements DetectorInterface
+use const PREG_SET_ORDER;
+
+/**
+ * @psalm-import-type ExplainTable from Types
+ * @psalm-import-type Suggestion from Types
+ */
+final class IneffectiveJoinDetector implements DetectorInterface
 {
+    private const JOIN_PREDICATE = '/`\w+`\.`(?<left>\w+)`\.`(?<leftColumn>\w+)`\s*=\s*`\w+`\.`(?<right>\w+)`\.`(?<rightColumn>\w+)`/';
+
     #[Override]
     public function detect(QueryContext $context): array
     {
-        $joinGroups = [];
-        foreach ($context->tableAccesses() as $access) {
-            $groupKey = $this->nestedLoopGroupKey($access['path']);
-            if ($groupKey === null) {
-                continue;
-            }
-
-            $joinGroups[$groupKey][] = $access['table'];
-        }
-
         $findings = [];
-        foreach ($joinGroups as $joinAccesses) {
-            if (count($joinAccesses) < 2) {
-                continue;
-            }
-
-            foreach ($joinAccesses as $tableInfo) {
-                if ($this->isIneffectiveJoin($tableInfo)) {
-                    $findings[] = new Finding(array_intersect_key($tableInfo, array_flip(['table_name', 'access_type', 'rows_examined_per_scan', 'rows_produced_per_join', 'cost_info'])));
+        foreach ($context->nestedLoops() as $members) {
+            // The first member drives the loop; its full scan belongs to FullTableScanDetector.
+            foreach (array_slice($members, 1) as $table) {
+                if (! $this->isIneffectiveJoin($table)) {
+                    continue;
                 }
+
+                $findings[] = new Finding(
+                    evidence: array_intersect_key($table, array_flip(['table_name', 'access_type', 'using_join_buffer', 'rows_examined_per_scan', 'rows_produced_per_join', 'attached_condition', 'ref'])),
+                    suggestion: $this->suggest($context, $table),
+                );
             }
         }
 
         return $findings;
     }
 
+    /** @param ExplainTable $table */
+    private function isIneffectiveJoin(array $table): bool
+    {
+        return in_array($table['access_type'], ['ALL', 'index'], true) || isset($table['using_join_buffer']);
+    }
+
     /**
-     * @param list<array-key> $path
+     * @param ExplainTable $table
      *
-     * @psalm-pure
+     * @return Suggestion
      */
-    private function nestedLoopGroupKey(array $path): string|null
+    private function suggest(QueryContext $context, array $table): array
     {
-        if (count($path) < 3) {
-            return null;
+        $suggestion = IndexSuggestion::create($context, $table['table_name'], $this->joinColumns($table));
+        if ($suggestion !== null) {
+            return $suggestion;
         }
 
-        $tableOffset = count($path) - 1;
-        $memberOffset = count($path) - 2;
-        $nestedLoopOffset = count($path) - 3;
-        if (
-            $path[$nestedLoopOffset] !== 'nested_loop' ||
-            ! is_int($path[$memberOffset]) ||
-            $path[$tableOffset] !== 'table'
-        ) {
-            return null;
+        return ['kind' => 'review', 'description' => 'No index is used for this join; check the join condition.'];
+    }
+
+    /**
+     * @param ExplainTable $table
+     *
+     * @return list<string> this table's columns compared for equality with another table's columns
+     */
+    private function joinColumns(array $table): array
+    {
+        preg_match_all(self::JOIN_PREDICATE, $table['attached_condition'] ?? '', $matches, PREG_SET_ORDER);
+        $columns = [];
+        foreach ($matches as $match) {
+            if ($match['left'] === $table['table_name']) {
+                $columns[] = $match['leftColumn'];
+            }
+
+            if ($match['right'] === $table['table_name']) {
+                $columns[] = $match['rightColumn'];
+            }
         }
 
-        $groupPath = array_slice($path, 0, $nestedLoopOffset + 1);
-
-        return implode("\0", array_map(static fn (int|string $part): string => (string) $part, $groupPath));
-    }
-
-    private function isIneffectiveJoin(array $tableInfo): bool
-    {
-        // 非効率的なJOINの条件をチェック
-        $conditions = [
-            // 行数が多すぎる場合
-            $this->hasHighRowCount($tableInfo),
-            // インデックスが適切に使用されていない場合
-            $this->hasInappropriateIndexUsage($tableInfo),
-            // コストが高すぎる場合
-            $this->hasHighCost($tableInfo),
-        ];
-
-        return in_array(true, $conditions, true);
-    }
-
-    private function hasHighRowCount(array $tableInfo): bool
-    {
-        $rowsExamined = $this->toFloat($tableInfo['rows_examined_per_scan'] ?? 0);
-        $rowsProduced = $this->toFloat($tableInfo['rows_produced_per_join'] ?? 0);
-
-        // 検査する行数と生成される行数に大きな差がある場合
-        return $rowsExamined > 1000 || ($rowsExamined > 0 && $rowsProduced / $rowsExamined < 0.1);
-    }
-
-    private function hasInappropriateIndexUsage(array $tableInfo): bool
-    {
-        $accessType = $tableInfo['access_type'] ?? '';
-
-        return $accessType === 'ALL' || $accessType === 'index';
-    }
-
-    private function hasHighCost(array $tableInfo): bool
-    {
-        $costInfo = $tableInfo['cost_info'] ?? [];
-        if (! is_array($costInfo)) {
-            return false;
-        }
-
-        $readCost = $this->toFloat($costInfo['read_cost'] ?? 0);
-        $evalCost = $this->toFloat($costInfo['eval_cost'] ?? 0);
-
-        // コストが高すぎる場合
-        return $readCost + $evalCost > 1000;
-    }
-
-    /** @psalm-pure */
-    private function toFloat(mixed $value): float
-    {
-        return is_numeric($value) ? (float) $value : 0.0;
+        return $columns;
     }
 }

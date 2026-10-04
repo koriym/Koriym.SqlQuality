@@ -1,6 +1,6 @@
 ---
 title: "非効率なLIKE検索パターン"
-severity: "HIGH"
+severity: "MEDIUM"
 category: "Performance"
 description: "インデックスを使用できないLIKE検索パターンを検出します"
 recommended: true
@@ -9,7 +9,7 @@ recommended: true
 # IneffectiveLikePattern
 
 ## 概要
-- 重要度: HIGH
+- 重要度: MEDIUM
 - カテゴリ: Performance
 - 説明: インデックスを使用できないLIKE検索パターンを検出します
 
@@ -20,22 +20,19 @@ recommended: true
 {
   "query_block": {
     "table": {
-      "attached_condition": "like_scan",    // LIKE検索の存在
-      "possible_keys": "index_name",        // インデックスは存在するが
-      "key": null,                          // 使用されていない
-      "rows": "large_number",               // 多数の行をスキャン
-      "filtered": "low_percentage",         // 低いフィルタ率
-      "using_where": true                   // WHERE句での評価
+      "table_name": "posts",
+      "access_type": "ALL",                                               // 全件走査、または
+      "filtered": "20.99",                                                // 読んだ行の大半を捨てている
+      "attached_condition": "(`test`.`posts`.`title` like '%keyword%')"  // 先頭がワイルドカードの LIKE
     }
   }
 }
 ```
 
 ### 主な検出条件
-1. 前方一致以外のワイルドカード使用（'%text'や'%text%'）
-2. アンダースコアワイルドカードの使用（'_text'）
-3. 複数のワイルドカードの組み合わせ
-4. LIKE条件での大文字小文字変換
+1. `attached_condition` に `like '%...'`（先頭がワイルドカード。末尾は問わない）がある
+2. かつ `access_type` が `ALL`、または `filtered` が 25 未満
+3. OR で結ばれた条件も対象。該当する列ごとに 1 件報告する
 
 ## パフォーマンスへの影響
 
@@ -151,16 +148,15 @@ PARTITION BY RANGE (TO_DAYS(created_at)) (
 ## 無視してよい場合
 
 1. 小規模データ
-    - テーブルサイズが1,000行未満
+    - テーブルサイズが 1,000 行未満
     - 実行頻度が低い
 
-2. 管理機能
-    - バックオフィス用途
-    - 同時実行が少ない
+2. 別の条件で十分に絞られている
+    - `key` が使われ、`rows_examined_per_scan` が小さい（`filtered` が低くても読む行数自体が少ない）
 
-3. レポート生成
-    - バッチ処理
-    - 非リアルタイム要件
+3. レポート生成・管理機能
+    - バッチ処理や非リアルタイム要件
+    - 同時実行が少ない
 
 ## トラブルシューティング
 
