@@ -27,7 +27,7 @@ final class UnnecessaryDistinctDetector implements DetectorInterface
     public function detect(QueryContext $context): array
     {
         $aliases = $context->aliases();
-        $sql = trim((string) preg_replace('/--.*$/m', '', $context->sql));
+        $sql = trim($context->sqlWithoutComments());
         if (count($aliases) !== 1 || preg_match(self::SELECT_DISTINCT, $sql, $match) !== 1 || ! $this->hasDuplicatesRemoval($context->explain['query_block'])) {
             return [];
         }
