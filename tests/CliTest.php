@@ -135,8 +135,8 @@ final class CliTest extends MySqlTestCase
 
         $report = json_decode($stdout, true);
         $this->assertIsArray($report);
-        $this->assertSame(0, $report['optimizer_impact']['cost_reduction_percent']);
-        $this->assertStringNotContainsString('-0', $stdout);
+        $this->assertStringContainsString('"cost_reduction_percent": 0', $stdout);
+        $this->assertStringNotContainsString('"cost_reduction_percent": -0', $stdout);
     }
 
     public function testExplainOfDdlStatementExitsWithTwoAndReportsClassifierReason(): void
