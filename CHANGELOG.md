@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `sql-quality explain` command analyzing a single SQL file and printing structured JSON
 - JSON Schema for the `analyze` and `explain` CLI output (`schema/analyze-report.schema.json`, `schema/explain-report.schema.json`)
 - `NotExplainable`, `NotReadOnlySelect`, `InvalidExplainResult` and `QueryFailed` exceptions thrown by `SqlFileAnalyzer`, all extending its `RuntimeException`
+- `InvalidSeverityThreshold` (rejected `--fail-on` value), `ReadOnlySessionUnavailable` (driver cannot report the session read-only flag) and `ActiveTransactionRejected` (`ReadOnlySession::run()` called on a connection with an open transaction) exceptions
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress
@@ -47,6 +48,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Per-query Markdown report was overwritten with the no-optimizer prompt
+- `SqlSafetyClassifier` read the body of a MySQL versioned comment (`/*!NNNNN ... */`) as a comment, and a backslash inside a backtick identifier as an escape; either hid a second statement from the stacked-statement check, so it reached `EXPLAIN` and was executed
+- `ReadOnlySession::run()` on a connection with an open transaction left that transaction writable
+- CLI exits 2 instead of 255 when the params file cannot be loaded, and 2 instead of 0 with an empty report when the report cannot be encoded as JSON (invalid UTF-8 in the SQL)
 
 ## [0.2.0] - 2026-01-15
 
