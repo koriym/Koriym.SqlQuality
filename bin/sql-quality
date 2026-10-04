@@ -9,6 +9,7 @@ use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 use PDO;
 use PDOException;
 use RuntimeException;
+use Throwable;
 
 use function array_slice;
 use function count;
@@ -250,7 +251,14 @@ USAGE;
             return 2;
         }
 
-        $sqlParams = require $paramsFile;
+        try {
+            $sqlParams = require $paramsFile;
+        } catch (Throwable $e) {
+            fwrite(STDERR, "Error: Params file could not be loaded: {$paramsFile}: {$e->getMessage()}\n");
+
+            return 2;
+        }
+
         if (! is_array($sqlParams)) {
             fwrite(STDERR, "Error: Params file must return an array: {$paramsFile}\n");
 
