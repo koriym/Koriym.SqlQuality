@@ -75,11 +75,30 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertFalse($result['is_read_only_select']);
     }
 
-    public function testBackslashInsideStringLiteralStillEscapesTheQuote(): void
+    public function testBackslashEscapedQuoteWithoutASemicolonIsStillReadOnly(): void
+    {
+        $result = $this->classifier->classify("SELECT 'it\\'s' AS s");
+
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    /**
+     * Under sql_mode NO_BACKSLASH_ESCAPES the literal ends at the first quote and the text after the
+     * semicolon is a second statement; the classifier cannot see the server's mode, so it rejects.
+     */
+    public function testSemicolonAfterABackslashEscapedQuoteIsRejectedAsAmbiguous(): void
     {
         $result = $this->classifier->classify("SELECT 'it\\'s; fine' AS s");
 
-        $this->assertTrue($result['is_read_only_select']);
+        $this->assertSame('unsafe', $result['kind']);
+    }
+
+    public function testBackslashBeforeQuoteIsAlsoReadAsLiteralSoNoBackslashEscapesModeCannotHideAStackedWrite(): void
+    {
+        $result = $this->classifier->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
     }
 
     public function testSelectWithQuotedLineCommentMarkerAndStackedWriteIsUnsafe(): void
