@@ -27,7 +27,7 @@ final class SqlSafetyClassifier
     /** @return SqlClassification */
     public function classify(string $sql): array
     {
-        if (self::containsStackedStatement($sql)) {
+        if (self::containsStackedStatement($sql, true) || self::containsStackedStatement($sql, false)) {
             return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
         }
 
@@ -92,8 +92,14 @@ final class SqlSafetyClassifier
         return trim($collapsed);
     }
 
-    /** @psalm-pure */
-    private static function containsStackedStatement(string $normalizedSql): bool
+    /**
+     * Whether a backslash escapes the next character in a string literal depends on the server's
+     * sql_mode (NO_BACKSLASH_ESCAPES), which a static classifier cannot see; a statement is
+     * rejected when either reading finds a second one.
+     *
+     * @psalm-pure
+     */
+    private static function containsStackedStatement(string $normalizedSql, bool $backslashEscapes): bool
     {
         $quote = null;
         $isEscaped = false;
@@ -108,7 +114,7 @@ final class SqlSafetyClassifier
             }
 
             if ($quote !== null) {
-                if ($char === '\\' && $quote !== '`') {
+                if ($backslashEscapes && $char === '\\' && $quote !== '`') {
                     $isEscaped = true;
 
                     continue;
