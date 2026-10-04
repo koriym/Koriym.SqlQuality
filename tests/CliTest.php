@@ -221,6 +221,34 @@ final class CliTest extends MySqlTestCase
         }
     }
 
+    /** @return array<string, array{string}> */
+    public function unloadableParamsFileProvider(): array
+    {
+        return [
+            'parse error' => ["<?php\nreturn [broken\n"],
+            'throws' => ["<?php\nthrow new \\Exception('boom');\n"],
+        ];
+    }
+
+    /** @dataProvider unloadableParamsFileProvider */
+    public function testUnloadableParamsFileExitsWithTwo(string $contents): void
+    {
+        $this->connect();
+
+        $badParamsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_badparams_', true) . '.php';
+        file_put_contents($badParamsFile, $contents);
+
+        try {
+            [$exitCode, $stdout, $stderr] = $this->runCli(['--format=json'], true, $badParamsFile);
+
+            $this->assertSame(2, $exitCode);
+            $this->assertSame('', $stdout);
+            $this->assertStringContainsString('Params file could not be loaded', $stderr);
+        } finally {
+            unlink($badParamsFile);
+        }
+    }
+
     /**
      * @param list<string> $args
      *

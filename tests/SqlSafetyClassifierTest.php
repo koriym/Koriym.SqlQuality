@@ -42,6 +42,46 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertFalse($result['is_read_only_select']);
     }
 
+    public function testStackedWriteInsideVersionedCommentIsUnsafe(): void
+    {
+        $result = $this->classifier->classify('SELECT 1; /*!40101 UPDATE users SET status = "banned" */');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testLeadingVersionedCommentIsClassifiedByItsBody(): void
+    {
+        $result = $this->classifier->classify('/*!40101 SET @probe = 1 */ SELECT 1');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+    }
+
+    public function testOptimizerHintCommentIsStillInert(): void
+    {
+        $result = $this->classifier->classify('SELECT /*+ NO_MERGE(d) */ d.id FROM (SELECT id FROM users) AS d');
+
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testBackslashInsideBacktickIdentifierDoesNotHideStackedWrite(): void
+    {
+        $result = $this->classifier->classify('SELECT 1 AS `a\`; UPDATE users SET status = "banned" -- `');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+        $this->assertFalse($result['is_read_only_select']);
+    }
+
+    public function testBackslashInsideStringLiteralStillEscapesTheQuote(): void
+    {
+        $result = $this->classifier->classify("SELECT 'it\\'s; fine' AS s");
+
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
     public function testSelectWithQuotedLineCommentMarkerAndStackedWriteIsUnsafe(): void
     {
         $result = $this->classifier->classify("SELECT '--'; UPDATE users SET status = 'banned'");

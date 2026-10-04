@@ -10,6 +10,7 @@ use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 use PDOException;
 use stdClass;
+use Throwable;
 
 use function array_slice;
 use function basename;
@@ -252,7 +253,14 @@ USAGE;
         $threshold = $this->parseFailOnThreshold($options);
         $pdo = $this->connectPdo($options);
 
-        $sqlParams = require $paramsFile;
+        try {
+            $sqlParams = require $paramsFile;
+        } catch (Throwable $e) {
+            fwrite(STDERR, "Error: Params file could not be loaded: {$paramsFile}: {$e->getMessage()}\n");
+
+            return 2;
+        }
+
         if (! is_array($sqlParams)) {
             fwrite(STDERR, "Error: Params file must return an array: {$paramsFile}\n");
 

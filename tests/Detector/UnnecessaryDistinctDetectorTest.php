@@ -70,6 +70,21 @@ final class UnnecessaryDistinctDetectorTest extends TestCase
         $this->assertSame([], (new UnnecessaryDistinctDetector())->detect(self::context('SELECT DISTINCT post_id FROM post_tags', self::distinctScan('post_tags'), $schema)));
     }
 
+    public function testSeesThroughALeadingBlockComment(): void
+    {
+        $findings = (new UnnecessaryDistinctDetector())->detect(self::context('/* report */ SELECT DISTINCT id FROM orders', self::distinctScan()));
+
+        $this->assertCount(1, $findings);
+    }
+
+    public function testKeepsADashMarkerInsideAStringLiteral(): void
+    {
+        $findings = (new UnnecessaryDistinctDetector())->detect(self::context("SELECT DISTINCT id FROM orders WHERE note = '--admin'", self::distinctScan()));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame("SELECT id FROM orders WHERE note = '--admin'", $findings[0]->suggestion['sql'] ?? null);
+    }
+
     /** @return array<string, mixed> */
     private static function distinctScan(string $table = 'orders'): array
     {
