@@ -19,6 +19,17 @@ jobs:
           - '8.2'
           - '8.3'
           - '8.4'
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: "yes"
+          MYSQL_DATABASE: test
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping -h 127.0.0.1" --health-interval=10s --health-timeout=5s --health-retries=10
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -45,5 +56,10 @@ jobs:
       - name: Install dependencies
         run: composer install --no-interaction --prefer-dist --ignore-platform-req=php
 
+      - name: Load schema
+        run: mysql -h 127.0.0.1 -u root test < tests/sql/schema.sql
+
       - name: Run test suite
         run: ./vendor/bin/phpunit
+        env:
+          SQL_QUALITY_REQUIRE_DB: "1"

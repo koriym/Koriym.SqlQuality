@@ -4,33 +4,33 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
 use function is_array;
 
-/**
- * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainNode from Types
- */
+/** @psalm-import-type ExplainNode from Types */
 final class ExcessiveDerivedTablesDetector implements DetectorInterface
 {
     /**
      * 派生テーブルの過剰使用を検出します
-     *
-     * @param ExplainResult $explainResult
      */
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
         // 一時テーブルのカウント
         $tempTableCount = 0;
 
         // クエリブロックをトラバースして一時テーブルをチェック
-        $this->traverseQueryBlock($explainResult, $tempTableCount);
+        $this->traverseQueryBlock($context->explain, $tempTableCount);
 
         // 3つ以上の一時テーブルを過剰使用とみなす
-        return $tempTableCount >= 3;
+        if ($tempTableCount < 3) {
+            return [];
+        }
+
+        return [new Finding(['materialized_temporary_tables' => $tempTableCount])];
     }
 
     /**

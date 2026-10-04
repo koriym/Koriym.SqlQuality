@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `--fail-on=LEVEL` option and exit codes 0 / 1 / 2 for the CLI
+- Skipped files and their reasons in the analysis result and the JSON output
+- `ReadOnlySession` guard around query timing and `EXPLAIN ANALYZE`
+- MySQL service and database-backed tests in CI
+- `SqlFileAnalyzer::queryContext()` returning the `QueryContext` the detectors receive
+
+### Changed
+- `analyzeSQLFiles()` returns results and skipped files instead of printing progress
+- `analyzeSQLFiles()` and `analyze()` no longer take an output directory
+- `--format=markdown` requires `--output`
+- `FullTableScan` and `IneffectiveJoin` are reported as `Critical`
+- `DetectorInterface::detect()` takes a `QueryContext` and returns a list of `Finding` instead of a bool
+- Detected issues carry `detector`, `evidence` and `suggestion`; a detector reports each matching table separately
+- `ExplainAnalyzer::analyze()` takes a `QueryContext` instead of the EXPLAIN array
+
+### Fixed
+- Per-query Markdown report was overwritten with the no-optimizer prompt
+
 ## [0.2.0] - 2026-01-15
 
 ### Added

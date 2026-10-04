@@ -1,0 +1,18 @@
+{
+    "sql": "-- 12_select1.sql\n-- Problem: Trivial query that always returns 1 (used to check very low cost case)\nSELECT 1;\n",
+    "explain": {
+        "query_block": {
+            "select_id": 1,
+            "message": "No tables used"
+        }
+    },
+    "explain_analyze": "-> Rows fetched before execution  (cost=0..0 rows=1) (actual time=0..0 rows=1 loops=1)\n",
+    "warnings": [
+        {
+            "Level": "Note",
+            "Code": 1003,
+            "Message": "/* select#1 */ select 1 AS `1`"
+        }
+    ],
+    "schema": []
+}

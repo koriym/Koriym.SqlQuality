@@ -57,21 +57,49 @@ final class ExplainWalker
      */
     public function contains(array $node, string $key, mixed $value): bool
     {
+        return $this->pathOf($node, $key, $value) !== null;
+    }
+
+    /**
+     * @param ExplainNode $node
+     *
+     * @return list<array-key>|null path of the first node holding $key => $value
+     *
+     * @psalm-mutation-free
+     */
+    public function pathOf(array $node, string $key, mixed $value): array|null
+    {
+        return $this->findPath($node, $key, $value, []);
+    }
+
+    /**
+     * @param ExplainNode     $node
+     * @param list<array-key> $path
+     *
+     * @return list<array-key>|null
+     *
+     * @psalm-mutation-free
+     */
+    private function findPath(array $node, string $key, mixed $value, array $path): array|null
+    {
         foreach ($node as $nodeKey => $nodeValue) {
             if ($nodeKey === $key && $nodeValue === $value) {
-                return true;
+                return $path;
             }
 
-            if (is_array($nodeValue)) {
-                /** @var ExplainNode $child */
-                $child = $nodeValue;
-                if ($this->contains($child, $key, $value)) {
-                    return true;
-                }
+            if (! is_array($nodeValue)) {
+                continue;
+            }
+
+            /** @var ExplainNode $child */
+            $child = $nodeValue;
+            $found = $this->findPath($child, $key, $value, [...$path, $nodeKey]);
+            if ($found !== null) {
+                return $found;
             }
         }
 
-        return false;
+        return null;
     }
 
     /**

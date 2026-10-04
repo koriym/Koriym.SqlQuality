@@ -28,7 +28,6 @@ use function microtime;
 use function mkdir;
 use function pathinfo;
 use function preg_replace;
-use function printf;
 use function sort;
 
 use const PATHINFO_FILENAME;
@@ -36,10 +35,9 @@ use const PATHINFO_FILENAME;
 /**
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
- * @psalm-import-type ExplainWithSql from Types
  * @psalm-import-type AnalysisResult from Types
+ * @psalm-import-type AnalysisRun from Types
  * @psalm-import-type AnalysisWithSettingsResult from Types
- * @psalm-import-type DetectedWarning from Types
  * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
  */
@@ -48,6 +46,7 @@ final class SqlFileAnalyzer
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
     private readonly SqlSafetyClassifier $sqlSafetyClassifier;
+    private readonly ReadOnlySession $readOnlySession;
 
     public function __construct(
         private readonly PDO $pdo,
@@ -58,6 +57,7 @@ final class SqlFileAnalyzer
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
         $this->sqlSafetyClassifier = new SqlSafetyClassifier();
+        $this->readOnlySession = new ReadOnlySession($pdo);
     }
 
     /**
@@ -76,58 +76,50 @@ final class SqlFileAnalyzer
      */
     public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
     {
-        // 1) すべての SQL を分析
-        $results = $this->analyzeSQLFiles($sqlParams, $outputDir);
-
-        // 2) 解析結果を統計計算にかける
-        $statistics = new QueryStatisticsCalculator();
-        $statistics->calculate($results);
-
-        // 3) レベル分類クラスとレポート生成クラスを用意
-        $classifier = new StatisticalQueryLevelClassifier();
-        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
-
-        // 4) それぞれの SQL に対応する Markdown レポート(= AI prompt)を出力
-        //    → ここでは SqlFileAnalyzer::savePromptToMarkdown を呼ぶ想定
-        //    （すでに内部で呼んでいる場合は省略可）
-        foreach ($results as $sqlFile => $analysisResult) {
-            $this->savePromptToMarkdown(
-                $sqlFile,
-                $analysisResult['ai_suggestions'],
-                $analysisResult['issues'],
-                $outputDir,
-            );
-        }
-
-        // 5) まとめレポート（summary_report.md）を出力
-        //    デフォルトのファイル名を summary_report.md とする
-        $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
+        $results = $this->analyzeSQLFiles($sqlParams)['results'];
+        $this->saveReports($results, $outputDir);
 
         return $results;
     }
 
     /**
-     * @param SqlParams $sqlParams
-     *
-     * @return array<string, AnalysisResult>
+     * @param array<string, AnalysisResult> $results
      *
      * @throws RuntimeException
      */
-    public function analyzeSQLFiles(array $sqlParams, string $outputDir): array
+    public function saveReports(array $results, string $outputDir): void
+    {
+        $statistics = new QueryStatisticsCalculator();
+        $statistics->calculate($results);
+
+        $classifier = new StatisticalQueryLevelClassifier();
+        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
+
+        foreach ($results as $sqlFile => $analysisResult) {
+            $this->savePromptToMarkdown($sqlFile, $analysisResult['ai_suggestions'], $outputDir);
+        }
+
+        $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
+    }
+
+    /**
+     * @param SqlParams $sqlParams
+     *
+     * @return AnalysisRun
+     */
+    public function analyzeSQLFiles(array $sqlParams): array
     {
         $results = [];
+        $skipped = [];
         foreach ($sqlParams as $sqlFile => $params) {
             try {
-                $result = $this->analyze($sqlFile, $params, $outputDir, $results);
-                $results[$sqlFile] = $result;
-                $cost = $result['cost'];
-                printf("✔️Analyzed: %4d: %s\n", $cost, $sqlFile);
+                $results[$sqlFile] = $this->analyze($sqlFile, $params);
             } catch (\RuntimeException $e) {
-                printf("⚠️Skipped: %s: %s\n", $sqlFile, $e->getMessage());
+                $skipped[$sqlFile] = $e->getMessage();
             }
         }
 
-        return $results;
+        return ['results' => $results, 'skipped' => $skipped];
     }
 
     /** @param ExplainResult $explainResult */
@@ -156,18 +148,41 @@ final class SqlFileAnalyzer
     /**
      * @param array<string, mixed> $params
      *
-     * @return ExplainWithSql
+     * @throws RuntimeException
+     */
+    public function queryContext(string $sqlFile, array $params): QueryContext
+    {
+        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params);
+    }
+
+    /**
+     * @param array<string, mixed> $params
      *
      * @throws RuntimeException
      */
-    private function executeExplain(string $sql, array $params, bool $executeAnalyze): array
+    private function buildQueryContext(string $sql, array $params): QueryContext
     {
         if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
             throw new RuntimeException('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+        $explain = $this->executeExplain($interpolatedSql);
+        // SHOW WARNINGS covers the last statement only; EXPLAIN ANALYZE and the session reset would clear these
+        $warnings = $this->getWarnings();
+        $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
+        $schema = $this->getSchemaInfo($sql);
 
+        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema);
+    }
+
+    /**
+     * @return ExplainResult
+     *
+     * @throws RuntimeException
+     */
+    private function executeExplain(string $interpolatedSql): array
+    {
         // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
@@ -199,23 +214,26 @@ final class SqlFileAnalyzer
         }
 
         /** @var ExplainResult $explainJsonData */
-        if (! $executeAnalyze) {
-            return [$explainJsonData, 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)'];
-        }
+        return $explainJsonData;
+    }
 
-        // EXPLAIN ANALYZE を実行
-        $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
-        if ($analyzeStmt === false) {
-            throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
-        }
-
+    /** @throws RuntimeException */
+    private function executeExplainAnalyze(string $interpolatedSql): string
+    {
         /** @var array|false $analyzeResult */
-        $analyzeResult = $analyzeStmt->fetch(PDO::FETCH_NUM);
+        $analyzeResult = $this->readOnlySession->run(function () use ($interpolatedSql): mixed {
+            $analyzeStmt = $this->pdo->query('EXPLAIN ANALYZE ' . $interpolatedSql);
+            if ($analyzeStmt === false) {
+                throw new RuntimeException('Failed to execute EXPLAIN ANALYZE query');
+            }
+
+            return $analyzeStmt->fetch(PDO::FETCH_NUM);
+        });
         if ($analyzeResult === false || ! isset($analyzeResult[0])) {
             throw new RuntimeException('Failed to get EXPLAIN ANALYZE result');
         }
 
-        return [$explainJsonData, $analyzeResult[0]];
+        return (string) $analyzeResult[0];
     }
 
     /**
@@ -276,12 +294,8 @@ final class SqlFileAnalyzer
         return $schemaInfo;
     }
 
-    /**
-     * @param list<DetectedWarning> $issues
-     *
-     * @throws RuntimeException
-     */
-    private function savePromptToMarkdown(string $sqlFile, string $prompt, array $issues, string $outputDir): void
+    /** @throws RuntimeException */
+    private function savePromptToMarkdown(string $sqlFile, string $prompt, string $outputDir): void
     {
         if (! is_dir($outputDir) && ! mkdir($outputDir, 0777, true)) {
             throw new RuntimeException("Failed to create directory: {$outputDir}");
@@ -304,32 +318,24 @@ final class SqlFileAnalyzer
     }
 
     /**
-     * @param array<string, mixed>          $params
-     * @param array<string, AnalysisResult> $results
+     * @param array<string, mixed> $params
      *
      * @return AnalysisResult
      */
-    public function analyze(
-        string $sqlFile,
-        array $params,
-        string $outputDir,
-        array $results
-    ): array {
+    public function analyze(string $sqlFile, array $params): array
+    {
         $sql = $this->readSqlFile($sqlFile);
 
-        // デフォルト（オプティマイザーあり）の分析を実行
-        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
 
-        // オプティマイザーを無効化して分析
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         try {
             $this->optimizerSettings->disableAll();
-            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile, $outputDir);
+            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
 
-        // 両方の結果を含めて返す
         $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
         if ($noOptimizerAnalysisCost === 0) {
             $noOptimizerAnalysisCost = 1;
@@ -356,44 +362,32 @@ final class SqlFileAnalyzer
      *
      * @return AnalysisWithSettingsResult
      */
-    private function analyzeWithSettings(
-        string $sql,
-        array $params,
-        string $sqlFile,
-        string $outputDir
-    ): array {
+    private function analyzeWithSettings(string $sql, array $params, string $sqlFile): array
+    {
         $classification = $this->sqlSafetyClassifier->classify($sql);
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
         $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
-        /** @var ExplainResult $explainResult */
-        [$explainResult, $explainAnalyze] = $this->executeExplain($sql, $params, $executed);
-        /** @var list<array{Level: string, Code: int, Message: string}> $warnings */
-        $warnings = $this->getWarnings();
-        /** @var list<DetectedWarning> $issues */
-        $issues = $this->analyzer->analyze($explainResult, $warnings);
-        /** @var array<string, SchemaInfo> $schemaInfo */
-        $schemaInfo = $this->getSchemaInfo($sql);
-        $cost = $this->calculateCost($explainResult);
+        $context = $this->buildQueryContext($sql, $params);
+        $issues = $this->analyzer->analyze($context);
+        $cost = $this->calculateCost($context->explain);
 
         $aiPrompt = $this->aiAdvisor->generatePrompt(
             $sqlFile,
             $sql,
-            $explainResult,
-            $explainAnalyze,
-            $warnings,
+            $context->explain,
+            $context->explainAnalyze ?? 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)',
+            $context->warnings,
             $issues,
-            $schemaInfo,
+            $context->schema,
         );
-
-        $this->savePromptToMarkdown($sqlFile, $aiPrompt, $issues, $outputDir);
 
         return [
             'mode' => 'wd',
             'executed' => $executed,
             'skipped_reason' => $skippedReason,
             'issues' => $issues,
-            'explain_result' => $explainResult,
+            'explain_result' => $context->explain,
             'ai_suggestions' => $aiPrompt,
             'cost' => $cost,
             'execution_time' => $executionTime,
@@ -408,6 +402,12 @@ final class SqlFileAnalyzer
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
+
+        return $this->readOnlySession->run(fn (): float => $this->measureExecution($interpolatedSql));
+    }
+
+    private function measureExecution(string $interpolatedSql): float
+    {
         // warm up the cache
         $warmupStmt = $this->pdo->query($interpolatedSql);
         if ($warmupStmt === false) {

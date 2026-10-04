@@ -68,6 +68,6 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
 
-        $analyzer->analyze('ddl.sql', [], $this->tempSqlDir, []);
+        $analyzer->analyze('ddl.sql', []);
     }
 }

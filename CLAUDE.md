@@ -45,7 +45,7 @@ composer pcov
   - Running analysis with and without MySQL optimizer to compare execution plans
   - Generating Markdown reports with AI prompts
 
-- **ExplainAnalyzer** (`src/ExplainAnalyzer.php`): Analyzes EXPLAIN results using pattern matching and detectors. Returns detected warnings with documentation links.
+- **ExplainAnalyzer** (`src/ExplainAnalyzer.php`): Runs every detector over a `QueryContext` and returns the detected warnings with severity, confidence, evidence and documentation links.
 
 - **AIQueryAdvisor** (`src/AIQueryAdvisor.php`): Generates AI prompts containing SQL, schema info, EXPLAIN results, and detected issues. Extracts table names and schema information from the database.
 
@@ -54,12 +54,16 @@ composer pcov
 Issue detectors implement `DetectorInterface` (`src/Detector/DetectorInterface.php`):
 ```php
 interface DetectorInterface {
-    public function detect(array $explainResult): bool;
+    /** @return list<Finding> */
+    public function detect(QueryContext $context): array;
 }
 ```
 
+`QueryContext` (`src/QueryContext.php`) carries the interpolated SQL, `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE`, `SHOW WARNINGS` and the schema of the referenced tables. `Finding` (`src/Detector/Finding.php`) carries the evidence, one per matching table. Detectors are registered in the `ExplainAnalyzer` constructor. `tests/fixtures/*.json` are recorded contexts (`Fixture::load()`, re-record with `php tests/fixtures/record.php`); `DetectorCorpusTest` checks every fixture against `tests/fixtures/expected.php`.
+
 Existing detectors in `src/Detector/`:
 - ExcessiveDerivedTablesDetector
+- FullTableScanDetector
 - FunctionInvalidatesIndexDetector
 - ImplicitTypeConversionDetector
 - IneffectiveJoinDetector
@@ -68,6 +72,8 @@ Existing detectors in `src/Detector/`:
 - IneffectiveSortDetector
 - IneffectiveUnionDetector
 - LowCardinalityIndexDetector
+- MultiTableUpdateDetector
+- TemporaryTableGroupingDetector
 - UnnecessaryDistinctDetector
 
 ### Type Definitions

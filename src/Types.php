@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use stdClass;
+
 /**
  * @psalm-type ExplainCostInfo = array{
  *   query_cost?: float,
@@ -15,12 +17,17 @@ namespace Koriym\SqlQuality;
  * @psalm-type ExplainTable = array{
  *   table_name: string,
  *   access_type: string,
- *   possible_keys?: string|null,
- *   key?: string|null,
- *   rows: int,
- *   rows_examined_per_scan?: int,
- *   filtered?: float,
+ *   possible_keys?: list<string>,
+ *   key?: string,
+ *   used_key_parts?: list<string>,
+ *   ref?: list<string>,
+ *   rows_examined_per_scan?: int|numeric-string,
+ *   rows_produced_per_join?: int|numeric-string,
+ *   filtered?: float|numeric-string,
+ *   using_join_buffer?: string,
+ *   index_condition?: string,
  *   attached_condition?: string,
+ *   backward_index_scan?: bool,
  *   cost_info?: ExplainCostInfo,
  *   using_temporary_table?: bool,
  *   using_filesort?: bool,
@@ -98,41 +105,38 @@ namespace Koriym\SqlQuality;
  *   TemporaryTableGrouping: string,
  *   UnnecessaryDistinct: string
  * }
- * @psalm-type WarningPattern = array{
- *   explain?: array<string, bool|string>,
- *   warnings?: list<string>
- * }
  * @psalm-type Warning = array{
  *   message: string,
- *   pattern: WarningPattern,
- *   detector?: Detector\DetectorInterface
+ *   detector: Detector\DetectorInterface
  * }
  * @psalm-type WarningSeverity = 'Info'|'Warning'|'Critical'
- * @psalm-type WarningEvidence = array<string, mixed>
+ * @psalm-type Suggestion = array{kind: 'index'|'rewrite'|'review', description: string, ddl?: string, sql?: string}
  * @psalm-type DetectedWarning = array{
  *   type: WarningType,
  *   message: string,
  *   documentation: string,
  *   severity: WarningSeverity,
  *   confidence: float,
- *   evidence: WarningEvidence
+ *   detector: class-string<Detector\DetectorInterface>,
+ *   evidence: array<string, mixed>,
+ *   suggestion: Suggestion|null
  * }
  * @psalm-type TreeNodeAttributes = array<string, string>
  * @psalm-type SchemaColumn = array{
- *   column_name: string,
- *   data_type: string,
- *   column_type: string,
- *   is_nullable: string,
- *   column_key: string,
- *   column_default: string|null,
- *   extra: string
+ *   COLUMN_NAME: string,
+ *   DATA_TYPE: string,
+ *   COLUMN_TYPE: string,
+ *   IS_NULLABLE: string,
+ *   COLUMN_KEY: string,
+ *   COLUMN_DEFAULT: string|null,
+ *   EXTRA: string
  * }
  * @psalm-type SchemaIndex = array{
- *   index_name: string,
- *   column_name: string,
- *   non_unique: string,
- *   seq_in_index: string,
- *   cardinality: string|null
+ *   INDEX_NAME: string,
+ *   COLUMN_NAME: string,
+ *   NON_UNIQUE: int,
+ *   SEQ_IN_INDEX: int,
+ *   CARDINALITY: int|null
  * }
  * @psalm-type TableStatus = array{
  *   table_rows: int|null,
@@ -171,6 +175,31 @@ namespace Koriym\SqlQuality;
  *          time_percent: float
  *      }
  *   }
+ * }
+ * @psalm-type AnalysisRun = array{
+ *   results: array<string, AnalysisResult>,
+ *   skipped: array<string, string>
+ * }
+ * @psalm-type JsonReportQuery = array{
+ *   mode: 'wd',
+ *   executed: bool,
+ *   skipped_reason: string|null,
+ *   cost: float,
+ *   execution_time_ms: float|null,
+ *   issues: list<DetectedWarning>,
+ *   optimizer_impact: array{cost_reduction_percent: float}
+ * }
+ * @psalm-type JsonReport = array{
+ *   summary: array{
+ *     total_queries: int,
+ *     analyzed: int,
+ *     skipped: int,
+ *     avg_cost: float,
+ *     total_issues: int,
+ *     issues_by_severity: array<WarningSeverity, int>
+ *   },
+ *   queries: array<string, JsonReportQuery>|stdClass,
+ *   skipped: array<string, string>|stdClass
  * }
  * @psalm-type QueryStatisticsResult = array{
  *   total_count: int,
@@ -235,7 +264,6 @@ namespace Koriym\SqlQuality;
  *    std_dev: float
  *  }
  * @psalm-type QueryBlock = array<mixed>
- * @psalm-type ExplainWithSql = array{0: ExplainResult, 1: string}
  * @psalm-type AnalysisWithSettingsResult = array{
  *   mode: 'wd',
  *   executed: bool,

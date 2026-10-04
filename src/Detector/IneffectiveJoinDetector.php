@@ -4,9 +4,11 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
-use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Override;
 
+use function array_flip;
+use function array_intersect_key;
 use function array_map;
 use function array_slice;
 use function count;
@@ -19,11 +21,10 @@ use function is_numeric;
 class IneffectiveJoinDetector implements DetectorInterface
 {
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
-        $walker = new ExplainWalker();
         $joinGroups = [];
-        foreach ($walker->tableAccesses($explainResult) as $access) {
+        foreach ($context->tableAccesses() as $access) {
             $groupKey = $this->nestedLoopGroupKey($access['path']);
             if ($groupKey === null) {
                 continue;
@@ -32,6 +33,7 @@ class IneffectiveJoinDetector implements DetectorInterface
             $joinGroups[$groupKey][] = $access['table'];
         }
 
+        $findings = [];
         foreach ($joinGroups as $joinAccesses) {
             if (count($joinAccesses) < 2) {
                 continue;
@@ -39,12 +41,12 @@ class IneffectiveJoinDetector implements DetectorInterface
 
             foreach ($joinAccesses as $tableInfo) {
                 if ($this->isIneffectiveJoin($tableInfo)) {
-                    return true;
+                    $findings[] = new Finding(array_intersect_key($tableInfo, array_flip(['table_name', 'access_type', 'rows_examined_per_scan', 'rows_produced_per_join', 'cost_info'])));
                 }
             }
         }
 
-        return false;
+        return $findings;
     }
 
     /**

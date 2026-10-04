@@ -7,21 +7,19 @@ namespace Koriym\SqlQuality;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 
-use function array_filter;
 use function array_map;
-use function array_merge;
 use function array_slice;
 use function array_unique;
 use function array_values;
-use function assert;
+use function explode;
 use function implode;
-use function is_string;
 use function json_encode;
 use function max;
 use function preg_match;
 use function preg_match_all;
 use function preg_replace;
 use function sprintf;
+use function trim;
 
 use const JSON_THROW_ON_ERROR;
 
@@ -37,6 +35,7 @@ use const JSON_THROW_ON_ERROR;
 final class AIQueryAdvisor
 {
     private const ISSUE_DOC_URL = 'https://koriym.github.io/Koriym.SqlQuality/issues';
+    private const TABLE_LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?(?:\s*,\s*`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?)*)/i';
 
     private const ANALYSIS_TEMPLATE = <<<'TEMPLATE'
 # SQL Performance Analysis
@@ -159,8 +158,9 @@ TEMPLATE;
             "\n",
             array_map(
                 static fn (array $issue): string => sprintf(
-                    '- %s [Learn more](%s/%s)',
+                    '- %s%s [Learn more](%s/%s)',
                     $issue['message'],
+                    isset($issue['evidence']['table_name']) ? sprintf(' (table: %s)', (string) $issue['evidence']['table_name']) : '',
                     self::ISSUE_DOC_URL,
                     $issue['type'],
                 ),
@@ -210,18 +210,17 @@ TEMPLATE;
     /** @return list<string> */
     public function extractTableNames(string $sql): array
     {
-        // SQLコメントを削除
-        $sql = preg_replace('/--.*$/m', '', $sql);
-        assert(is_string($sql));
-        // キーワードの後にあるテーブル名を抽出
-        // AS/ON/WHEREなどの後のテーブル名は除外
-        if (preg_match_all('/(?:FROM|JOIN)\s+(?:`?(\w+)`?(?:\s+AS)?\s+[a-zA-Z]|`?(\w+)`?(?:\s|$))/i', $sql, $matches) !== false) {
-            $tables = array_filter(array_merge($matches[1], $matches[2]));
+        $sql = (string) preg_replace('/--.*$/m', '', $sql);
+        preg_match_all(self::TABLE_LIST, $sql, $matches);
 
-            return array_values(array_unique($tables));
+        $tables = [];
+        foreach ($matches[1] as $list) {
+            foreach (explode(',', $list) as $reference) {
+                $tables[] = trim((string) preg_replace('/\s.*/s', '', trim($reference)), '`');
+            }
         }
 
-        return [];
+        return array_values(array_unique($tables));
     }
 
     private function isValidTableName(string $tableName): bool

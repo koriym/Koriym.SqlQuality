@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function ctype_digit;
 use function ord;
 use function preg_match;
 use function preg_replace;
@@ -26,7 +27,7 @@ final class SqlSafetyClassifier
     /** @return SqlClassification */
     public function classify(string $sql): array
     {
-        if (self::containsStackedStatement($sql)) {
+        if (self::containsStackedStatement($sql, true) || self::containsStackedStatement($sql, false)) {
             return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
         }
 
@@ -91,8 +92,14 @@ final class SqlSafetyClassifier
         return trim($collapsed);
     }
 
-    /** @psalm-pure */
-    private static function containsStackedStatement(string $normalizedSql): bool
+    /**
+     * Whether a backslash escapes the next character in a string literal depends on the server's
+     * sql_mode (NO_BACKSLASH_ESCAPES), which a static classifier cannot see; a statement is
+     * rejected when either reading finds a second one.
+     *
+     * @psalm-pure
+     */
+    private static function containsStackedStatement(string $normalizedSql, bool $backslashEscapes): bool
     {
         $quote = null;
         $isEscaped = false;
@@ -107,7 +114,7 @@ final class SqlSafetyClassifier
             }
 
             if ($quote !== null) {
-                if ($char === '\\') {
+                if ($backslashEscapes && $char === '\\' && $quote !== '`') {
                     $isEscaped = true;
 
                     continue;
@@ -122,6 +129,12 @@ final class SqlSafetyClassifier
 
                     $quote = null;
                 }
+
+                continue;
+            }
+
+            if (self::isVersionedCommentStart($normalizedSql, $offset, $length)) {
+                $offset += 2;
 
                 continue;
             }
@@ -180,6 +193,7 @@ final class SqlSafetyClassifier
         $result = '';
         $quote = null;
         $isEscaped = false;
+        $inVersionedComment = false;
         $length = strlen($sql);
         for ($offset = 0; $offset < $length; $offset++) {
             $char = $sql[$offset];
@@ -193,7 +207,7 @@ final class SqlSafetyClassifier
 
             if ($quote !== null) {
                 $result .= $char;
-                if ($char === '\\') {
+                if ($char === '\\' && $quote !== '`') {
                     $isEscaped = true;
 
                     continue;
@@ -209,6 +223,28 @@ final class SqlSafetyClassifier
 
                     $quote = null;
                 }
+
+                continue;
+            }
+
+            if (self::isVersionedCommentStart($sql, $offset, $length)) {
+                // MySQL executes the body of /*!NNNNN ... */, so it stays SQL; only the markers go.
+                $result .= ' ';
+                $inVersionedComment = true;
+                $offset += 3;
+                while ($offset < $length && ctype_digit($sql[$offset])) {
+                    $offset++;
+                }
+
+                $offset--;
+
+                continue;
+            }
+
+            if ($inVersionedComment && $char === '*' && $offset + 1 < $length && $sql[$offset + 1] === '/') {
+                $result .= ' ';
+                $inVersionedComment = false;
+                $offset++;
 
                 continue;
             }
@@ -252,6 +288,15 @@ final class SqlSafetyClassifier
         }
 
         return $result;
+    }
+
+    /** @psalm-pure */
+    private static function isVersionedCommentStart(string $sql, int $offset, int $length): bool
+    {
+        return $offset + 2 < $length
+            && $sql[$offset] === '/'
+            && $sql[$offset + 1] === '*'
+            && $sql[$offset + 2] === '!';
     }
 
     /** @psalm-pure */

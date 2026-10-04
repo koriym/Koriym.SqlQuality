@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\ExplainWalker;
+use Koriym\SqlQuality\QueryContext;
 use Override;
+
+use function count;
 
 /**
  * Detects multi-table UPDATE plans.
@@ -17,20 +20,24 @@ final class MultiTableUpdateDetector implements DetectorInterface
 {
     /** @psalm-mutation-free */
     #[Override]
-    public function detect(array $explainResult): bool
+    public function detect(QueryContext $context): array
     {
         $walker = new ExplainWalker();
-        if ($walker->contains($explainResult, 'update_operation', 'multi_table')) {
-            return true;
+        if ($walker->contains($context->explain, 'update_operation', 'multi_table')) {
+            return [new Finding(['update_operation' => 'multi_table'])];
         }
 
-        $updatedTables = 0;
-        foreach ($walker->tables($explainResult) as $table) {
+        $updatedTables = [];
+        foreach ($context->tables() as $table) {
             if (($table['update'] ?? false) === true) {
-                $updatedTables++;
+                $updatedTables[] = $table['table_name'];
             }
         }
 
-        return $updatedTables > 1;
+        if (count($updatedTables) < 2) {
+            return [];
+        }
+
+        return [new Finding(['tables' => $updatedTables])];
     }
 }

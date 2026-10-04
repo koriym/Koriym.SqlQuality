@@ -63,6 +63,7 @@ $analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
 ```bash
 sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
 sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --output=build/sql-quality
+sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
 sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
 sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 ```
@@ -77,8 +78,19 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 | `--user=USER` | データベースユーザー | `root` |
 | `--password=PASS` | データベースパスワード | （空） |
 | `--format=FORMAT` | 出力フォーマット: `json`または`markdown` | `json` |
-| `--output=DIR` | Markdownレポートの出力ディレクトリ | |
+| `--output=DIR` | Markdownレポートの出力ディレクトリ（`--format=markdown`には必須） | |
+| `--fail-on=LEVEL` | `critical`・`warning`・`info`のいずれかを指定し、その水準以上の問題があれば1で終わる | なし |
 | `--lang=LANG` | メッセージの言語: `en`または`ja` | `en` |
+
+### 終了コード
+
+| コード | 意味 |
+|------|---------|
+| `0` | `--fail-on`の水準に達した問題がない |
+| `1` | `--fail-on`の水準に達した問題がある |
+| `2` | 使い方・データベース接続・パラメータファイルの誤り |
+
+分析できなかったファイルは終了コードを変えません。JSON出力の`skipped`に、ファイル名と理由が並びます。
 
 ## Claude Code Skills
 
@@ -210,3 +222,31 @@ $analyzer = new SqlFileAnalyzer(
 ```
 
 これにより、エラーメッセージとAI分析結果の両方を指定した言語で出力できます。
+
+## Detectorを書く
+
+Detectorは`src/Detector/`に置く`DetectorInterface`の実装です。`detect()`は`QueryContext`を受け取り、該当したテーブルや実行計画のノードごとに`Finding`を1つ返します。
+
+```php
+final class FullTableScanDetector implements DetectorInterface
+{
+    /** @return list<Finding> */
+    public function detect(QueryContext $context): array
+    {
+        $findings = [];
+        foreach ($context->tables() as $table) {
+            if ($table['access_type'] === 'ALL') {
+                $findings[] = new Finding(array_intersect_key($table, array_flip(['table_name', 'rows_examined_per_scan', 'possible_keys', 'key'])));
+            }
+        }
+
+        return $findings;
+    }
+}
+```
+
+`QueryContext`には、パラメータを埋めた`sql`、`explain`（`EXPLAIN FORMAT=JSON`）、`explainAnalyze`、`warnings`（`SHOW WARNINGS`）、テーブルごとの`schema`（information_schema）が入っています。`tables()`、`tableAccesses()`、`warningsWithCode()`、`indexColumns()`、`aliases()`、`schemaFor()`、`columnType()`、`primaryKeyColumns()`で読み出します。
+
+`Finding::$evidence`にはDetectorが判定の根拠にした値を入れます。実行計画から取った値はEXPLAINのキー名のまま、1つのテーブルについてのfindingなら`table_name`も含めます。この値はissueの`evidence`としてそのまま報告されます。`severity`、`confidence`、`suggestion`は省略でき、指定するとそのtypeの既定値に代わって使われます。
+
+テストには`tests/fixtures/`に記録済みの実行計画を使います。`Fixture::load('1_full_table_scan.sql')`が`tests/sql/1_full_table_scan.sql`の`QueryContext`を返し、`tests/fixtures/expected.php`には各fixtureが出すべきtypeが並んでいます。Detectorを登録するには、`ExplainAnalyzer`のコンストラクタに追加し、`src/Types.php`の`WarningType`と`WarningMessages`にtypeを、`ExplainAnalyzer::DEFAULT_MESSAGES`に既定メッセージを、`docs/issues/`にページを足します。
