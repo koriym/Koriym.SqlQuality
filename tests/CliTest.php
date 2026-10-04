@@ -170,6 +170,39 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('PDOException: SQLSTATE', $stderr);
     }
 
+    public function testExplainWithUnloadableParamsFileExitsWithTwo(): void
+    {
+        $paramsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_broken_params_', true) . '.php';
+        file_put_contents($paramsFile, "<?php\nreturn [broken\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/1_full_table_scan.sql',
+            '--params=' . $paramsFile,
+        ]);
+
+        unlink($paramsFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('Params file could not be loaded', $stderr);
+    }
+
+    public function testExplainOfSqlWithInvalidUtf8ExitsWithTwoInsteadOfAnEmptyReport(): void
+    {
+        $this->connect();
+
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_bad_utf8_', true) . '.sql';
+        file_put_contents($sqlFile, "SELECT \"\xe9\";");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('Report could not be encoded as JSON', $stderr);
+    }
+
     public function testUnwritableOutputDirExitsWithTwo(): void
     {
         $this->connect();

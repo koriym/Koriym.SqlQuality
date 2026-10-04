@@ -7,6 +7,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 use Koriym\SqlQuality\Exception\RuntimeException;
+use JsonException;
 use PDO;
 use PDOException;
 use stdClass;
@@ -29,6 +30,7 @@ use function str_ends_with;
 use function str_starts_with;
 
 use const JSON_PRETTY_PRINT;
+use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
@@ -292,10 +294,7 @@ USAGE;
             return $exitCode;
         }
 
-        $report = (new JsonReportGenerator())->generate($run);
-        fwrite(STDOUT, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
-
-        return $exitCode;
+        return $this->writeReport((new JsonReportGenerator())->generate($run), $exitCode);
     }
 
     /**
@@ -356,7 +355,26 @@ USAGE;
             'context' => $contextData,
         ];
 
-        fwrite(STDOUT, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+        return $this->writeReport($report, $exitCode);
+    }
+
+    /**
+     * json_encode() returns false for malformed UTF-8 in the report (the SQL text can carry it);
+     * that must not pass as a successful empty run.
+     *
+     * @param array<string, mixed> $report
+     */
+    private function writeReport(array $report, int $exitCode): int
+    {
+        try {
+            $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            fwrite(STDERR, "Error: Report could not be encoded as JSON: {$e->getMessage()}\n");
+
+            return 2;
+        }
+
+        fwrite(STDOUT, $json . PHP_EOL);
 
         return $exitCode;
     }
@@ -439,7 +457,14 @@ USAGE;
             return null;
         }
 
-        $decoded = require $paramsOption;
+        try {
+            $decoded = require $paramsOption;
+        } catch (Throwable $e) {
+            fwrite(STDERR, "Error: Params file could not be loaded: {$paramsOption}: {$e->getMessage()}\n");
+
+            return null;
+        }
+
         if (! is_array($decoded)) {
             fwrite(STDERR, "Error: Params file must return an array: {$paramsOption}\n");
 
