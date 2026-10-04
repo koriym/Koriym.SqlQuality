@@ -66,6 +66,7 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --outpu
 sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
 sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
 sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
+sql-quality explain --sql-file=sql/1_full_table_scan.sql --params='{"min_views":1000}'
 ```
 
 ### オプション
@@ -82,15 +83,28 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 | `--fail-on=LEVEL` | `critical`・`warning`・`info`のいずれかを指定し、その水準以上の問題があれば1で終わる | なし |
 | `--lang=LANG` | メッセージの言語: `en`または`ja` | `en` |
 
+### `explain`
+
+ディレクトリ全体ではなく、SQLファイル1本を分析し、構造化されたJSONを1つ出力します。`--dsn`・`--user`・`--password`・`--fail-on`・`--lang`は`analyze`と同じです。
+
+| オプション | 説明 | デフォルト |
+|--------|-------------|---------|
+| `--sql-file=FILE` | 分析するSQLファイル（必須） | |
+| `--params=JSON\|FILE` | JSONオブジェクトを直接渡すか、`analyze`の`--params`と同じ形式のPHPファイルを渡す | `{}` |
+
 ### 終了コード
 
 | コード | 意味 |
 |------|---------|
 | `0` | `--fail-on`の水準に達した問題がない |
 | `1` | `--fail-on`の水準に達した問題がある |
-| `2` | 使い方・データベース接続・パラメータファイルの誤り |
+| `2` | 使い方・データベース接続・パラメータファイル・未知の`--format`の誤り。`explain`ではさらに、分析できない文（DDLなど）やMySQLが拒否する文（存在しないテーブルなど）も含む |
 
-分析できなかったファイルは終了コードを変えません。JSON出力の`skipped`に、ファイル名と理由が並びます。
+`analyze`では、分析できなかったファイルは終了コードを変えません。JSON出力の`skipped`に、ファイル名と理由が並びます。`explain`では振り分け先のファイルがないため、同種の失敗は終了コード`2`で終了し、理由を標準エラー出力に出します。
+
+### JSON Schema
+
+両コマンドのJSON出力は[`schema/`](schema/)のスキーマに適合します。`analyze --format=json`の出力は[`analyze-report.schema.json`](schema/analyze-report.schema.json)に、`explain`の出力は[`explain-report.schema.json`](schema/explain-report.schema.json)に適合します。エージェントは出力を使う前にこのスキーマで検証できます。
 
 ## Claude Code Skills
 

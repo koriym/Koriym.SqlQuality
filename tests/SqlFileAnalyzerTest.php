@@ -83,6 +83,17 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertSame(['p' => 'posts', 'c' => 'comments'], $context->aliases());
     }
 
+    public function testExplainReturnsTheResultWithTheContextOfTheOptimizerEnabledPass(): void
+    {
+        ['result' => $result, 'context' => $context] = $this->createAnalyzer()
+            ->explain('11_nested_loop.sql', ['email' => 'example@example.com']);
+
+        $this->assertNotSame($result['cost'], $result['optimizer_comparison']['without_optimizer']['cost']);
+        $this->assertSame($result['cost'], (float) $context->explain['query_block']['cost_info']['query_cost']);
+        $this->assertStringContainsString("'example@example.com'", $context->sql);
+        $this->assertStringStartsWith('-> ', (string) $context->explainAnalyze);
+    }
+
     public function testAnalyzeSqlDirectoryWritesReportPerQueryAndSummary(): void
     {
         $this->outputDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_report_', true);

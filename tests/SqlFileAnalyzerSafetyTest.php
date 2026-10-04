@@ -4,7 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use Koriym\SqlQuality\Exception\RuntimeException;
+use Koriym\SqlQuality\Exception\NotExplainable;
+use Koriym\SqlQuality\Exception\NotReadOnlySelect;
 use PDO;
 use PHPUnit\Framework\TestCase;
 
@@ -46,8 +47,7 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
             new AIQueryAdvisor(''),
         );
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('Execution timing is limited to read-only SELECT statements');
+        $this->expectException(NotReadOnlySelect::class);
 
         $analyzer->getExecutedTime('UPDATE users SET id = id + 1', []);
     }
@@ -65,9 +65,27 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
             new AIQueryAdvisor(''),
         );
 
-        $this->expectException(RuntimeException::class);
-        $this->expectExceptionMessage('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
+        $this->expectException(NotExplainable::class);
+        $this->expectExceptionMessage('DDL statement is not explainable in WD mode');
 
         $analyzer->analyze('ddl.sql', []);
+    }
+
+    public function testAnalyzeSqlFilesPrefixesSkippedReasonWithExceptionClassNameAndClassifierReason(): void
+    {
+        $this->tempSqlDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_safety_', true);
+        mkdir($this->tempSqlDir);
+        file_put_contents($this->tempSqlDir . '/ddl.sql', 'CREATE TABLE users (id INT PRIMARY KEY)');
+
+        $analyzer = new SqlFileAnalyzer(
+            new PDO('sqlite::memory:'),
+            new ExplainAnalyzer(),
+            $this->tempSqlDir,
+            new AIQueryAdvisor(''),
+        );
+
+        $run = $analyzer->analyzeSQLFiles(['ddl.sql' => []]);
+
+        $this->assertSame('NotExplainable: DDL statement is not explainable in WD mode', $run['skipped']['ddl.sql']);
     }
 }

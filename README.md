@@ -68,6 +68,7 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --outpu
 sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
 sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
 sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
+sql-quality explain --sql-file=sql/1_full_table_scan.sql --params='{"min_views":1000}'
 ```
 
 ### Options
@@ -84,15 +85,28 @@ sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
 | `--fail-on=LEVEL` | Exit 1 when an issue of `critical`, `warning` or `info` level or above is found | none |
 | `--lang=LANG` | Language for messages: `en` or `ja` | `en` |
 
+### `explain`
+
+Analyzes one SQL file and prints a single structured JSON report, instead of scanning a whole directory. `--dsn`, `--user`, `--password`, `--fail-on` and `--lang` behave the same as for `analyze`.
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `--sql-file=FILE` | Single SQL file to explain (required) | |
+| `--params=JSON\|FILE` | Inline JSON object, or a PHP file in the same format as `analyze`'s `--params` | `{}` |
+
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
 | `0` | No issue reached the `--fail-on` level |
 | `1` | An issue reached the `--fail-on` level |
-| `2` | Usage, database connection or params file error |
+| `2` | Usage, database connection, params file, or unknown `--format` error; for `explain`, also a query that cannot be explained (e.g. DDL) or that MySQL rejects (e.g. a missing table) |
 
-A file that cannot be analyzed does not change the exit code. It is listed with its reason under `skipped` in the JSON output.
+For `analyze`, a file that cannot be analyzed does not change the exit code — it is listed with its reason under `skipped` in the JSON output. For `explain`, the same kind of failure has no file to skip into, so it exits with code `2` and prints the reason to stderr instead.
+
+### JSON Schema
+
+Both commands' JSON output conforms to a schema in [`schema/`](schema/): [`analyze-report.schema.json`](schema/analyze-report.schema.json) for `analyze --format=json`, [`explain-report.schema.json`](schema/explain-report.schema.json) for `explain`. An agent can validate the CLI output against either schema before acting on it.
 
 ## Claude Code Skills
 

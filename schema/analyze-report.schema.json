@@ -1,0 +1,120 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://koriym.github.io/Koriym.SqlQuality/schema/analyze-report.schema.json",
+  "title": "Koriym.SqlQuality analyze report",
+  "description": "Output of `sql-quality analyze --format=json`.",
+  "type": "object",
+  "required": ["summary", "queries", "skipped"],
+  "additionalProperties": false,
+  "properties": {
+    "summary": {
+      "type": "object",
+      "required": ["total_queries", "analyzed", "skipped", "avg_cost", "total_issues", "issues_by_severity"],
+      "additionalProperties": false,
+      "properties": {
+        "total_queries": { "type": "integer", "minimum": 0 },
+        "analyzed": { "type": "integer", "minimum": 0 },
+        "skipped": { "type": "integer", "minimum": 0 },
+        "avg_cost": { "type": "number" },
+        "total_issues": { "type": "integer", "minimum": 0 },
+        "issues_by_severity": {
+          "type": "object",
+          "required": ["Critical", "Warning", "Info"],
+          "additionalProperties": false,
+          "properties": {
+            "Critical": { "type": "integer", "minimum": 0 },
+            "Warning": { "type": "integer", "minimum": 0 },
+            "Info": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "queries": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/query" }
+    },
+    "skipped": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "query": {
+      "type": "object",
+      "required": ["mode", "executed", "skipped_reason", "cost", "execution_time_ms", "issues", "optimizer_impact"],
+      "additionalProperties": false,
+      "properties": {
+        "mode": { "const": "wd" },
+        "executed": { "type": "boolean" },
+        "skipped_reason": { "type": ["string", "null"] },
+        "cost": { "type": "number" },
+        "execution_time_ms": { "type": ["number", "null"] },
+        "issues": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/issue" }
+        },
+        "optimizer_impact": {
+          "type": "object",
+          "required": ["cost_reduction_percent"],
+          "additionalProperties": false,
+          "properties": {
+            "cost_reduction_percent": { "type": "number" }
+          }
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": ["type", "message", "documentation", "severity", "confidence", "detector", "evidence", "suggestion"],
+      "additionalProperties": false,
+      "properties": {
+        "type": {
+          "enum": [
+            "CartesianProduct",
+            "DeepOffset",
+            "DependentSubquery",
+            "EstimateDivergence",
+            "ExcessiveDerivedTables",
+            "FunctionInvalidatesIndex",
+            "FullTableScan",
+            "ImplicitTypeConversion",
+            "IneffectiveJoin",
+            "IneffectiveLikePattern",
+            "IneffectiveRangeScan",
+            "IneffectiveSort",
+            "IneffectiveUnion",
+            "LowCardinalityIndex",
+            "MultiTableUpdate",
+            "OrderByRand",
+            "TemporaryTableGrouping",
+            "UnnecessaryDistinct"
+          ]
+        },
+        "message": { "type": "string" },
+        "documentation": { "type": "string", "format": "uri" },
+        "severity": { "$ref": "#/$defs/severity" },
+        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
+        "detector": { "type": "string" },
+        "evidence": { "type": "object" },
+        "suggestion": { "$ref": "#/$defs/suggestion" }
+      }
+    },
+    "suggestion": {
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "object",
+          "required": ["kind", "description"],
+          "additionalProperties": false,
+          "properties": {
+            "kind": { "enum": ["index", "rewrite", "review"] },
+            "description": { "type": "string" },
+            "ddl": { "type": "string" },
+            "sql": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "severity": { "enum": ["Critical", "Warning", "Info"] }
+  }
+}

@@ -59,15 +59,27 @@ For each suggested index:
    CREATE INDEX idx_name ON table(columns);
    ```
 
-2. **Re-analyze**
+2. **Re-analyze the target file only**
+   ```bash
+   php bin/sql-quality explain \
+     --sql-file="$(echo $ARGUMENTS | cut -d' ' -f1)/<file>" \
+     --params="$(echo $ARGUMENTS | cut -d' ' -f2)"
+   ```
 
 3. **Evaluate impact**
+   - Compare `cost` against the file's cost before this index, and check
+     whether the table node under `context.explain.query_block.table` (or
+     `nested_loop[*].table`)'s `access_type` / `key` now show the new
+     index being used
    - Cost improved ≥ 5% → Keep index
    - Cost not improved → Rollback
      ```sql
      DROP INDEX idx_name ON table;
      ```
      Record as "ineffective, rolled back"
+
+Once every candidate index has been tried, re-run Step 0's `analyze` over the
+whole directory once to get the final `total_cost` for Step 3.
 
 ### Step 3: Generate Report
 

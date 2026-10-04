@@ -6,23 +6,31 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
+use Koriym\SqlQuality\Exception\RuntimeException;
+use JsonException;
 use PDO;
 use PDOException;
-use RuntimeException;
+use stdClass;
 use Throwable;
 
 use function array_slice;
+use function basename;
 use function count;
+use function dirname;
 use function file_exists;
 use function fwrite;
 use function in_array;
 use function ini_set;
 use function is_array;
 use function is_string;
+use function json_decode;
 use function json_encode;
 use function preg_match;
+use function str_ends_with;
+use function str_starts_with;
 
 use const JSON_PRETTY_PRINT;
+use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
@@ -64,19 +72,23 @@ SQL Quality Analyzer - Detect performance issues in SQL queries
 
 Usage:
   sql-quality analyze [options]
+  sql-quality explain [options]
   sql-quality --help
   sql-quality --version
 
 Commands:
   analyze    Analyze SQL files for performance issues
+  explain    Explain one SQL file and print structured JSON
 
 Options:
-  --sql-dir=DIR       Directory containing SQL files (required)
-  --params=FILE       PHP file returning SQL parameters array (required)
+  --sql-dir=DIR       Directory containing SQL files (analyze, required)
+  --sql-file=FILE     Single SQL file to explain (explain, required)
+  --params=FILE       PHP file returning SQL parameters array (analyze, required)
+  --params=JSON|FILE  Inline JSON object or PHP file (explain, default: {})
   --dsn=DSN           Database DSN (default: mysql:host=127.0.0.1;dbname=test)
   --user=USER         Database user (default: root)
   --password=PASS     Database password (default: empty)
-  --format=FORMAT     Output format: json or markdown (default: json)
+  --format=FORMAT     Output format: json or markdown (analyze, default: json)
   --output=DIR        Output directory for markdown reports (required with --format=markdown)
   --fail-on=LEVEL     Exit 1 when an issue of critical, warning or info level
                       or above is found (default: never exit 1)
@@ -87,12 +99,13 @@ Options:
 Exit codes:
   0  No issue reached the --fail-on level
   1  An issue reached the --fail-on level
-  2  Usage, database connection or params file error
+  2  Usage, database connection, params or SQL file error
 
 Examples:
   sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
   sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
   sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb"
+  sql-quality explain --sql-file=sql/1_full_table_scan.sql --params='{"min_views":1000}'
 
 USAGE;
 
@@ -153,7 +166,7 @@ USAGE;
         }
 
         $command = $argv[1] ?? '';
-        if ($command !== 'analyze') {
+        if (! in_array($command, ['analyze', 'explain'], true)) {
             fwrite(STDERR, "Unknown command: {$command}\n");
             fwrite(STDERR, "Run 'sql-quality --help' for usage.\n");
             return 2;
@@ -163,9 +176,17 @@ USAGE;
         $options = $this->parseOptions(array_slice($argv, 2));
 
         try {
-            return $this->analyze($options);
+            return $command === 'analyze' ? $this->analyze($options) : $this->explain($options);
+        } catch (InvalidSeverityThreshold $e) {
+            fwrite(STDERR, "Error: --fail-on accepts critical, warning or info, not: {$e->getMessage()}\n");
+
+            return 2;
         } catch (RuntimeException $e) {
             fwrite(STDERR, "Error: {$e->getMessage()}\n");
+
+            return 2;
+        } catch (PDOException $e) {
+            fwrite(STDERR, "Error: Database connection failed: {$e->getMessage()}\n");
 
             return 2;
         }
@@ -188,7 +209,12 @@ USAGE;
         return $options;
     }
 
-    /** @param array<string, string|false> $options */
+    /**
+     * @param array<string, string|false> $options
+     *
+     * @throws InvalidSeverityThreshold
+     * @throws PDOException
+     */
     private function analyze(array $options): int
     {
         $sqlDir = $options['sql-dir'] ?? null;
@@ -226,30 +252,8 @@ USAGE;
             return 2;
         }
 
-        $failOn = $options['fail-on'] ?? null;
-        $threshold = null;
-        if ($failOn !== null) {
-            try {
-                $threshold = new SeverityThreshold(is_string($failOn) ? $failOn : '');
-            } catch (InvalidSeverityThreshold $e) {
-                fwrite(STDERR, "Error: --fail-on accepts critical, warning or info, not: {$e->getMessage()}\n");
-
-                return 2;
-            }
-        }
-
-        $dsn = (string) ($options['dsn'] ?? 'mysql:host=127.0.0.1;dbname=test');
-        $user = (string) ($options['user'] ?? 'root');
-        $password = (string) ($options['password'] ?? '');
-        $lang = $options['lang'] ?? 'en';
-
-        try {
-            $pdo = new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
-        } catch (PDOException $e) {
-            fwrite(STDERR, "Error: Database connection failed: {$e->getMessage()}\n");
-
-            return 2;
-        }
+        $threshold = $this->parseFailOnThreshold($options);
+        $pdo = $this->connectPdo($options);
 
         try {
             $sqlParams = require $paramsFile;
@@ -273,19 +277,8 @@ USAGE;
             }
         }
 
-        $messages = $lang === 'ja' ? self::MESSAGES_JA : self::MESSAGES_EN;
-        $instruction = $lang === 'ja'
-            ? '以上の分析を日本語で記述してください。'
-            : 'Please provide your analysis in English.';
-
         /** @var array<string, array<string, mixed>> $sqlParams */
-        $analyzer = new SqlFileAnalyzer(
-            $pdo,
-            new ExplainAnalyzer($messages),
-            $sqlDir,
-            new AIQueryAdvisor($instruction),
-            new OptimizerSettings($pdo),
-        );
+        $analyzer = $this->buildAnalyzer($pdo, $sqlDir, $options);
 
         $run = $analyzer->analyzeSQLFiles($sqlParams);
         $exitCode = $threshold !== null && $threshold->isMetBy($run) ? 1 : 0;
@@ -301,10 +294,206 @@ USAGE;
             return $exitCode;
         }
 
-        $report = (new JsonReportGenerator())->generate($run);
-        fwrite(STDOUT, json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL);
+        return $this->writeReport((new JsonReportGenerator())->generate($run), $exitCode);
+    }
+
+    /**
+     * @param array<string, string|false> $options
+     *
+     * @throws InvalidSeverityThreshold
+     * @throws PDOException
+     */
+    private function explain(array $options): int
+    {
+        $sqlFile = $options['sql-file'] ?? null;
+        if (! is_string($sqlFile) || $sqlFile === '') {
+            fwrite(STDERR, "Error: --sql-file is required.\n");
+
+            return 2;
+        }
+
+        if (! file_exists($sqlFile)) {
+            fwrite(STDERR, "Error: SQL file not found: {$sqlFile}\n");
+
+            return 2;
+        }
+
+        $sqlFileName = basename($sqlFile);
+        $params = $this->resolveExplainParams($sqlFileName, $options['params'] ?? null);
+        if ($params === null) {
+            return 2;
+        }
+
+        $threshold = $this->parseFailOnThreshold($options);
+        $pdo = $this->connectPdo($options);
+        $analyzer = $this->buildAnalyzer($pdo, dirname($sqlFile), $options);
+
+        try {
+            ['result' => $result, 'context' => $context] = $analyzer->explain($sqlFileName, $params);
+        } catch (RuntimeException | PDOException $e) {
+            fwrite(STDERR, 'Error: ' . SqlFileAnalyzer::exceptionLabel($e) . ": {$e->getMessage()}\n");
+
+            return 2;
+        }
+
+        $exitCode = $threshold !== null && $threshold->isMetBy(['results' => [$sqlFileName => $result], 'skipped' => []]) ? 1 : 0;
+
+        // context.schema is an associative array keyed by table name; a table-free query leaves it
+        // empty, and json_encode() would emit [] there instead of the {} the schema requires.
+        $contextData = $context->toArray();
+        $contextData['schema'] = $contextData['schema'] === [] ? new stdClass() : $contextData['schema'];
+
+        $report = [
+            'file' => $sqlFileName,
+            'sql' => $context->sql,
+            'executed' => $result['executed'],
+            'skipped_reason' => $result['skipped_reason'],
+            'cost' => $result['cost'],
+            'execution_time_ms' => $result['executed'] ? $result['execution_time'] * 1000 : null,
+            'issues' => $result['issues'],
+            'optimizer_impact' => ['cost_reduction_percent' => JsonReportGenerator::costReductionPercent($result['optimizer_comparison']['difference']['cost_percent'])],
+            'context' => $contextData,
+        ];
+
+        return $this->writeReport($report, $exitCode);
+    }
+
+    /**
+     * json_encode() returns false for malformed UTF-8 in the report (the SQL text can carry it);
+     * that must not pass as a successful empty run.
+     *
+     * @param array<string, mixed> $report
+     */
+    private function writeReport(array $report, int $exitCode): int
+    {
+        try {
+            $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR);
+        } catch (JsonException $e) {
+            fwrite(STDERR, "Error: Report could not be encoded as JSON: {$e->getMessage()}\n");
+
+            return 2;
+        }
+
+        fwrite(STDOUT, $json . PHP_EOL);
 
         return $exitCode;
+    }
+
+    /**
+     * @param array<string, string|false> $options
+     *
+     * @throws InvalidSeverityThreshold
+     */
+    private function parseFailOnThreshold(array $options): SeverityThreshold|null
+    {
+        $failOn = $options['fail-on'] ?? null;
+        if ($failOn === null) {
+            return null;
+        }
+
+        return new SeverityThreshold(is_string($failOn) ? $failOn : '');
+    }
+
+    /**
+     * @param array<string, string|false> $options
+     *
+     * @throws PDOException
+     */
+    private function connectPdo(array $options): PDO
+    {
+        $dsn = (string) ($options['dsn'] ?? 'mysql:host=127.0.0.1;dbname=test');
+        $user = (string) ($options['user'] ?? 'root');
+        $password = (string) ($options['password'] ?? '');
+
+        return new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+    }
+
+    /** @param array<string, string|false> $options */
+    private function buildAnalyzer(PDO $pdo, string $sqlDir, array $options): SqlFileAnalyzer
+    {
+        $lang = $options['lang'] ?? 'en';
+        $messages = $lang === 'ja' ? self::MESSAGES_JA : self::MESSAGES_EN;
+        $instruction = $lang === 'ja'
+            ? '以上の分析を日本語で記述してください。'
+            : 'Please provide your analysis in English.';
+
+        return new SqlFileAnalyzer(
+            $pdo,
+            new ExplainAnalyzer($messages),
+            $sqlDir,
+            new AIQueryAdvisor($instruction),
+            new OptimizerSettings($pdo),
+        );
+    }
+
+    /** @return array<string, mixed>|null null means the value was invalid and an error was already written */
+    private function resolveExplainParams(string $sqlFileName, string|false|null $paramsOption): array|null
+    {
+        if ($paramsOption === null) {
+            return [];
+        }
+
+        if ($paramsOption === false) {
+            fwrite(STDERR, "Error: --params requires a value.\n");
+
+            return null;
+        }
+
+        if (str_starts_with($paramsOption, '{')) {
+            $decoded = json_decode($paramsOption, true);
+            if (! is_array($decoded)) {
+                fwrite(STDERR, "Error: --params is not valid JSON: {$paramsOption}\n");
+
+                return null;
+            }
+
+            /** @var array<string, mixed> $decoded */
+            return $decoded;
+        }
+
+        if (! file_exists($paramsOption)) {
+            fwrite(STDERR, "Error: Params file not found: {$paramsOption}\n");
+
+            return null;
+        }
+
+        try {
+            $decoded = require $paramsOption;
+        } catch (Throwable $e) {
+            fwrite(STDERR, "Error: Params file could not be loaded: {$paramsOption}: {$e->getMessage()}\n");
+
+            return null;
+        }
+
+        if (! is_array($decoded)) {
+            fwrite(STDERR, "Error: Params file must return an array: {$paramsOption}\n");
+
+            return null;
+        }
+
+        if ($this->isKeyedBySqlFile($decoded)) {
+            /** @var array<string, array<string, mixed>> $decoded */
+            return $decoded[$sqlFileName] ?? [];
+        }
+
+        /** @var array<string, mixed> $decoded */
+        return $decoded;
+    }
+
+    /** @param array<array-key, mixed> $decoded */
+    private function isKeyedBySqlFile(array $decoded): bool
+    {
+        if ($decoded === []) {
+            return false;
+        }
+
+        foreach ($decoded as $key => $value) {
+            if (! is_string($key) || ! str_ends_with($key, '.sql') || ! is_array($value)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 }
 

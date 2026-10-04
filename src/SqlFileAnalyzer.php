@@ -4,8 +4,13 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\InvalidExplainResult;
+use Koriym\SqlQuality\Exception\NotExplainable;
+use Koriym\SqlQuality\Exception\NotReadOnlySelect;
+use Koriym\SqlQuality\Exception\QueryFailed;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
+use Throwable;
 
 use function array_keys;
 use function array_map;
@@ -29,6 +34,9 @@ use function mkdir;
 use function pathinfo;
 use function preg_replace;
 use function sort;
+use function strrpos;
+use function substr;
+use function var_export;
 
 use const PATHINFO_FILENAME;
 
@@ -115,11 +123,20 @@ final class SqlFileAnalyzer
             try {
                 $results[$sqlFile] = $this->analyze($sqlFile, $params);
             } catch (\RuntimeException $e) {
-                $skipped[$sqlFile] = $e->getMessage();
+                $skipped[$sqlFile] = self::exceptionLabel($e) . ': ' . $e->getMessage();
             }
         }
 
         return ['results' => $results, 'skipped' => $skipped];
+    }
+
+    /** short class name, so a skipped-file reason or stderr line reads e.g. "NotExplainable: …" rather than a bare message */
+    public static function exceptionLabel(Throwable $e): string
+    {
+        $class = $e::class;
+        $separator = strrpos($class, '\\');
+
+        return $separator === false ? $class : substr($class, $separator + 1);
     }
 
     /** @param ExplainResult $explainResult */
@@ -162,8 +179,9 @@ final class SqlFileAnalyzer
      */
     private function buildQueryContext(string $sql, array $params): QueryContext
     {
-        if (! $this->sqlSafetyClassifier->isExplainable($sql)) {
-            throw new RuntimeException('EXPLAIN FORMAT=JSON is limited to SELECT and DML statements');
+        $classification = $this->sqlSafetyClassifier->classify($sql);
+        if (! $classification['is_explainable']) {
+            throw new NotExplainable($classification['reason']);
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
@@ -201,16 +219,16 @@ final class SqlFileAnalyzer
         }
 
         if (! is_string($explainJson)) {
-            throw new RuntimeException('Invalid EXPLAIN result');
+            throw new InvalidExplainResult(var_export($explainJson, true));
         }
 
         $explainJsonData = json_decode($explainJson, true);
         if (! is_array($explainJsonData)) {
-            throw new RuntimeException('Invalid EXPLAIN JSON result');
+            throw new InvalidExplainResult($explainJson);
         }
 
         if (! isset($explainJsonData['query_block']) || ! is_array($explainJsonData['query_block'])) {
-            throw new RuntimeException('Invalid EXPLAIN JSON query block');
+            throw new InvalidExplainResult($explainJson);
         }
 
         /** @var ExplainResult $explainJsonData */
@@ -327,20 +345,60 @@ final class SqlFileAnalyzer
         $sql = $this->readSqlFile($sqlFile);
 
         $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
 
+        return $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis);
+    }
+
+    /**
+     * Analyzes one SQL file and returns the QueryContext built for the optimizer-enabled pass alongside
+     * the result, so a caller that needs both does not trigger a third EXPLAIN / EXPLAIN ANALYZE round trip.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array{result: AnalysisResult, context: QueryContext}
+     *
+     * @throws RuntimeException
+     */
+    public function explain(string $sqlFile, array $params): array
+    {
+        $sql = $this->readSqlFile($sqlFile);
+        $context = $this->buildQueryContext($sql, $params);
+
+        $defaultAnalysis = $this->analyzeContext($context, $sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
+
+        return [
+            'result' => $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis),
+            'context' => $context,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
+    private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile): array
+    {
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         try {
             $this->optimizerSettings->disableAll();
-            $noOptimizerAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
+
+            return $this->analyzeWithSettings($sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
+    }
 
-        $noOptimizerAnalysisCost = $noOptimizerAnalysis['cost'];
-        if ($noOptimizerAnalysisCost === 0) {
-            $noOptimizerAnalysisCost = 1;
-        }
-
+    /**
+     * @param AnalysisWithSettingsResult $defaultAnalysis
+     * @param AnalysisWithSettingsResult $noOptimizerAnalysis
+     *
+     * @return AnalysisResult
+     */
+    private function combineOptimizerComparison(array $defaultAnalysis, array $noOptimizerAnalysis): array
+    {
         $noOptimizerCost = (float) $noOptimizerAnalysis['cost'];
         $noOptimizerTime = (float) $noOptimizerAnalysis['execution_time'];
 
@@ -364,11 +422,20 @@ final class SqlFileAnalyzer
      */
     private function analyzeWithSettings(string $sql, array $params, string $sqlFile): array
     {
+        return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisWithSettingsResult
+     */
+    private function analyzeContext(QueryContext $context, string $sql, array $params, string $sqlFile): array
+    {
         $classification = $this->sqlSafetyClassifier->classify($sql);
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
         $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
-        $context = $this->buildQueryContext($sql, $params);
         $issues = $this->analyzer->analyze($context);
         $cost = $this->calculateCost($context->explain);
 
@@ -398,7 +465,7 @@ final class SqlFileAnalyzer
     public function getExecutedTime(string $sql, array $params): float
     {
         if (! $this->sqlSafetyClassifier->isReadOnlySelect($sql)) {
-            throw new RuntimeException('Execution timing is limited to read-only SELECT statements');
+            throw new NotReadOnlySelect($sql);
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
@@ -411,14 +478,14 @@ final class SqlFileAnalyzer
         // warm up the cache
         $warmupStmt = $this->pdo->query($interpolatedSql);
         if ($warmupStmt === false) {
-            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            throw new QueryFailed($interpolatedSql);
         }
 
         $warmupStmt->fetchAll();
 
         $secondWarmupStmt = $this->pdo->query($interpolatedSql);
         if ($secondWarmupStmt === false) {
-            throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+            throw new QueryFailed($interpolatedSql);
         }
 
         $secondWarmupStmt->fetchAll();
@@ -428,7 +495,7 @@ final class SqlFileAnalyzer
             $startTime = microtime(true);
             $stmt = $this->pdo->query($interpolatedSql);
             if ($stmt === false) {
-                throw new RuntimeException('Failed to execute SQL query:' . $interpolatedSql);
+                throw new QueryFailed($interpolatedSql);
             }
 
             // Fetch all results to ensure:

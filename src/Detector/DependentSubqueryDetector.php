@@ -44,7 +44,7 @@ final class DependentSubqueryDetector implements DetectorInterface
     private function dependentPaths(array $node, array $path): array
     {
         $paths = [];
-        // EXISTS usually becomes a semijoin without "dependent" (11_nested_loop.sql); Note 1276 alone is not evidence
+        // Note 1276 alone is not evidence: an EXISTS usually becomes a semijoin without "dependent"
         if (($node['dependent'] ?? false) === true) {
             $paths[] = $path;
         }

@@ -99,6 +99,110 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('--output', $stderr);
     }
 
+    public function testExplainWithFlatListParamsFileInterpolatesTheList(): void
+    {
+        $this->connect();
+
+        $paramsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_flat_params_', true) . '.php';
+        file_put_contents($paramsFile, "<?php\nreturn ['listed_params' => ['Alice', 'Bob']];\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/15_listed_parameters.sql',
+            '--params=' . $paramsFile,
+        ]);
+
+        unlink($paramsFile);
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+
+        $report = json_decode($stdout, true);
+        $this->assertIsArray($report);
+        $this->assertStringContainsString("IN ('Alice','Bob')", $report['sql']);
+    }
+
+    public function testExplainCostReductionPercentIsPositiveZeroNotNegativeZeroWhenCostIsUnchanged(): void
+    {
+        $this->connect();
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/12_select1.sql',
+            '--params={}',
+        ]);
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+
+        $report = json_decode($stdout, true);
+        $this->assertIsArray($report);
+        $this->assertStringContainsString('"cost_reduction_percent": 0', $stdout);
+        $this->assertStringNotContainsString('"cost_reduction_percent": -0', $stdout);
+    }
+
+    public function testExplainOfDdlStatementExitsWithTwoAndReportsClassifierReason(): void
+    {
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_ddl_', true) . '.sql';
+        file_put_contents($sqlFile, 'CREATE TABLE sqlquality_probe (id INT PRIMARY KEY)');
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('NotExplainable: DDL statement is not explainable in WD mode', $stderr);
+        $this->assertStringNotContainsString('CREATE TABLE', $stderr);
+    }
+
+    public function testExplainOfMissingTableExitsWithTwoAndReportsPdoException(): void
+    {
+        $this->connect();
+
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_missing_table_', true) . '.sql';
+        file_put_contents($sqlFile, 'SELECT * FROM sqlquality_table_that_does_not_exist');
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('PDOException: SQLSTATE', $stderr);
+    }
+
+    public function testExplainWithUnloadableParamsFileExitsWithTwo(): void
+    {
+        $paramsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_broken_params_', true) . '.php';
+        file_put_contents($paramsFile, "<?php\nreturn [broken\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli([
+            '--sql-file=' . __DIR__ . '/sql/1_full_table_scan.sql',
+            '--params=' . $paramsFile,
+        ]);
+
+        unlink($paramsFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('Params file could not be loaded', $stderr);
+    }
+
+    public function testExplainOfSqlWithInvalidUtf8ExitsWithTwoInsteadOfAnEmptyReport(): void
+    {
+        $this->connect();
+
+        $sqlFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_bad_utf8_', true) . '.sql';
+        file_put_contents($sqlFile, "SELECT \"\xe9\";");
+
+        [$exitCode, $stdout, $stderr] = $this->runExplainCli(['--sql-file=' . $sqlFile]);
+
+        unlink($sqlFile);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('Report could not be encoded as JSON', $stderr);
+    }
+
     public function testUnwritableOutputDirExitsWithTwo(): void
     {
         $this->connect();
@@ -191,6 +295,28 @@ final class CliTest extends MySqlTestCase
         }
 
         $process = proc_open(array_merge($command, $args), [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
+        if ($process === false) {
+            $this->fail('Failed to start the CLI');
+        }
+
+        $stdout = (string) stream_get_contents($pipes[1]);
+        $stderr = (string) stream_get_contents($pipes[2]);
+        fclose($pipes[1]);
+        fclose($pipes[2]);
+
+        return [proc_close($process), $stdout, $stderr];
+    }
+
+    /**
+     * @param list<string> $args
+     *
+     * @return array{0: int, 1: string, 2: string}
+     */
+    private function runExplainCli(array $args): array
+    {
+        $command = array_merge([PHP_BINARY, dirname(__DIR__) . '/bin/sql-quality', 'explain'], $args);
+
+        $process = proc_open($command, [1 => ['pipe', 'w'], 2 => ['pipe', 'w']], $pipes);
         if ($process === false) {
             $this->fail('Failed to start the CLI');
         }

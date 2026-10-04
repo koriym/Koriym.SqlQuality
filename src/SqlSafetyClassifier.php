@@ -14,8 +14,6 @@ use function substr;
 use function trim;
 
 /**
- * Classifies SQL statements before WD execution.
- *
  * EXPLAIN FORMAT=JSON is safe for SELECT and DML, but EXPLAIN ANALYZE and
  * timing loops execute the statement and are restricted to read-only SELECT.
  *

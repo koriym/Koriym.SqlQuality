@@ -13,12 +13,9 @@ use function is_array;
 use function is_int;
 
 /**
- * Traverses MySQL EXPLAIN FORMAT=JSON structures.
- *
- * EXPLAIN JSON can place table access under query_block.table,
- * nested_loop[*].table, ordering_operation, grouping_operation,
- * duplicates_removal, union_result, and subqueries. This walker keeps
- * detectors from re-implementing ad-hoc recursion for each shape.
+ * Enumerates table access wherever EXPLAIN FORMAT=JSON places it: query_block.table,
+ * nested_loop[*].table, ordering_operation, grouping_operation, duplicates_removal,
+ * union_result and subqueries.
  *
  * @psalm-immutable
  * @psalm-import-type ExplainNode from Types
