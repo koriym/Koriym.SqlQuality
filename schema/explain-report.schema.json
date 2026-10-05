@@ -48,10 +48,11 @@
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "required": ["table"],
+                    "required": ["table", "select"],
                     "additionalProperties": false,
                     "properties": {
                       "table": { "type": "string" },
+                      "select": { "type": "integer", "description": "select_id of the query block the table belongs to" },
                       "range_analysis": { "type": "object" },
                       "considered_access_paths": { "type": "array" },
                       "rechecking_index_usage": { "type": "object" }

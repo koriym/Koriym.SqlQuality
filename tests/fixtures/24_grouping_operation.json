@@ -156,6 +156,7 @@
         "tables": [
             {
                 "table": "comments",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 10017,

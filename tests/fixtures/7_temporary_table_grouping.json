@@ -166,6 +166,7 @@
         "tables": [
             {
                 "table": "orders",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 2000,

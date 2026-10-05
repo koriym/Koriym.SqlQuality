@@ -270,6 +270,7 @@
         "tables": [
             {
                 "table": "u",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 1000,
@@ -284,6 +285,7 @@
             },
             {
                 "table": "o",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 2000,

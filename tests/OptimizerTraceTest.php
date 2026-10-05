@@ -23,7 +23,7 @@ final class OptimizerTraceTest extends TestCase
         ]));
 
         $this->assertNotNull($excerpt);
-        $this->assertSame(['u', 'p'], [$excerpt['tables'][0]['table'], $excerpt['tables'][1]['table']]);
+        $this->assertSame([['u', 1], ['p', 1]], [[$excerpt['tables'][0]['table'], $excerpt['tables'][0]['select']], [$excerpt['tables'][1]['table'], $excerpt['tables'][1]['select']]]);
         $this->assertSame('scan', $excerpt['tables'][0]['considered_access_paths'][0]['access_type'] ?? null);
         $this->assertSame('ref', $excerpt['tables'][1]['considered_access_paths'][0]['access_type'] ?? null);
         $this->assertSame(['rows' => 10, 'cost' => 2.5], $excerpt['tables'][1]['range_analysis']['table_scan'] ?? null);
@@ -54,7 +54,7 @@ final class OptimizerTraceTest extends TestCase
         ]));
 
         $this->assertNotNull($excerpt);
-        $this->assertSame('p', $excerpt['tables'][1]['table']);
+        $this->assertSame(['p', 2], [$excerpt['tables'][1]['table'], $excerpt['tables'][1]['select']]);
         $this->assertSame('subquery-p', $excerpt['tables'][1]['considered_access_paths'][0]['index'] ?? null);
         $this->assertSame(['rows' => 7, 'cost' => 1.5], $excerpt['tables'][1]['range_analysis']['table_scan'] ?? null, 'range analysis comes from the subquery block, not the outer one');
     }

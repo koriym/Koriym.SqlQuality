@@ -366,6 +366,7 @@
         "tables": [
             {
                 "table": "posts",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,
@@ -487,6 +488,7 @@
             },
             {
                 "table": "posts",
+                "select": 2,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,
@@ -595,6 +597,7 @@
             },
             {
                 "table": "comments",
+                "select": 2,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",

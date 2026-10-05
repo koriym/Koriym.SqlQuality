@@ -302,10 +302,12 @@
     "optimizer_trace": {
         "tables": [
             {
-                "table": "p"
+                "table": "p",
+                "select": 1
             },
             {
-                "table": "u"
+                "table": "u",
+                "select": 1
             }
         ],
         "transformations": [],

@@ -291,6 +291,7 @@
         "tables": [
             {
                 "table": "u",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 1000,
@@ -303,6 +304,7 @@
             },
             {
                 "table": "o",
+                "select": 2,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",

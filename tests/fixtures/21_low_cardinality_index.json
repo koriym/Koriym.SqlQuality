@@ -153,6 +153,7 @@
         "tables": [
             {
                 "table": "users",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 1000,

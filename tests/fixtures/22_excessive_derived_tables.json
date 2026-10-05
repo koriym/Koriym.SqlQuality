@@ -462,6 +462,7 @@
         "tables": [
             {
                 "table": "posts",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,
@@ -559,6 +560,7 @@
             },
             {
                 "table": "users",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 1000,
@@ -642,6 +644,7 @@
             },
             {
                 "table": "orders",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 2000,

@@ -169,6 +169,7 @@
         "tables": [
             {
                 "table": "posts",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 4952,

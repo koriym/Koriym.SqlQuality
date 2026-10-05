@@ -154,6 +154,7 @@
         "tables": [
             {
                 "table": "orders",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 2000,

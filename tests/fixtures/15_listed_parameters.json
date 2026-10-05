@@ -140,6 +140,7 @@
         "tables": [
             {
                 "table": "users",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 1000,

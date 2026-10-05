@@ -48,11 +48,15 @@ final class QueryContext
     ) {
     }
 
-    /** @return OptimizerTraceTable|null what the optimizer recorded for this table of the final plan */
-    public function optimizerTraceFor(string $tableName): array|null
+    /**
+     * @param int|null $select the query block (select_id) the table belongs to; null takes the first block naming it
+     *
+     * @return OptimizerTraceTable|null what the optimizer recorded for this table of the final plan
+     */
+    public function optimizerTraceFor(string $tableName, int|null $select = null): array|null
     {
         foreach ($this->optimizerTrace['tables'] ?? [] as $table) {
-            if ($table['table'] === $tableName) {
+            if ($table['table'] === $tableName && ($select === null || $table['select'] === $select)) {
                 return $table;
             }
         }

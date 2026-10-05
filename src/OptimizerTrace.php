@@ -56,8 +56,9 @@ final class OptimizerTrace
         $excerptTables = [];
         /** @var array<int, list<string>> $prefixes trace identifiers of the tables already placed, per query block */
         $prefixes = [];
-        foreach ((new ExplainWalker())->tableAccesses($explain['query_block']) as $access) {
-            $select = self::selectId($explain['query_block'], $access['path']);
+        $walker = new ExplainWalker();
+        foreach ($walker->tableAccesses($explain['query_block']) as $access) {
+            $select = $walker->selectId($explain['query_block'], $access['path']);
             $tableName = $access['table']['table_name'];
             $identifier = self::identifier($tableName, $select, $collected);
             if ($identifier === null) {
@@ -65,7 +66,7 @@ final class OptimizerTrace
             }
 
             $prefix = $prefixes[$select] ?? [];
-            $entry = ['table' => $tableName];
+            $entry = ['table' => $tableName, 'select' => $select];
 
             $estimation = self::find($collected['rows_estimation'], $identifier, $select, static fn (array $node): bool => isset($node['range_analysis']) && is_array($node['range_analysis']));
             if ($estimation !== null) {
@@ -139,31 +140,6 @@ final class OptimizerTrace
                 self::collect($child, $collected, $select);
             }
         }
-    }
-
-    /**
-     * The select_id of the query_block enclosing the table at $path.
-     *
-     * @param TraceNode       $queryBlock
-     * @param list<array-key> $path
-     */
-    private static function selectId(array $queryBlock, array $path): int
-    {
-        $select = is_int($queryBlock['select_id'] ?? null) ? $queryBlock['select_id'] : 0;
-        $node = $queryBlock;
-        foreach ($path as $key) {
-            $child = $node[$key] ?? null;
-            if (! is_array($child)) {
-                break;
-            }
-
-            $node = $child;
-            if (is_int($node['select_id'] ?? null)) {
-                $select = $node['select_id'];
-            }
-        }
-
-        return $select;
     }
 
     /**

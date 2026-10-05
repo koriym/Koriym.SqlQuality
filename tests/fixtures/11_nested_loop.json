@@ -301,6 +301,7 @@
         "tables": [
             {
                 "table": "users",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",
@@ -327,6 +328,7 @@
             },
             {
                 "table": "posts",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",

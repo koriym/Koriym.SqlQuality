@@ -101,6 +101,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     public function testAFailingExplainStillRestoresTheOptimizerTraceAndIsNotMaskedByARestoreFailure(): void
     {
         $pdo = $this->connect();
+        $before = $pdo->query('SELECT @@optimizer_trace')->fetchColumn();
         $this->writeSqlFile('zz_missing_table.sql', 'SELECT * FROM no_such_table');
 
         try {
@@ -110,7 +111,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
             $this->assertStringContainsString('no_such_table', $e->getMessage());
         }
 
-        $this->assertSame('enabled=off,one_line=off', $pdo->query('SELECT @@optimizer_trace')->fetchColumn());
+        $this->assertSame($before, $pdo->query('SELECT @@optimizer_trace')->fetchColumn());
 
         $failingRestore = new RestoreFailingPdo($this->connectionSettings());
         try {

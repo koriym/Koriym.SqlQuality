@@ -199,6 +199,7 @@
         "tables": [
             {
                 "table": "d",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "rows_to_scan": 4952,
@@ -211,6 +212,7 @@
             },
             {
                 "table": "posts",
+                "select": 2,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,

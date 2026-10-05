@@ -180,6 +180,7 @@
         "tables": [
             {
                 "table": "u",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 1000,
@@ -271,6 +272,7 @@
             },
             {
                 "table": "p",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,

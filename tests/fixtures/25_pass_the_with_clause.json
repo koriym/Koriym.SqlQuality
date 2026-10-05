@@ -302,6 +302,7 @@
         "tables": [
             {
                 "table": "users",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 1000,
@@ -410,6 +411,7 @@
             },
             {
                 "table": "comments",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",

@@ -313,6 +313,7 @@
         "tables": [
             {
                 "table": "c",
+                "select": 1,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",
@@ -339,6 +340,7 @@
             },
             {
                 "table": "p",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 4952,

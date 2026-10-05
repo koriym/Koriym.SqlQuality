@@ -79,6 +79,7 @@ use stdClass;
  * @psalm-type ShowWarnings = list<ShowWarning>
  * @psalm-type OptimizerTraceTable = array{
  *   table: string,
+ *   select: int,
  *   range_analysis?: array<string, mixed>,
  *   considered_access_paths?: list<array<string, mixed>>,
  *   rechecking_index_usage?: array<string, mixed>

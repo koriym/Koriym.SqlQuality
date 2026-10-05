@@ -172,11 +172,11 @@ final class FullTableScanDetectorTest extends TestCase
 
         return new QueryContext(
             sql: 'SELECT * FROM orders',
-            explain: ['query_block' => ['table' => $table]],
+            explain: ['query_block' => ['select_id' => 1, 'table' => $table]],
             explainAnalyze: null,
             warnings: [],
             schema: ['orders' => ['indexes' => []]],
-            optimizerTrace: $trace === null ? null : ['tables' => [$trace], 'transformations' => [], 'condition_processing' => []],
+            optimizerTrace: $trace === null ? null : ['tables' => [['select' => 1, ...$trace]], 'transformations' => [], 'condition_processing' => []],
         );
     }
 }

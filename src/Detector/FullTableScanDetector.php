@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality\Detector;
 
+use Koriym\SqlQuality\ExplainWalker;
 use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
@@ -30,13 +31,20 @@ final class FullTableScanDetector implements DetectorInterface
     public function detect(QueryContext $context): array
     {
         $findings = [];
-        foreach ($context->tables() as $table) {
+        $walker = new ExplainWalker();
+        foreach ($context->tableAccesses() as $access) {
+            $table = $access['table'];
             if ($table['access_type'] !== 'ALL' || str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery'])) {
                 continue;
             }
 
             $evidence = array_intersect_key($table, array_flip(['table_name', 'rows_examined_per_scan', 'filtered', 'possible_keys', 'key', 'attached_condition']));
-            $reason = $this->hasUnusedIndex($table) ? $this->unusedIndexReason($context->optimizerTraceFor($table['table_name'])) : null;
+            $reason = null;
+            if ($this->hasUnusedIndex($table)) {
+                $select = $walker->selectId($context->explain['query_block'], $access['path']);
+                $reason = $this->unusedIndexReason($context->optimizerTraceFor($table['table_name'], $select));
+            }
+
             if ($reason !== null) {
                 $evidence['optimizer_trace'] = $reason;
             }

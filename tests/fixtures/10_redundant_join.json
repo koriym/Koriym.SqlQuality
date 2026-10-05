@@ -452,6 +452,7 @@
         "tables": [
             {
                 "table": "u",
+                "select": 1,
                 "range_analysis": {
                     "table_scan": {
                         "rows": 1000,
@@ -537,6 +538,7 @@
             },
             {
                 "table": "comments",
+                "select": 3,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",
@@ -556,6 +558,7 @@
             },
             {
                 "table": "orders",
+                "select": 2,
                 "considered_access_paths": [
                     {
                         "access_type": "ref",
