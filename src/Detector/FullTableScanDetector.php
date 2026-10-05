@@ -115,7 +115,8 @@ final class FullTableScanDetector implements DetectorInterface
                 ),
             ],
             // The table leads the join and its only usable keys are join keys, so the scan is the plan
-            default => null,
+            'join_key_only' => null,
+            default => ['kind' => 'review', 'description' => 'An index exists but is not used; check selectivity or statistics.'],
         };
     }
 
