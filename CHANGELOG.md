@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-10-05
+
 ### Added
 - `--fail-on=LEVEL` option and exit codes 0 / 1 / 2 for the CLI
 - Skipped files and their reasons in the analysis result and the JSON output
