@@ -189,15 +189,27 @@ final class SqlFileAnalyzer
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
         $savedTrace = $withOptimizerTrace ? $this->enableOptimizerTrace() : null;
+        $original = null;
         try {
             $explain = $this->executeExplain($interpolatedSql);
             // SHOW WARNINGS covers the last statement only and, unlike any SELECT, leaves the optimizer trace in place;
             // EXPLAIN ANALYZE and the schema lookups would replace both
             $warnings = $this->getWarnings();
             $optimizerTrace = $savedTrace === null ? null : $this->readOptimizerTrace($explain);
+        } catch (Throwable $e) {
+            $original = $e;
+
+            throw $e;
         } finally {
             if ($savedTrace !== null) {
-                $this->pdo->exec("SET optimizer_trace = '{$savedTrace}'");
+                try {
+                    $this->pdo->exec("SET optimizer_trace = '{$savedTrace}'");
+                } catch (Throwable $restoreError) {
+                    // A failed restore must not mask the exception the EXPLAIN threw.
+                    if ($original === null) {
+                        throw $restoreError;
+                    }
+                }
             }
         }
 
