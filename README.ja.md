@@ -259,7 +259,7 @@ final class FullTableScanDetector implements DetectorInterface
 }
 ```
 
-`QueryContext`には、パラメータを埋めた`sql`、`explain`（`EXPLAIN FORMAT=JSON`）、`explainAnalyze`、`warnings`（`SHOW WARNINGS`）、テーブルごとの`schema`（information_schema）が入っています。`tables()`、`tableAccesses()`、`nestedLoops()`、`warningsWithCode()`、`indexColumns()`、`aliases()`、`schemaFor()`、`columnType()`、`primaryKeyColumns()`で読み出します。
+`QueryContext`には、パラメータを埋めた`sql`、`explain`（`EXPLAIN FORMAT=JSON`）、`explainAnalyze`、`warnings`（`SHOW WARNINGS`）、テーブルごとの`schema`（information_schema）、`optimizerTrace`（デフォルトオプティマイザの`EXPLAIN`に対する`information_schema.OPTIMIZER_TRACE`の抜粋。サーバーが返さなければ`null`）が入っています。`tables()`、`tableAccesses()`、`nestedLoops()`、`warningsWithCode()`、`indexColumns()`、`aliases()`、`schemaFor()`、`columnType()`、`primaryKeyColumns()`、`optimizerTraceFor()`で読み出します。
 
 `Finding::$evidence`にはDetectorが判定の根拠にした値を入れます。実行計画から取った値はEXPLAINのキー名のまま、1つのテーブルについてのfindingなら`table_name`も含めます。この値はissueの`evidence`としてそのまま報告されます。`severity`、`confidence`、`suggestion`は省略でき、指定するとそのtypeの既定値に代わって使われます。
 
