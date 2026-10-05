@@ -114,7 +114,7 @@ final class FullTableScanDetector implements DetectorInterface
                     (string) $reason['table_scan_cost'],
                 ),
             ],
-            // The table leads the join and its only usable keys are join keys, so the scan is the plan
+            // Only join keys were usable on this table, so the scan is the plan rather than a missed index
             'join_key_only' => null,
             default => ['kind' => 'review', 'description' => 'An index exists but is not used; check selectivity or statistics.'],
         };
@@ -134,29 +134,26 @@ final class FullTableScanDetector implements DetectorInterface
         }
 
         $rangeAnalysis = $trace['range_analysis'] ?? null;
-        if (is_array($rangeAnalysis)) {
-            $tableScan = ['table_scan_rows' => null, 'table_scan_cost' => null];
-            if (is_array($rangeAnalysis['table_scan'] ?? null)) {
-                $tableScan = ['table_scan_rows' => $rangeAnalysis['table_scan']['rows'] ?? null, 'table_scan_cost' => $rangeAnalysis['table_scan']['cost'] ?? null];
-            }
+        if (is_array($rangeAnalysis) && is_array($rangeAnalysis['table_scan'] ?? null) && isset($rangeAnalysis['table_scan']['rows'], $rangeAnalysis['table_scan']['cost'])) {
+            $tableScan = ['table_scan_rows' => $rangeAnalysis['table_scan']['rows'], 'table_scan_cost' => $rangeAnalysis['table_scan']['cost']];
 
             $alternatives = $rangeAnalysis['analyzing_range_alternatives']['range_scan_alternatives'] ?? [];
             foreach (is_array($alternatives) ? $alternatives : [] as $alternative) {
-                if (is_array($alternative) && ($alternative['cause'] ?? null) === 'cost') {
-                    return ['cause' => 'cost', 'index' => $alternative['index'] ?? null, 'rows' => $alternative['rows'] ?? null, 'cost' => $alternative['cost'] ?? null, ...$tableScan];
+                if (is_array($alternative) && ($alternative['cause'] ?? null) === 'cost' && isset($alternative['index'], $alternative['rows'], $alternative['cost'])) {
+                    return ['cause' => 'cost', 'index' => $alternative['index'], 'rows' => $alternative['rows'], 'cost' => $alternative['cost'], ...$tableScan];
                 }
             }
 
             $unions = $rangeAnalysis['analyzing_index_merge_union'] ?? [];
             foreach (is_array($unions) ? $unions : [] as $union) {
-                if (! is_array($union) || ! is_array($union['indexes_to_merge'] ?? null)) {
+                if (! is_array($union) || ! is_array($union['indexes_to_merge'] ?? null) || ! isset($union['total_cost'])) {
                     continue;
                 }
 
                 /** @var list<array<string, mixed>> $toMerge */
                 $toMerge = $union['indexes_to_merge'];
 
-                return ['cause' => 'index_merge_union', 'indexes' => array_column($toMerge, 'index_to_merge'), 'cost' => $union['total_cost'] ?? null, ...$tableScan];
+                return ['cause' => 'index_merge_union', 'indexes' => array_column($toMerge, 'index_to_merge'), 'cost' => $union['total_cost'], ...$tableScan];
             }
         }
 

@@ -15,10 +15,12 @@ final class OptimizerTraceTest extends TestCase
 {
     public function testKeepsTheNodeWhosePrefixIsTheTablesBeforeItInExplainOrder(): void
     {
-        $excerpt = OptimizerTrace::excerpt(self::trace(), [
-            ['table_name' => 'u', 'access_type' => 'ALL'],
-            ['table_name' => 'p', 'access_type' => 'ref'],
-        ]);
+        $excerpt = OptimizerTrace::excerpt(self::trace(), self::explain([
+            'nested_loop' => [
+                ['table' => ['table_name' => 'u', 'access_type' => 'ALL']],
+                ['table' => ['table_name' => 'p', 'access_type' => 'ref']],
+            ],
+        ]));
 
         $this->assertNotNull($excerpt);
         $this->assertSame(['u', 'p'], [$excerpt['tables'][0]['table'], $excerpt['tables'][1]['table']]);
@@ -30,19 +32,36 @@ final class OptimizerTraceTest extends TestCase
 
     public function testThePrunedJoinOrderIsNotTheFinalPlan(): void
     {
-        $excerpt = OptimizerTrace::excerpt(self::trace(), [
-            ['table_name' => 'p', 'access_type' => 'ALL'],
-            ['table_name' => 'u', 'access_type' => 'eq_ref'],
-        ]);
+        $excerpt = OptimizerTrace::excerpt(self::trace(), self::explain([
+            'nested_loop' => [
+                ['table' => ['table_name' => 'p', 'access_type' => 'ALL']],
+                ['table' => ['table_name' => 'u', 'access_type' => 'eq_ref']],
+            ],
+        ]));
 
         $this->assertNotNull($excerpt);
         $this->assertSame('pruned-p', $excerpt['tables'][0]['considered_access_paths'][0]['index'] ?? null);
         $this->assertArrayNotHasKey('considered_access_paths', $excerpt['tables'][1]);
     }
 
+    public function testEachQueryBlockStartsItsOwnPrefixAndKeepsToItsOwnNodes(): void
+    {
+        $excerpt = OptimizerTrace::excerpt(self::trace(), self::explain([
+            'table' => ['table_name' => 'u', 'access_type' => 'ALL'],
+            'select_list_subqueries' => [
+                ['query_block' => ['select_id' => 2, 'table' => ['table_name' => 'p', 'access_type' => 'ALL']]],
+            ],
+        ]));
+
+        $this->assertNotNull($excerpt);
+        $this->assertSame('p', $excerpt['tables'][1]['table']);
+        $this->assertSame('subquery-p', $excerpt['tables'][1]['considered_access_paths'][0]['index'] ?? null);
+        $this->assertSame(['rows' => 7, 'cost' => 1.5], $excerpt['tables'][1]['range_analysis']['table_scan'] ?? null, 'range analysis comes from the subquery block, not the outer one');
+    }
+
     public function testCollectsRecheckTransformationsAndConditionProcessing(): void
     {
-        $excerpt = OptimizerTrace::excerpt(self::trace(), [['table_name' => 'p', 'access_type' => 'ALL']]);
+        $excerpt = OptimizerTrace::excerpt(self::trace(), self::explain(['table' => ['table_name' => 'p', 'access_type' => 'ALL']]));
 
         $this->assertNotNull($excerpt);
         $this->assertSame(['recheck_reason' => 'low_limit'], $excerpt['tables'][0]['rechecking_index_usage'] ?? null);
@@ -52,24 +71,36 @@ final class OptimizerTraceTest extends TestCase
 
     public function testSkipsTablesTheTraceDoesNotName(): void
     {
-        $excerpt = OptimizerTrace::excerpt(self::trace(), [['table_name' => '<derived2>', 'access_type' => 'ALL']]);
+        $excerpt = OptimizerTrace::excerpt(self::trace(), self::explain(['table' => ['table_name' => '<derived2>', 'access_type' => 'ALL']]));
 
         $this->assertSame([], $excerpt['tables'] ?? null);
     }
 
     public function testEmptyAndTruncatedTracesYieldNull(): void
     {
-        $this->assertNull(OptimizerTrace::excerpt('', []));
-        $this->assertNull(OptimizerTrace::excerpt(substr(self::trace(), 0, 80), []));
+        $this->assertNull(OptimizerTrace::excerpt('', self::explain([])));
+        $this->assertNull(OptimizerTrace::excerpt(substr(self::trace(), 0, 80), self::explain([])));
     }
 
+    /**
+     * @param array<string, mixed> $queryBlock
+     *
+     * @return array{query_block: array<string, mixed>, analyze_result: array<string, mixed>}
+     */
+    private static function explain(array $queryBlock): array
+    {
+        return ['query_block' => ['select_id' => 1, ...$queryBlock], 'analyze_result' => []];
+    }
+
+    /** select#1 joins u then p and considers p first before pruning; select#2 is a subquery over p */
     private static function trace(): string
     {
         return json_encode([
             'steps' => [
-                ['join_preparation' => ['steps' => [['transformation' => ['from' => 'IN (SELECT)', 'to' => 'semijoin', 'chosen' => true]]]]],
+                ['join_preparation' => ['select#' => 1, 'steps' => [['transformation' => ['from' => 'IN (SELECT)', 'to' => 'semijoin', 'chosen' => true]]]]],
                 [
                     'join_optimization' => [
+                        'select#' => 1,
                         'steps' => [
                             ['condition_processing' => ['condition' => 'WHERE', 'original_condition' => '(`u`.`id` = `p`.`user_id`)']],
                             [
@@ -103,6 +134,24 @@ final class OptimizerTraceTest extends TestCase
                                 ],
                             ],
                             ['attaching_conditions_to_tables' => ['attached_conditions_computation' => [['table' => '`posts` `p`', 'rechecking_index_usage' => ['recheck_reason' => 'low_limit']]]]],
+                            [
+                                'join_optimization' => [
+                                    'select#' => 2,
+                                    'steps' => [
+                                        ['rows_estimation' => [['table' => '`posts` `p`', 'range_analysis' => ['table_scan' => ['rows' => 7, 'cost' => 1.5]]]]],
+                                        [
+                                            'considered_execution_plans' => [
+                                                [
+                                                    'plan_prefix' => [],
+                                                    'table' => '`posts` `p`',
+                                                    'best_access_path' => ['considered_access_paths' => [['access_type' => 'scan', 'index' => 'subquery-p', 'chosen' => true]]],
+                                                    'chosen' => true,
+                                                ],
+                                            ],
+                                        ],
+                                    ],
+                                ],
+                            ],
                         ],
                     ],
                 ],

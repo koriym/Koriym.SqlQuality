@@ -258,7 +258,17 @@
                         "chosen": false,
                         "cause": "has_group_by"
                     }
-                }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 4952,
+                        "access_type": "scan",
+                        "resulting_rows": 4952,
+                        "cost": 503.45,
+                        "chosen": true,
+                        "use_tmp_table": true
+                    }
+                ]
             }
         ],
         "transformations": [],

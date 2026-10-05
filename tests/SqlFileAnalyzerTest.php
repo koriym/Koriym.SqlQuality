@@ -4,9 +4,12 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use PDOException;
+
 use function array_column;
 use function array_keys;
 use function file_exists;
+use function file_put_contents;
 use function is_dir;
 use function mkdir;
 use function rmdir;
@@ -81,6 +84,59 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertNull($context->explainAnalyze);
         $this->assertCount(1, $context->warningsWithCode(1003));
         $this->assertSame(['p' => 'posts', 'c' => 'comments'], $context->aliases());
+    }
+
+    public function testQueryContextCarriesTheOptimizerTraceAndRestoresTheSessionVariable(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec("SET optimizer_trace = 'enabled=off,one_line=on'");
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''));
+
+        $context = $analyzer->queryContext('9_inefficient_in_query.sql', ['status1' => 'draft', 'status2' => 'published', 'status3' => 'archived', 'status4' => 'deleted', 'status5' => 'pending']);
+
+        $this->assertSame('cost', $context->optimizerTraceFor('posts')['range_analysis']['analyzing_range_alternatives']['range_scan_alternatives'][0]['cause'] ?? null);
+        $this->assertSame('enabled=off,one_line=on', $pdo->query('SELECT @@optimizer_trace')->fetchColumn());
+    }
+
+    public function testAFailingExplainStillRestoresTheOptimizerTraceAndIsNotMaskedByARestoreFailure(): void
+    {
+        $pdo = $this->connect();
+        $this->writeSqlFile('zz_missing_table.sql', 'SELECT * FROM no_such_table');
+
+        try {
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_missing_table.sql', []);
+            $this->fail('EXPLAIN on a missing table must throw');
+        } catch (PDOException $e) {
+            $this->assertStringContainsString('no_such_table', $e->getMessage());
+        }
+
+        $this->assertSame('enabled=off,one_line=off', $pdo->query('SELECT @@optimizer_trace')->fetchColumn());
+
+        $failingRestore = new RestoreFailingPdo($this->connectionSettings());
+        try {
+            (new SqlFileAnalyzer($failingRestore, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_missing_table.sql', []);
+            $this->fail('EXPLAIN on a missing table must throw');
+        } catch (PDOException $e) {
+            $this->assertStringContainsString('no_such_table', $e->getMessage(), 'the EXPLAIN error wins over the restore error');
+        }
+    }
+
+    public function testARestoreFailureAfterASuccessfulExplainPropagates(): void
+    {
+        $pdo = new RestoreFailingPdo($this->connectionSettings());
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''));
+
+        $this->expectException(PDOException::class);
+        $this->expectExceptionMessage(RestoreFailingPdo::MESSAGE);
+
+        $analyzer->queryContext('1_full_table_scan.sql', ['min_views' => 1000]);
+    }
+
+    private function writeSqlFile(string $name, string $sql): void
+    {
+        $this->outputDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_sql_', true);
+        mkdir($this->outputDir);
+        file_put_contents($this->outputDir . '/' . $name, $sql);
     }
 
     public function testExplainReturnsTheResultWithTheContextOfTheOptimizerEnabledPass(): void

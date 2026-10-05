@@ -514,38 +514,24 @@
                         },
                         {
                             "index": "idx_posts_user_status",
-                            "usable": true,
-                            "key_parts": [
-                                "user_id",
-                                "status",
-                                "id"
-                            ]
+                            "usable": false,
+                            "cause": "not_applicable"
                         }
                     ],
                     "best_covering_index_scan": {
-                        "index": "idx_posts_status_created",
-                        "cost": 509.357,
+                        "index": "idx_posts_user_status",
+                        "cost": 509.203,
                         "chosen": false,
                         "cause": "cost"
                     },
                     "setup_range_conditions": [],
                     "group_index_range": {
                         "chosen": false,
-                        "cause": "not_group_by_or_distinct"
+                        "cause": "not_original_query_table"
                     },
                     "skip_scan_range": {
-                        "potential_skip_scan_indexes": [
-                            {
-                                "index": "idx_posts_status_created",
-                                "usable": false,
-                                "cause": "no_range_predicate"
-                            },
-                            {
-                                "index": "idx_posts_user_status",
-                                "usable": false,
-                                "cause": "query_references_nonkey_column"
-                            }
-                        ]
+                        "chosen": false,
+                        "cause": "not_single_table"
                     },
                     "analyzing_range_alternatives": {
                         "range_scan_alternatives": [
@@ -562,11 +548,6 @@
                                 "rows": 2476,
                                 "cost": 254.812,
                                 "chosen": true
-                            },
-                            {
-                                "index": "idx_posts_user_status",
-                                "chosen": false,
-                                "cause": "no_valid_range_for_this_index"
                             }
                         ],
                         "analyzing_roworder_intersect": {
@@ -587,10 +568,54 @@
                         "cost_for_plan": 254.812,
                         "chosen": true
                     }
-                }
+                },
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "PRIMARY",
+                        "usable": false,
+                        "chosen": false
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_posts_status_created",
+                        "rows": 2476,
+                        "cost": 254.802,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_posts_status_created"
+                        },
+                        "chosen": false,
+                        "cause": "heuristic_index_cheaper"
+                    }
+                ]
             },
             {
-                "table": "comments"
+                "table": "comments",
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_comments_post_id",
+                        "rows": 2.31982,
+                        "cost": 2010.36,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_comments_post_created",
+                        "rows": 2.31982,
+                        "cost": 1194.88,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "scan",
+                        "chosen": false,
+                        "cause": "covering_index_better_than_full_scan"
+                    }
+                ]
             }
         ],
         "transformations": [

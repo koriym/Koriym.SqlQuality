@@ -203,7 +203,9 @@ final class SqlFileAnalyzer
         } finally {
             if ($savedTrace !== null) {
                 try {
-                    $this->pdo->exec("SET optimizer_trace = '{$savedTrace}'");
+                    if ($this->pdo->exec("SET optimizer_trace = '{$savedTrace}'") === false) {
+                        throw new RuntimeException('Failed to restore optimizer_trace');
+                    }
                 } catch (Throwable $restoreError) {
                     // A failed restore must not mask the exception the EXPLAIN threw.
                     if ($original === null) {
@@ -263,7 +265,7 @@ final class SqlFileAnalyzer
             return null;
         }
 
-        return OptimizerTrace::excerpt($trace, (new ExplainWalker())->tables($explain['query_block']));
+        return OptimizerTrace::excerpt($trace, $explain);
     }
 
     /**

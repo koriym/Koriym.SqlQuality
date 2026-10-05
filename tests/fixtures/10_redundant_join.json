@@ -536,10 +536,49 @@
                 ]
             },
             {
-                "table": "comments"
+                "table": "comments",
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "user_id",
+                        "rows": 10.017,
+                        "cost": 1.25417,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "scan",
+                        "cost": 1025.95,
+                        "rows": 10017,
+                        "chosen": false,
+                        "cause": "cost"
+                    }
+                ]
             },
             {
-                "table": "orders"
+                "table": "orders",
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_orders_user_id",
+                        "rows": 2.25734,
+                        "cost": 0.476079,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_orders_user_status",
+                        "rows": 2.25734,
+                        "cost": 0.479226,
+                        "chosen": false
+                    },
+                    {
+                        "access_type": "scan",
+                        "cost": 202.5,
+                        "rows": 2000,
+                        "chosen": false,
+                        "cause": "cost"
+                    }
+                ]
             }
         ],
         "transformations": [],
