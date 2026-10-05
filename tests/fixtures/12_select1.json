@@ -14,5 +14,10 @@
             "Message": "/* select#1 */ select 1 AS `1`"
         }
     ],
-    "schema": []
+    "schema": [],
+    "optimizer_trace": {
+        "tables": [],
+        "transformations": [],
+        "condition_processing": []
+    }
 }

@@ -22,6 +22,8 @@ use const PREG_SET_ORDER;
  * @psalm-import-type ShowWarnings from Types
  * @psalm-import-type ShowWarning from Types
  * @psalm-import-type SchemaInfo from Types
+ * @psalm-import-type OptimizerTraceExcerpt from Types
+ * @psalm-import-type OptimizerTraceTable from Types
  */
 final class QueryContext
 {
@@ -29,11 +31,12 @@ final class QueryContext
     private const TABLE_REFERENCE_ITEM = '/^`?(\w+)`?(?:\s+(?:AS\s+)?`?(\w+)`?)?$/i';
 
     /**
-     * @param ExplainResult             $explain
-     * @param ShowWarnings              $warnings
-     * @param array<string, SchemaInfo> $schema         keyed by table name
-     * @param string                    $sql            the statement as sent to MySQL, parameters interpolated
-     * @param string|null               $explainAnalyze null unless the statement is a read-only SELECT
+     * @param ExplainResult              $explain
+     * @param ShowWarnings               $warnings
+     * @param array<string, SchemaInfo>  $schema         keyed by table name
+     * @param string                     $sql            the statement as sent to MySQL, parameters interpolated
+     * @param string|null                $explainAnalyze null unless the statement is a read-only SELECT
+     * @param OptimizerTraceExcerpt|null $optimizerTrace null when the trace was not captured, unreadable or truncated
      */
     public function __construct(
         public readonly string $sql,
@@ -41,7 +44,24 @@ final class QueryContext
         public readonly string|null $explainAnalyze,
         public readonly array $warnings,
         public readonly array $schema,
+        public readonly array|null $optimizerTrace = null,
     ) {
+    }
+
+    /**
+     * @param int|null $select the query block (select_id) the table belongs to; null takes the first block naming it
+     *
+     * @return OptimizerTraceTable|null what the optimizer recorded for this table of the final plan
+     */
+    public function optimizerTraceFor(string $tableName, int|null $select = null): array|null
+    {
+        foreach ($this->optimizerTrace['tables'] ?? [] as $table) {
+            if ($table['table'] === $tableName && ($select === null || $table['select'] === $select)) {
+                return $table;
+            }
+        }
+
+        return null;
     }
 
     /** @return list<ExplainTable> */
@@ -167,10 +187,11 @@ final class QueryContext
             'explain_analyze' => $this->explainAnalyze,
             'warnings' => $this->warnings,
             'schema' => $this->schema,
+            'optimizer_trace' => $this->optimizerTrace,
         ];
     }
 
-    /** @param array<string, mixed> $data */
+    /** @param array<string, mixed> $data optimizer_trace may be absent in fixtures recorded before it was captured */
     public static function fromArray(array $data): self
     {
         /** @var string $sql */
@@ -183,7 +204,9 @@ final class QueryContext
         $warnings = $data['warnings'];
         /** @var array<string, SchemaInfo> $schema */
         $schema = $data['schema'];
+        /** @var OptimizerTraceExcerpt|null $optimizerTrace */
+        $optimizerTrace = $data['optimizer_trace'] ?? null;
 
-        return new self($sql, $explain, $explainAnalyze, $warnings, $schema);
+        return new self($sql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace);
     }
 }

@@ -59,7 +59,7 @@ interface DetectorInterface {
 }
 ```
 
-`QueryContext` (`src/QueryContext.php`) carries the interpolated SQL, `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE`, `SHOW WARNINGS` and the schema of the referenced tables. `Finding` (`src/Detector/Finding.php`) carries the evidence, one per matching table. Detectors are registered in the `ExplainAnalyzer` constructor. `tests/fixtures/*.json` are recorded contexts (`Fixture::load()`, re-record with `php tests/fixtures/record.php`); `DetectorCorpusTest` checks every fixture against `tests/fixtures/expected.php`.
+`QueryContext` (`src/QueryContext.php`) carries the interpolated SQL, `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE`, `SHOW WARNINGS`, the schema of the referenced tables and an excerpt of `information_schema.OPTIMIZER_TRACE` (`OptimizerTrace::excerpt()`, captured for the default-optimizer `EXPLAIN` only, `null` when unavailable). `Finding` (`src/Detector/Finding.php`) carries the evidence, one per matching table. Detectors are registered in the `ExplainAnalyzer` constructor. `tests/fixtures/*.json` are recorded contexts (`Fixture::load()`, re-record with `php tests/fixtures/record.php`); `DetectorCorpusTest` checks every fixture against `tests/fixtures/expected.php`.
 
 Existing detectors in `src/Detector/`:
 - CartesianProductDetector

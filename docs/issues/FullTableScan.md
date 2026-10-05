@@ -36,7 +36,11 @@ recommended: true
 ### 主な検出条件
 1. `access_type` が `ALL`（内部一時テーブルを除く）
 2. `rows_examined_per_scan` が100件未満なら重要度 `Info`、以上なら既定（`Critical`）
-3. `attached_condition` から等値・範囲条件のカラムが取れればインデックス作成（`index`）を提案。取れず `possible_keys` はあるが `key` が使われていなければレビュー（`review`）を提案
+3. `possible_keys` はあるが `key` が使われていなければ、Optimizer Trace が示す理由を `evidence.optimizer_trace` に記録する。`attached_condition` から等値・範囲条件のカラムが取れればインデックス作成（`index`）を提案し、取れなければ理由ごとに提案を変える
+   - `cost`: レンジスキャンがコストで棄却された（棄却されたインデックス・行数・コストとテーブルスキャンの行数・コストを併記）。条件を絞るかカバリングインデックスにする（`review`）
+   - `index_merge_union`: `OR` を 1 本のインデックスで処理できず、index merge union がテーブルスキャンに負けた。複合インデックスか `UNION` への書き換え（`rewrite`）
+   - `join_key_only`: 結合順の先頭テーブルで、使えるキーが結合キーだけ。スキャンは想定どおりなので提案なし
+   - トレースが無い、または上記に当てはまらない場合はレビュー（`review`）を提案
 
 ## パフォーマンスへの影響
 

@@ -107,8 +107,42 @@ final class QueryContextTest extends TestCase
         $context = Fixture::load('20_multi_table_update.sql');
         $data = $context->toArray();
 
-        $this->assertSame(['sql', 'explain', 'explain_analyze', 'warnings', 'schema'], array_keys($data));
+        $this->assertSame(['sql', 'explain', 'explain_analyze', 'warnings', 'schema', 'optimizer_trace'], array_keys($data));
         $this->assertNull($data['explain_analyze']);
         $this->assertEquals($context, QueryContext::fromArray($data));
+    }
+
+    public function testFromArrayAcceptsFixturesRecordedWithoutOptimizerTrace(): void
+    {
+        $data = Fixture::load('1_full_table_scan.sql')->toArray();
+        unset($data['optimizer_trace']);
+
+        $context = QueryContext::fromArray($data);
+        $this->assertNull($context->optimizerTrace);
+        $this->assertNull($context->optimizerTraceFor('posts'));
+    }
+
+    public function testOptimizerTraceForFindsTheTableOfTheFinalPlanInItsQueryBlock(): void
+    {
+        $context = new QueryContext(
+            sql: 'SELECT * FROM posts p WHERE p.user_id IN (SELECT user_id FROM posts p WHERE status = "x")',
+            explain: ['query_block' => ['select_id' => 1]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+            optimizerTrace: [
+                'tables' => [
+                    ['table' => 'p', 'select' => 1, 'range_analysis' => ['table_scan' => ['rows' => 10, 'cost' => 1.0]]],
+                    ['table' => 'p', 'select' => 2, 'range_analysis' => ['table_scan' => ['rows' => 3, 'cost' => 0.5]]],
+                ],
+                'transformations' => [],
+                'condition_processing' => [],
+            ],
+        );
+
+        $this->assertSame(['rows' => 10, 'cost' => 1.0], $context->optimizerTraceFor('p')['range_analysis']['table_scan'] ?? null, 'without a block the first entry wins');
+        $this->assertSame(['rows' => 3, 'cost' => 0.5], $context->optimizerTraceFor('p', 2)['range_analysis']['table_scan'] ?? null);
+        $this->assertNull($context->optimizerTraceFor('p', 3));
+        $this->assertNull($context->optimizerTraceFor('comments'));
     }
 }

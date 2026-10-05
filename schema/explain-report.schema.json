@@ -34,7 +34,37 @@
         "explain": { "type": "object" },
         "explain_analyze": { "type": ["string", "null"] },
         "warnings": { "type": "array" },
-        "schema": { "type": "object" }
+        "schema": { "type": "object" },
+        "optimizer_trace": {
+          "description": "Excerpt of information_schema.OPTIMIZER_TRACE for the default-optimizer EXPLAIN; null when the trace was unavailable, truncated or not captured.",
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["tables", "transformations", "condition_processing"],
+              "additionalProperties": false,
+              "properties": {
+                "tables": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": ["table", "select"],
+                    "additionalProperties": false,
+                    "properties": {
+                      "table": { "type": "string" },
+                      "select": { "type": "integer", "description": "select_id of the query block the table belongs to" },
+                      "range_analysis": { "type": "object" },
+                      "considered_access_paths": { "type": "array" },
+                      "rechecking_index_usage": { "type": "object" }
+                    }
+                  }
+                },
+                "transformations": { "type": "array", "items": { "type": "object" } },
+                "condition_processing": { "type": "array", "items": { "type": "object" } }
+              }
+            }
+          ]
+        }
       }
     }
   },

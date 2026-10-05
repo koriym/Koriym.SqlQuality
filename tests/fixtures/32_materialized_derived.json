@@ -194,5 +194,101 @@
                 "update_time": "2026-09-26 20:09:50"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "d",
+                "select": 1,
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 4952,
+                        "access_type": "scan",
+                        "resulting_rows": 4952,
+                        "cost": 559.6,
+                        "chosen": true
+                    }
+                ]
+            },
+            {
+                "table": "posts",
+                "select": 2,
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 4952,
+                        "cost": 505.55
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_id",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_posts_status_created",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_status",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "status",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_posts_user_id",
+                        "cost": 496.809,
+                        "chosen": true
+                    },
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_applicable_aggregate_function"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "has_group_by"
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 4952,
+                        "access_type": "scan",
+                        "resulting_rows": 4952,
+                        "cost": 503.45,
+                        "chosen": true,
+                        "use_tmp_table": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "HAVING",
+                "original_condition": "(count(0) > 3)",
+                "steps": [
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(count(0) > 3)"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(count(0) > 3)"
+                    }
+                ]
+            }
+        ]
     }
 }

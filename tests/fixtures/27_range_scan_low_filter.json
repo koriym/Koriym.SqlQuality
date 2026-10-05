@@ -152,5 +152,152 @@
                 "update_time": "2026-09-23 00:49:29"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "comments",
+                "select": 1,
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 10017,
+                        "cost": 1028.05
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_comments_post_id",
+                            "usable": true,
+                            "key_parts": [
+                                "post_id",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_comments_post_created",
+                            "usable": true,
+                            "key_parts": [
+                                "post_id",
+                                "created_at",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_group_by_or_distinct"
+                    },
+                    "skip_scan_range": {
+                        "potential_skip_scan_indexes": [
+                            {
+                                "index": "idx_comments_post_id",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            },
+                            {
+                                "index": "idx_comments_post_created",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            }
+                        ]
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_comments_post_id",
+                                "ranges": [
+                                    "1 <= post_id <= 1000"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 1990,
+                                "cost": 696.76,
+                                "chosen": true
+                            },
+                            {
+                                "index": "idx_comments_post_created",
+                                "ranges": [
+                                    "1 <= post_id <= 1000"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 1990,
+                                "cost": 696.76,
+                                "chosen": false,
+                                "cause": "cost"
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_comments_post_id",
+                            "rows": 1990,
+                            "ranges": [
+                                "1 <= post_id <= 1000"
+                            ]
+                        },
+                        "rows_for_plan": 1990,
+                        "cost_for_plan": 696.76,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 1990,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 0.1111,
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_comments_post_id"
+                        },
+                        "resulting_rows": 221.089,
+                        "cost": 895.76,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`comments`.`post_id` between 1 and 1000) and (`comments`.`content` like '%rare%'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "((`comments`.`post_id` between 1 and 1000) and (`comments`.`content` like '%rare%'))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "((`comments`.`post_id` between 1 and 1000) and (`comments`.`content` like '%rare%'))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "((`comments`.`post_id` between 1 and 1000) and (`comments`.`content` like '%rare%'))"
+                    }
+                ]
+            }
+        ]
     }
 }

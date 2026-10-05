@@ -161,5 +161,72 @@
                 "update_time": "2026-09-23 00:49:29"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "orders",
+                "select": 1,
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 2000,
+                        "cost": 204.6
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_orders_user_id",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_orders_status_created",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_orders_user_status",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "status",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_orders_user_id",
+                        "cost": 200.799,
+                        "chosen": true
+                    },
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_applicable_aggregate_function"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "has_group_by"
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 2000,
+                        "access_type": "scan",
+                        "resulting_rows": 2000,
+                        "cost": 202.5,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": []
     }
 }

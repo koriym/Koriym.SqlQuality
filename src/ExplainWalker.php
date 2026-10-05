@@ -76,6 +76,34 @@ final class ExplainWalker
     }
 
     /**
+     * The select_id of the query_block enclosing the node at $path; the root's select_id (or 0) when none is nested.
+     *
+     * @param ExplainNode     $queryBlock
+     * @param list<array-key> $path       as reported by tableAccesses()
+     *
+     * @psalm-mutation-free
+     */
+    public function selectId(array $queryBlock, array $path): int
+    {
+        $select = is_int($queryBlock['select_id'] ?? null) ? $queryBlock['select_id'] : 0;
+        $node = $queryBlock;
+        foreach ($path as $key) {
+            $child = $node[$key] ?? null;
+            if (! is_array($child)) {
+                break;
+            }
+
+            /** @var ExplainNode $node */
+            $node = $child;
+            if (is_int($node['select_id'] ?? null)) {
+                $select = $node['select_id'];
+            }
+        }
+
+        return $select;
+    }
+
+    /**
      * @param ExplainNode $node
      *
      * @psalm-mutation-free

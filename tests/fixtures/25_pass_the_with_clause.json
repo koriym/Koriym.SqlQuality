@@ -297,5 +297,181 @@
                 "update_time": null
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "users",
+                "select": 1,
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 1000,
+                        "cost": 103.85
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_users_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_users_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_users_status_created",
+                        "cost": 103.056,
+                        "chosen": true
+                    },
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_original_query_table"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "not_single_table"
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_users_status_created",
+                                "ranges": [
+                                    "status = 'active'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 800,
+                                "cost": 82.5044,
+                                "chosen": true
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_users_status_created",
+                            "rows": 800,
+                            "ranges": [
+                                "status = 'active'"
+                            ]
+                        },
+                        "rows_for_plan": 800,
+                        "cost_for_plan": 82.5044,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "PRIMARY",
+                        "usable": false,
+                        "chosen": false
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_users_id",
+                        "usable": false,
+                        "chosen": false
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_users_status_created",
+                        "rows": 800,
+                        "cost": 82.4944,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_users_status_created"
+                        },
+                        "chosen": false,
+                        "cause": "heuristic_index_cheaper"
+                    }
+                ]
+            },
+            {
+                "table": "comments",
+                "select": 1,
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "user_id",
+                        "rows": 10.017,
+                        "cost": 2804.76,
+                        "chosen": true
+                    },
+                    {
+                        "rows_to_scan": 10017,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "scan",
+                        "using_join_cache": true,
+                        "buffers_needed": 1,
+                        "resulting_rows": 10017,
+                        "cost": 801391,
+                        "chosen": false
+                    }
+                ]
+            }
+        ],
+        "transformations": [
+            {
+                "select#": 2,
+                "from": "IN (SELECT)",
+                "to": "semijoin",
+                "chosen": true,
+                "transformation_to_semi_join": {
+                    "subquery_predicate": "`comments`.`user_id` in (/* select#2 */ select `users`.`id` from <constant table> join (`users`) on((`users`.`status` = 'active')))",
+                    "embedded in": "WHERE",
+                    "semi-join condition": "(`comments`.`user_id` = `users`.`id`)",
+                    "decorrelated_predicates": [
+                        {
+                            "outer": "`comments`.`user_id`",
+                            "inner": "`users`.`id`"
+                        }
+                    ]
+                }
+            }
+        ],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`comments`.`user_id` = `users`.`id`) and (`users`.`status` = 'active'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(multiple equal(`comments`.`user_id`, `users`.`id`) and multiple equal('active', `users`.`status`))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(multiple equal(`comments`.`user_id`, `users`.`id`) and multiple equal('active', `users`.`status`))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(multiple equal(`comments`.`user_id`, `users`.`id`) and multiple equal('active', `users`.`status`))"
+                    }
+                ]
+            }
+        ]
     }
 }
