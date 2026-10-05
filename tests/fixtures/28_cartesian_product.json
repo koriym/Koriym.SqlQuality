@@ -175,5 +175,217 @@
                 "update_time": "2026-09-23 00:49:27"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "u",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 1000,
+                        "cost": 352
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_users_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_users_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_single_table"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "not_single_table"
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_users_status_created",
+                                "ranges": [
+                                    "status = 'active'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 800,
+                                "cost": 280.26,
+                                "chosen": true
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_users_status_created",
+                            "rows": 800,
+                            "ranges": [
+                                "status = 'active'"
+                            ]
+                        },
+                        "rows_for_plan": 800,
+                        "cost_for_plan": 280.26,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_users_status_created",
+                        "rows": 800,
+                        "cost": 85.25,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_users_status_created"
+                        },
+                        "chosen": false,
+                        "cause": "heuristic_index_cheaper"
+                    }
+                ]
+            },
+            {
+                "table": "p",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 4952,
+                        "cost": 1735.2
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_posts_user_status",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        }
+                    ],
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_single_table"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "not_single_table"
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "ranges": [
+                                    "status = 'published'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 2476,
+                                "cost": 866.86,
+                                "chosen": true
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_posts_status_created",
+                            "rows": 2476,
+                            "ranges": [
+                                "status = 'published'"
+                            ]
+                        },
+                        "rows_for_plan": 2476,
+                        "cost_for_plan": 866.86,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_posts_status_created",
+                        "rows": 2476,
+                        "cost": 217880,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_posts_status_created"
+                        },
+                        "chosen": false,
+                        "cause": "heuristic_index_cheaper"
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`u`.`status` = 'active') and (`p`.`status` = 'published'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(multiple equal('active', `u`.`status`) and multiple equal('published', `p`.`status`))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(multiple equal('active', `u`.`status`) and multiple equal('published', `p`.`status`))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(multiple equal('active', `u`.`status`) and multiple equal('published', `p`.`status`))"
+                    }
+                ]
+            }
+        ]
     }
 }

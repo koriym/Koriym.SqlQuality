@@ -168,5 +168,132 @@
                 "update_time": "2026-09-23 00:49:28"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "posts",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 4952,
+                        "cost": 505.55
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_posts_user_status",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "status",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_group_by_or_distinct"
+                    },
+                    "skip_scan_range": {
+                        "potential_skip_scan_indexes": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            }
+                        ]
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "ranges": [
+                                    "status = 'archived'",
+                                    "status = 'deleted'",
+                                    "status = 'draft'",
+                                    "status = 'pending'",
+                                    "status = 'published'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 2978,
+                                "cost": 1043.56,
+                                "chosen": false,
+                                "cause": "cost"
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "chosen": false,
+                                "cause": "no_valid_range_for_this_index"
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 4952,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 0.601373,
+                        "access_type": "scan",
+                        "resulting_rows": 2978,
+                        "cost": 503.45,
+                        "chosen": true,
+                        "use_tmp_table": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "(`posts`.`status` in ('draft','published','archived','deleted','pending'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(`posts`.`status` in ('draft','published','archived','deleted','pending'))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(`posts`.`status` in ('draft','published','archived','deleted','pending'))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(`posts`.`status` in ('draft','published','archived','deleted','pending'))"
+                    }
+                ]
+            }
+        ]
     }
 }

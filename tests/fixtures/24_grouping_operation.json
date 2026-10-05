@@ -151,5 +151,176 @@
                 "update_time": "2026-09-23 00:49:29"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "comments",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 10017,
+                        "cost": 1028.05
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_comments_post_id",
+                            "usable": true,
+                            "key_parts": [
+                                "post_id",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_comments_post_created",
+                            "usable": true,
+                            "key_parts": [
+                                "post_id",
+                                "created_at",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_comments_post_id",
+                        "cost": 1004.7,
+                        "chosen": true
+                    },
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_applicable_aggregate_function"
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "has_group_by"
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_comments_post_id",
+                                "ranges": [
+                                    "post_id = 375",
+                                    "post_id = 376",
+                                    "post_id = 377",
+                                    "post_id = 388",
+                                    "post_id = 389",
+                                    "post_id = 390"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 13,
+                                "cost": 1.56329,
+                                "chosen": true
+                            },
+                            {
+                                "index": "idx_comments_post_created",
+                                "ranges": [
+                                    "post_id = 375",
+                                    "post_id = 376",
+                                    "post_id = 377",
+                                    "post_id = 388",
+                                    "post_id = 389",
+                                    "post_id = 390"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 13,
+                                "cost": 1.56548,
+                                "chosen": false,
+                                "cause": "cost"
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_comments_post_id",
+                            "rows": 13,
+                            "ranges": [
+                                "post_id = 375",
+                                "post_id = 376",
+                                "post_id = 377",
+                                "post_id = 388",
+                                "post_id = 389",
+                                "post_id = 390"
+                            ]
+                        },
+                        "rows_for_plan": 13,
+                        "cost_for_plan": 1.56329,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 13,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_comments_post_id"
+                        },
+                        "resulting_rows": 13,
+                        "cost": 2.86329,
+                        "chosen": true,
+                        "use_tmp_table": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "(`comments`.`post_id` in (375,376,377,388,389,390))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(`comments`.`post_id` in (375,376,377,388,389,390))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(`comments`.`post_id` in (375,376,377,388,389,390))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(`comments`.`post_id` in (375,376,377,388,389,390))"
+                    }
+                ]
+            },
+            {
+                "condition": "HAVING",
+                "original_condition": "(count(0) = 2)",
+                "steps": [
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(count(0) = 2)"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(count(0) = 2)"
+                    }
+                ]
+            }
+        ]
     }
 }

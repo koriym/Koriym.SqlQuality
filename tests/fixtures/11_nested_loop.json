@@ -296,5 +296,105 @@
                 "update_time": "2026-09-23 00:49:27"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "users",
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "PRIMARY",
+                        "usable": false,
+                        "chosen": false
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_users_id",
+                        "usable": false,
+                        "chosen": false
+                    },
+                    {
+                        "rows_to_scan": 1000,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 0.1,
+                        "access_type": "scan",
+                        "resulting_rows": 100,
+                        "cost": 101.75,
+                        "chosen": true
+                    }
+                ]
+            },
+            {
+                "table": "posts",
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_posts_user_id",
+                        "rows": 4.97688,
+                        "cost": 174.191,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "ref",
+                        "index": "idx_posts_user_status",
+                        "rows": 4.97688,
+                        "cost": 174.191,
+                        "chosen": false
+                    },
+                    {
+                        "rows_to_scan": 4952,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "scan",
+                        "using_join_cache": true,
+                        "buffers_needed": 1,
+                        "resulting_rows": 4952,
+                        "cost": 49531.5,
+                        "chosen": false
+                    }
+                ]
+            }
+        ],
+        "transformations": [
+            {
+                "select#": 2,
+                "from": "IN (SELECT)",
+                "to": "semijoin",
+                "chosen": true,
+                "transformation_to_semi_join": {
+                    "subquery_predicate": "exists(/* select#2 */ select 1 from `users` where ((`users`.`id` = `posts`.`user_id`) and (`users`.`email` = 'example@example.com')))",
+                    "embedded in": "WHERE",
+                    "evaluating_constant_semijoin_conditions": [],
+                    "semi-join condition": "((`users`.`email` = 'example@example.com') and (`posts`.`user_id` = `users`.`id`))",
+                    "decorrelated_predicates": [
+                        {
+                            "outer": "`posts`.`user_id`",
+                            "inner": "`users`.`id`"
+                        }
+                    ]
+                }
+            }
+        ],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`users`.`email` = 'example@example.com') and (`posts`.`user_id` = `users`.`id`))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(multiple equal('example@example.com', `users`.`email`) and multiple equal(`posts`.`user_id`, `users`.`id`))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(multiple equal('example@example.com', `users`.`email`) and multiple equal(`posts`.`user_id`, `users`.`id`))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(multiple equal('example@example.com', `users`.`email`) and multiple equal(`posts`.`user_id`, `users`.`id`))"
+                    }
+                ]
+            }
+        ]
     }
 }

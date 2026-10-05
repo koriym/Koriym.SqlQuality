@@ -135,5 +135,44 @@
                 "update_time": "2026-09-23 00:49:27"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "users",
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 1000,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 0.2,
+                        "access_type": "scan",
+                        "resulting_rows": 200,
+                        "cost": 101.75,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "(`users`.`name` in ('User 1','User 10'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(`users`.`name` in ('User 1','User 10'))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(`users`.`name` in ('User 1','User 10'))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(`users`.`name` in ('User 1','User 10'))"
+                    }
+                ]
+            }
+        ]
     }
 }

@@ -298,5 +298,36 @@
                 "update_time": "2026-09-26 20:09:49"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "p"
+            },
+            {
+                "table": "u"
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`p`.`id` = 5) and (`u`.`id` = `p`.`user_id`))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(multiple equal(5, `p`.`id`) and multiple equal(`u`.`id`, `p`.`user_id`))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(multiple equal(5, `p`.`id`) and multiple equal(`u`.`id`, `p`.`user_id`))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(multiple equal(5, `p`.`id`) and multiple equal(`u`.`id`, `p`.`user_id`))"
+                    }
+                ]
+            }
+        ]
     }
 }

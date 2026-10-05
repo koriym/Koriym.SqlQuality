@@ -10,6 +10,7 @@ use Koriym\SqlQuality\Exception\NotReadOnlySelect;
 use Koriym\SqlQuality\Exception\QueryFailed;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
+use PDOException;
 use Throwable;
 
 use function array_keys;
@@ -48,6 +49,7 @@ use const PATHINFO_FILENAME;
  * @psalm-import-type AnalysisWithSettingsResult from Types
  * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
+ * @psalm-import-type OptimizerTraceExcerpt from Types
  */
 final class SqlFileAnalyzer
 {
@@ -169,15 +171,16 @@ final class SqlFileAnalyzer
      */
     public function queryContext(string $sqlFile, array $params): QueryContext
     {
-        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params);
+        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params, withOptimizerTrace: true);
     }
 
     /**
      * @param array<string, mixed> $params
+     * @param bool                 $withOptimizerTrace capture information_schema.OPTIMIZER_TRACE for the EXPLAIN; only meaningful with the default optimizer_switch
      *
      * @throws RuntimeException
      */
-    private function buildQueryContext(string $sql, array $params): QueryContext
+    private function buildQueryContext(string $sql, array $params, bool $withOptimizerTrace = false): QueryContext
     {
         $classification = $this->sqlSafetyClassifier->classify($sql);
         if (! $classification['is_explainable']) {
@@ -185,13 +188,70 @@ final class SqlFileAnalyzer
         }
 
         $interpolatedSql = $this->interpolateQuery($sql, $params);
-        $explain = $this->executeExplain($interpolatedSql);
-        // SHOW WARNINGS covers the last statement only; EXPLAIN ANALYZE and the session reset would clear these
-        $warnings = $this->getWarnings();
+        $savedTrace = $withOptimizerTrace ? $this->enableOptimizerTrace() : null;
+        try {
+            $explain = $this->executeExplain($interpolatedSql);
+            // SHOW WARNINGS covers the last statement only and, unlike any SELECT, leaves the optimizer trace in place;
+            // EXPLAIN ANALYZE and the schema lookups would replace both
+            $warnings = $this->getWarnings();
+            $optimizerTrace = $savedTrace === null ? null : $this->readOptimizerTrace($explain);
+        } finally {
+            if ($savedTrace !== null) {
+                $this->pdo->exec("SET optimizer_trace = '{$savedTrace}'");
+            }
+        }
+
         $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
         $schema = $this->getSchemaInfo($sql);
 
-        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema);
+        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace);
+    }
+
+    /** @return string|null the optimizer_trace value to restore, null when the server has no optimizer trace to enable */
+    private function enableOptimizerTrace(): string|null
+    {
+        try {
+            $stmt = $this->pdo->query('SELECT @@optimizer_trace');
+            if ($stmt === false) {
+                return null;
+            }
+
+            /** @var string|false $saved */
+            $saved = $stmt->fetchColumn();
+            if ($saved === false || $this->pdo->exec("SET optimizer_trace = 'enabled=on'") === false) {
+                return null;
+            }
+        } catch (PDOException) {
+            return null;
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param ExplainResult $explain
+     *
+     * @return OptimizerTraceExcerpt|null
+     */
+    private function readOptimizerTrace(array $explain): array|null
+    {
+        try {
+            $stmt = $this->pdo->query('SELECT TRACE FROM information_schema.OPTIMIZER_TRACE');
+        } catch (PDOException) {
+            return null;
+        }
+
+        if ($stmt === false) {
+            return null;
+        }
+
+        /** @var string|false $trace */
+        $trace = $stmt->fetchColumn();
+        if ($trace === false) {
+            return null;
+        }
+
+        return OptimizerTrace::excerpt($trace, (new ExplainWalker())->tables($explain['query_block']));
     }
 
     /**
@@ -344,7 +404,7 @@ final class SqlFileAnalyzer
     {
         $sql = $this->readSqlFile($sqlFile);
 
-        $defaultAnalysis = $this->analyzeWithSettings($sql, $params, $sqlFile);
+        $defaultAnalysis = $this->analyzeContext($this->buildQueryContext($sql, $params, withOptimizerTrace: true), $sql, $params, $sqlFile);
         $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
 
         return $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis);
@@ -363,7 +423,7 @@ final class SqlFileAnalyzer
     public function explain(string $sqlFile, array $params): array
     {
         $sql = $this->readSqlFile($sqlFile);
-        $context = $this->buildQueryContext($sql, $params);
+        $context = $this->buildQueryContext($sql, $params, withOptimizerTrace: true);
 
         $defaultAnalysis = $this->analyzeContext($context, $sql, $params, $sqlFile);
         $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
@@ -385,7 +445,7 @@ final class SqlFileAnalyzer
         try {
             $this->optimizerSettings->disableAll();
 
-            return $this->analyzeWithSettings($sql, $params, $sqlFile);
+            return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
@@ -413,16 +473,6 @@ final class SqlFileAnalyzer
                 ],
             ],
         ];
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     *
-     * @return AnalysisWithSettingsResult
-     */
-    private function analyzeWithSettings(string $sql, array $params, string $sqlFile): array
-    {
-        return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
     }
 
     /**

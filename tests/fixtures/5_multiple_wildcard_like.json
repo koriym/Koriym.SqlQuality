@@ -159,5 +159,44 @@
                 "update_time": "2026-09-23 00:49:28"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "posts",
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 4952,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 0.209857,
+                        "access_type": "scan",
+                        "resulting_rows": 1039.21,
+                        "cost": 503.45,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`posts`.`title` like '%keyword%') or (`posts`.`content` like '%keyword%'))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "((`posts`.`title` like '%keyword%') or (`posts`.`content` like '%keyword%'))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "((`posts`.`title` like '%keyword%') or (`posts`.`content` like '%keyword%'))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "((`posts`.`title` like '%keyword%') or (`posts`.`content` like '%keyword%'))"
+                    }
+                ]
+            }
+        ]
     }
 }

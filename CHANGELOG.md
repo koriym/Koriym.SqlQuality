@@ -23,6 +23,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - JSON Schema for the `analyze` and `explain` CLI output (`schema/analyze-report.schema.json`, `schema/explain-report.schema.json`)
 - `NotExplainable`, `NotReadOnlySelect`, `InvalidExplainResult` and `QueryFailed` exceptions thrown by `SqlFileAnalyzer`, all extending its `RuntimeException`
 - `InvalidSeverityThreshold` (rejected `--fail-on` value), `ReadOnlySessionUnavailable` (driver cannot report the session read-only flag) and `ActiveTransactionRejected` (`ReadOnlySession::run()` called on a connection with an open transaction) exceptions
+- `OptimizerTrace::excerpt()` and `QueryContext::$optimizerTrace` / `optimizerTraceFor()`: an excerpt of `information_schema.OPTIMIZER_TRACE` (range analysis, considered access paths and index recheck per table of the final plan, subquery transformations and condition processing per statement) captured with the default-optimizer `EXPLAIN FORMAT=JSON`, `null` when the server has no trace, the privilege is missing or the trace was truncated
+- `context.optimizer_trace` in the `explain` JSON output and in `tests/fixtures/*.json`
 
 ### Changed
 - `analyzeSQLFiles()` returns results and skipped files instead of printing progress
@@ -31,6 +33,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `FullTableScan` and `IneffectiveJoin` are reported as `Critical`
 - `FullTableScanDetector` excludes internal temp tables (`<derived2>`, `<union1,2>`), reports `Info` below 100 rows examined, and suggests an index or review based on the attached condition
 - `IneffectiveSortDetector` reports every `ordering_operation` with `using_filesort` over a full scan or 1000+ examined rows, and drops the query-cost, data-size, and backward-scan rules
+- `FullTableScanDetector` reads the optimizer trace when an index exists but is not used: `evidence.optimizer_trace` names the cause (`cost`, `index_merge_union` or `join_key_only`) with the rows and costs the optimizer compared, and the suggestion follows the cause instead of the fixed review text
 - `TemporaryTableGroupingDetector` reports every `grouping_operation` (or the `ordering_operation` above one) that uses a temporary table, with the tables beneath it, and ignores `union_result` and `duplicates_removal` temporary tables
 - `LowCardinalityIndexDetector` judges by the leading key column's `CARDINALITY` over `table_rows` (at most 1%) on lookups examining 500+ rows, instead of `filtered`, and suggests a review
 - `UnnecessaryDistinctDetector` checks the SELECT list of single-table `SELECT DISTINCT` statements against the table's primary key from the schema, instead of looking for a column named `id`, and suggests the statement without `DISTINCT`

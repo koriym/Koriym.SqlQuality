@@ -265,5 +265,60 @@
                 "update_time": "2026-09-23 00:49:27"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "u",
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 1000,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "scan",
+                        "resulting_rows": 1000,
+                        "cost": 101.75,
+                        "chosen": true
+                    }
+                ]
+            },
+            {
+                "table": "o",
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 2000,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "scan",
+                        "using_join_cache": true,
+                        "buffers_needed": 8,
+                        "resulting_rows": 2000,
+                        "cost": 200022,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "(`u`.`email` = `o`.`reference_code`)",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(`u`.`email` = `o`.`reference_code`)"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(`u`.`email` = `o`.`reference_code`)"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(`u`.`email` = `o`.`reference_code`)"
+                    }
+                ]
+            }
+        ]
     }
 }

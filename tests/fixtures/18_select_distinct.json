@@ -152,5 +152,209 @@
                 "update_time": "2026-09-23 00:49:29"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "comments",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 10017,
+                        "cost": 1028.05
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": true,
+                            "key_parts": [
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "user_id",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_comments_post_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_comments_post_created",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "user_id",
+                        "cost": 1004.7,
+                        "chosen": true
+                    },
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "distinct_query": true,
+                        "potential_group_range_indexes": [
+                            {
+                                "index": "PRIMARY",
+                                "usable": false,
+                                "cause": "not_covering"
+                            },
+                            {
+                                "index": "user_id",
+                                "covering": true,
+                                "index_dives_for_eq_ranges": true,
+                                "ranges": [
+                                    "user_id = 371 AND id = 1",
+                                    "user_id = 371 AND id = 2",
+                                    "user_id = 371 AND id = 555",
+                                    "user_id = 371 AND id = 999",
+                                    "user_id = 963 AND id = 1",
+                                    "user_id = 963 AND id = 2",
+                                    "user_id = 963 AND id = 555",
+                                    "user_id = 963 AND id = 999"
+                                ],
+                                "rows": 4,
+                                "cost": 1.3
+                            }
+                        ]
+                    },
+                    "best_group_range_summary": {
+                        "type": "index_group",
+                        "index": "user_id",
+                        "group_attribute": null,
+                        "min_aggregate": false,
+                        "max_aggregate": false,
+                        "distinct_aggregate": false,
+                        "rows": 4,
+                        "cost": 1.3,
+                        "key_parts_used_for_access": [
+                            "user_id",
+                            "id"
+                        ],
+                        "ranges": [
+                            "user_id = 371 AND id = 1",
+                            "user_id = 371 AND id = 2",
+                            "user_id = 371 AND id = 555",
+                            "user_id = 371 AND id = 999",
+                            "user_id = 963 AND id = 1",
+                            "user_id = 963 AND id = 2",
+                            "user_id = 963 AND id = 555",
+                            "user_id = 963 AND id = 999"
+                        ],
+                        "chosen": true
+                    },
+                    "skip_scan_range": {
+                        "chosen": false,
+                        "cause": "has_select_distinct"
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "PRIMARY",
+                                "ranges": [
+                                    "id = 1",
+                                    "id = 2",
+                                    "id = 555",
+                                    "id = 999"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": true,
+                                "using_mrr": false,
+                                "index_only": false,
+                                "in_memory": 1,
+                                "rows": 4,
+                                "cost": 1.4125,
+                                "chosen": false,
+                                "cause": "cost"
+                            },
+                            {
+                                "index": "user_id",
+                                "ranges": [
+                                    "user_id = 371 AND id = 1",
+                                    "user_id = 371 AND id = 2",
+                                    "user_id = 371 AND id = 555",
+                                    "user_id = 371 AND id = 999",
+                                    "user_id = 963 AND id = 1",
+                                    "user_id = 963 AND id = 2",
+                                    "user_id = 963 AND id = 555",
+                                    "user_id = 963 AND id = 999"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 8,
+                                "cost": 1.06192,
+                                "chosen": true
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "user_id",
+                            "rows": 8,
+                            "ranges": [
+                                "user_id = 371 AND id = 1",
+                                "user_id = 371 AND id = 2",
+                                "user_id = 371 AND id = 555",
+                                "user_id = 371 AND id = 999",
+                                "user_id = 963 AND id = 1",
+                                "user_id = 963 AND id = 2",
+                                "user_id = 963 AND id = 555",
+                                "user_id = 963 AND id = 999"
+                            ]
+                        },
+                        "rows_for_plan": 8,
+                        "cost_for_plan": 1.06192,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "rows_to_scan": 8,
+                        "filtering_effect": [],
+                        "final_filtering_effect": 1,
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "user_id"
+                        },
+                        "resulting_rows": 8,
+                        "cost": 1.86192,
+                        "chosen": true
+                    }
+                ]
+            }
+        ],
+        "transformations": [],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "((`comments`.`user_id` in (371,963)) and (`comments`.`id` in (1,2,555,999)))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "((`comments`.`user_id` in (371,963)) and (`comments`.`id` in (1,2,555,999)))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "((`comments`.`user_id` in (371,963)) and (`comments`.`id` in (1,2,555,999)))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "((`comments`.`user_id` in (371,963)) and (`comments`.`id` in (1,2,555,999)))"
+                    }
+                ]
+            }
+        ]
     }
 }

@@ -361,5 +361,295 @@
                 "update_time": "2026-09-23 00:49:29"
             }
         }
+    },
+    "optimizer_trace": {
+        "tables": [
+            {
+                "table": "posts",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 4952,
+                        "cost": 505.55
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_posts_user_status",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "status",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_posts_status_created",
+                        "cost": 509.357,
+                        "chosen": false,
+                        "cause": "cost"
+                    },
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_group_by_or_distinct"
+                    },
+                    "skip_scan_range": {
+                        "potential_skip_scan_indexes": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "usable": false,
+                                "cause": "no_range_predicate"
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            }
+                        ]
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "ranges": [
+                                    "status = 'published'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 2476,
+                                "cost": 254.812,
+                                "chosen": true
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "chosen": false,
+                                "cause": "no_valid_range_for_this_index"
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_posts_status_created",
+                            "rows": 2476,
+                            "ranges": [
+                                "status = 'published'"
+                            ]
+                        },
+                        "rows_for_plan": 2476,
+                        "cost_for_plan": 254.812,
+                        "chosen": true
+                    }
+                },
+                "considered_access_paths": [
+                    {
+                        "access_type": "ref",
+                        "index": "idx_posts_status_created",
+                        "rows": 2476,
+                        "cost": 254.802,
+                        "chosen": true
+                    },
+                    {
+                        "access_type": "range",
+                        "range_details": {
+                            "used_index": "idx_posts_status_created"
+                        },
+                        "chosen": false,
+                        "cause": "heuristic_index_cheaper"
+                    }
+                ]
+            },
+            {
+                "table": "posts",
+                "range_analysis": {
+                    "table_scan": {
+                        "rows": 4952,
+                        "cost": 505.55
+                    },
+                    "potential_range_indexes": [
+                        {
+                            "index": "PRIMARY",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_user_id",
+                            "usable": false,
+                            "cause": "not_applicable"
+                        },
+                        {
+                            "index": "idx_posts_status_created",
+                            "usable": true,
+                            "key_parts": [
+                                "status",
+                                "created_at",
+                                "id"
+                            ]
+                        },
+                        {
+                            "index": "idx_posts_user_status",
+                            "usable": true,
+                            "key_parts": [
+                                "user_id",
+                                "status",
+                                "id"
+                            ]
+                        }
+                    ],
+                    "best_covering_index_scan": {
+                        "index": "idx_posts_status_created",
+                        "cost": 509.357,
+                        "chosen": false,
+                        "cause": "cost"
+                    },
+                    "setup_range_conditions": [],
+                    "group_index_range": {
+                        "chosen": false,
+                        "cause": "not_group_by_or_distinct"
+                    },
+                    "skip_scan_range": {
+                        "potential_skip_scan_indexes": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "usable": false,
+                                "cause": "no_range_predicate"
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "usable": false,
+                                "cause": "query_references_nonkey_column"
+                            }
+                        ]
+                    },
+                    "analyzing_range_alternatives": {
+                        "range_scan_alternatives": [
+                            {
+                                "index": "idx_posts_status_created",
+                                "ranges": [
+                                    "status = 'published'"
+                                ],
+                                "index_dives_for_eq_ranges": true,
+                                "rowid_ordered": false,
+                                "using_mrr": false,
+                                "index_only": true,
+                                "in_memory": 1,
+                                "rows": 2476,
+                                "cost": 254.812,
+                                "chosen": true
+                            },
+                            {
+                                "index": "idx_posts_user_status",
+                                "chosen": false,
+                                "cause": "no_valid_range_for_this_index"
+                            }
+                        ],
+                        "analyzing_roworder_intersect": {
+                            "usable": false,
+                            "cause": "too_few_roworder_scans"
+                        }
+                    },
+                    "chosen_range_access_summary": {
+                        "range_access_plan": {
+                            "type": "range_scan",
+                            "index": "idx_posts_status_created",
+                            "rows": 2476,
+                            "ranges": [
+                                "status = 'published'"
+                            ]
+                        },
+                        "rows_for_plan": 2476,
+                        "cost_for_plan": 254.812,
+                        "chosen": true
+                    }
+                }
+            },
+            {
+                "table": "comments"
+            }
+        ],
+        "transformations": [
+            {
+                "select#": 3,
+                "from": "IN (SELECT)",
+                "to": "semijoin",
+                "chosen": true,
+                "transformation_to_semi_join": {
+                    "subquery_predicate": "`comments`.`post_id` in (/* select#3 */ select `posts`.`id` from `posts` where (`posts`.`status` = 'published'))",
+                    "embedded in": "WHERE",
+                    "evaluating_constant_semijoin_conditions": [],
+                    "semi-join condition": "((`posts`.`status` = 'published') and (`comments`.`post_id` = `posts`.`id`))",
+                    "decorrelated_predicates": [
+                        {
+                            "outer": "`comments`.`post_id`",
+                            "inner": "`posts`.`id`"
+                        }
+                    ]
+                }
+            }
+        ],
+        "condition_processing": [
+            {
+                "condition": "WHERE",
+                "original_condition": "(`posts`.`status` = 'published')",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "multiple equal('published', `posts`.`status`)"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "multiple equal('published', `posts`.`status`)"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "multiple equal('published', `posts`.`status`)"
+                    }
+                ]
+            },
+            {
+                "condition": "WHERE",
+                "original_condition": "((`posts`.`status` = 'published') and (`comments`.`post_id` = `posts`.`id`))",
+                "steps": [
+                    {
+                        "transformation": "equality_propagation",
+                        "resulting_condition": "(multiple equal('published', `posts`.`status`) and multiple equal(`comments`.`post_id`, `posts`.`id`))"
+                    },
+                    {
+                        "transformation": "constant_propagation",
+                        "resulting_condition": "(multiple equal('published', `posts`.`status`) and multiple equal(`comments`.`post_id`, `posts`.`id`))"
+                    },
+                    {
+                        "transformation": "trivial_condition_removal",
+                        "resulting_condition": "(multiple equal('published', `posts`.`status`) and multiple equal(`comments`.`post_id`, `posts`.`id`))"
+                    }
+                ]
+            }
+        ]
     }
 }

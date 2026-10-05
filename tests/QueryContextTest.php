@@ -107,8 +107,40 @@ final class QueryContextTest extends TestCase
         $context = Fixture::load('20_multi_table_update.sql');
         $data = $context->toArray();
 
-        $this->assertSame(['sql', 'explain', 'explain_analyze', 'warnings', 'schema'], array_keys($data));
+        $this->assertSame(['sql', 'explain', 'explain_analyze', 'warnings', 'schema', 'optimizer_trace'], array_keys($data));
         $this->assertNull($data['explain_analyze']);
         $this->assertEquals($context, QueryContext::fromArray($data));
+    }
+
+    public function testFromArrayAcceptsFixturesRecordedWithoutOptimizerTrace(): void
+    {
+        $data = Fixture::load('1_full_table_scan.sql')->toArray();
+        unset($data['optimizer_trace']);
+
+        $context = QueryContext::fromArray($data);
+        $this->assertNull($context->optimizerTrace);
+        $this->assertNull($context->optimizerTraceFor('posts'));
+    }
+
+    public function testOptimizerTraceForFindsTheTableOfTheFinalPlan(): void
+    {
+        $context = new QueryContext(
+            sql: 'SELECT * FROM posts p JOIN users u ON u.id = p.user_id',
+            explain: ['query_block' => ['select_id' => 1]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+            optimizerTrace: [
+                'tables' => [
+                    ['table' => 'u', 'considered_access_paths' => []],
+                    ['table' => 'p', 'range_analysis' => ['table_scan' => ['rows' => 10, 'cost' => 1.0]]],
+                ],
+                'transformations' => [],
+                'condition_processing' => [],
+            ],
+        );
+
+        $this->assertSame(['table_scan' => ['rows' => 10, 'cost' => 1.0]], $context->optimizerTraceFor('p')['range_analysis'] ?? null);
+        $this->assertNull($context->optimizerTraceFor('comments'));
     }
 }
