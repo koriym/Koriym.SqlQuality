@@ -179,4 +179,25 @@ final class FullTableScanDetectorTest extends TestCase
             optimizerTrace: $trace === null ? null : ['tables' => [['select' => 1, ...$trace]], 'transformations' => [], 'condition_processing' => []],
         );
     }
+
+    public function testIgnoresATableFunction(): void
+    {
+        $findings = (new FullTableScanDetector())->detect(new QueryContext(
+            sql: '',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'nested_loop' => [
+                        ['table' => ['table_name' => 'articles', 'access_type' => 'index', 'key' => 'PRIMARY', 'rows_examined_per_scan' => 45345]],
+                        ['table' => ['table_name' => 'reducebody', 'access_type' => 'ALL', 'table_function' => 'json_table', 'rows_examined_per_scan' => 2, 'rows_produced_per_join' => 90690]],
+                    ],
+                ],
+            ],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
 }

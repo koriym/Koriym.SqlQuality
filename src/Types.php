@@ -34,7 +34,8 @@ use stdClass;
  *   using_index?: bool,
  *   update?: bool,
  *   used_columns?: list<string>,
- *   materialized_from_subquery?: array<string, mixed>
+ *   materialized_from_subquery?: array<string, mixed>,
+ *   table_function?: string
  * }
  * @psalm-type DuplicatesRemovalOperation = array{
  *   using_temporary_table?: bool,
@@ -120,10 +121,10 @@ use stdClass;
  * | 'TemporaryTableGrouping'
  * | 'UnnecessaryDistinct'
  * @psalm-type WarningMessages = array{
- *   CartesianProduct: string,
- *   DeepOffset: string,
- *   DependentSubquery: string,
- *   EstimateDivergence: string,
+ *   CartesianProduct?: string,
+ *   DeepOffset?: string,
+ *   DependentSubquery?: string,
+ *   EstimateDivergence?: string,
  *   ExcessiveDerivedTables: string,
  *   FunctionInvalidatesIndex: string,
  *   FullTableScan: string,
@@ -135,7 +136,7 @@ use stdClass;
  *   IneffectiveUnion: string,
  *   LowCardinalityIndex: string,
  *   MultiTableUpdate: string,
- *   OrderByRand: string,
+ *   OrderByRand?: string,
  *   TemporaryTableGrouping: string,
  *   UnnecessaryDistinct: string
  * }

@@ -9,6 +9,30 @@ use PHPUnit\Framework\TestCase;
 
 final class ExplainAnalyzerIssueMetadataTest extends TestCase
 {
+    public function testOmittedMessagesFallBackToDefaults(): void
+    {
+        $analyzer = new ExplainAnalyzer(['FullTableScan' => 'custom']);
+
+        $issues = $analyzer->analyze(new QueryContext(
+            sql: 'SELECT * FROM users',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'table' => [
+                        'table_name' => 'users',
+                        'access_type' => 'ALL',
+                        'rows_examined_per_scan' => 1000,
+                    ],
+                ],
+            ],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame('custom', $issues[0]['message']);
+    }
+
     public function testAnalyzeAddsSeverityConfidenceDetectorAndEvidence(): void
     {
         $analyzer = new ExplainAnalyzer();

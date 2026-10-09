@@ -65,6 +65,7 @@ final class ExplainAnalyzer
     /** @param WarningMessages $messages */
     public function __construct(array $messages = self::DEFAULT_MESSAGES)
     {
+        $messages += self::DEFAULT_MESSAGES;
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [
             'CartesianProduct' => [

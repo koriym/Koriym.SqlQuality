@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `ExplainAnalyzer` falls back to `DEFAULT_MESSAGES` for message keys the caller omits
+- `CartesianProductDetector`, `FullTableScanDetector` and `IneffectiveJoinDetector` no longer flag `JSON_TABLE`
+- The Issues column of the summary report lists the issues of the default plan, as the detail report does
+
 ## [0.3.0] - 2026-10-05
 
 ### Added
