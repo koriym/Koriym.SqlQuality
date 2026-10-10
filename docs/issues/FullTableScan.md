@@ -31,7 +31,7 @@ recommended: true
 }
 ```
 
-`<derived2>` や `<union1,2>` のように `<` で始まる `table_name` はサブクエリ/UNION結果を保持する内部一時テーブルで、検出対象から除外されます。
+`<derived2>` や `<union1,2>` のように `<` で始まる `table_name` はサブクエリ/UNION結果を保持する内部一時テーブルで、検出対象から除外されます。`JSON_TABLE`（`table_function`）も、インデックスを作れないため除外されます。
 
 ### 主な検出条件
 1. `access_type` が `ALL`（内部一時テーブルを除く）

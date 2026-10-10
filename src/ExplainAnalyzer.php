@@ -24,7 +24,11 @@ use Koriym\SqlQuality\Detector\MultiTableUpdateDetector;
 use Koriym\SqlQuality\Detector\OrderByRandDetector;
 use Koriym\SqlQuality\Detector\TemporaryTableGroupingDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
+use Koriym\SqlQuality\Exception\UnknownMessageKey;
 
+use function array_diff_key;
+use function array_keys;
+use function implode;
 use function sprintf;
 
 /**
@@ -65,6 +69,11 @@ final class ExplainAnalyzer
     /** @param WarningMessages $messages */
     public function __construct(array $messages = self::DEFAULT_MESSAGES)
     {
+        $unknown = array_diff_key($messages, self::DEFAULT_MESSAGES);
+        if ($unknown !== []) {
+            throw new UnknownMessageKey(implode(', ', array_keys($unknown)));
+        }
+
         $messages += self::DEFAULT_MESSAGES;
         /** @psalm-suppress InvalidPropertyAssignmentValue */
         $this->warnings = [

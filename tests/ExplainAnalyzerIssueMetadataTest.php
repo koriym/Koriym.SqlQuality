@@ -5,7 +5,10 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Detector\FullTableScanDetector;
+use Koriym\SqlQuality\Exception\UnknownMessageKey;
 use PHPUnit\Framework\TestCase;
+
+use function array_column;
 
 final class ExplainAnalyzerIssueMetadataTest extends TestCase
 {
@@ -14,14 +17,13 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
         $analyzer = new ExplainAnalyzer(['FullTableScan' => 'custom']);
 
         $issues = $analyzer->analyze(new QueryContext(
-            sql: 'SELECT * FROM users',
+            sql: '',
             explain: [
                 'query_block' => [
                     'select_id' => 1,
-                    'table' => [
-                        'table_name' => 'users',
-                        'access_type' => 'ALL',
-                        'rows_examined_per_scan' => 1000,
+                    'nested_loop' => [
+                        ['table' => ['table_name' => 'a', 'access_type' => 'ALL', 'rows_examined_per_scan' => 1000]],
+                        ['table' => ['table_name' => 'b', 'access_type' => 'ALL', 'rows_examined_per_scan' => 1000, 'attached_condition' => '(`test`.`b`.`a_id` = `test`.`a`.`id`)']],
                     ],
                 ],
             ],
@@ -30,7 +32,17 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
             schema: [],
         ));
 
-        $this->assertSame('custom', $issues[0]['message']);
+        $messages = array_column($issues, 'message', 'type');
+        $this->assertSame('custom', $messages['FullTableScan']);
+        $this->assertSame(ExplainAnalyzer::DEFAULT_MESSAGES['IneffectiveJoin'], $messages['IneffectiveJoin']);
+    }
+
+    public function testUnknownMessageKeyIsRejected(): void
+    {
+        $this->expectException(UnknownMessageKey::class);
+        $this->expectExceptionMessage('FullTableScn, Foo');
+
+        new ExplainAnalyzer(['FullTableScan' => 'custom', 'FullTableScn' => 'typo', 'Foo' => 'bar']);
     }
 
     public function testAnalyzeAddsSeverityConfidenceDetectorAndEvidence(): void
