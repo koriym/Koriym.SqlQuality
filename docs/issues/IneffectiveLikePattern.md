@@ -33,6 +33,7 @@ recommended: true
 1. `attached_condition` に `like '%...'`（先頭がワイルドカード。末尾は問わない）がある
 2. かつ `access_type` が `ALL`、または `filtered` が 25 未満
 3. OR で結ばれた条件も対象。該当する列ごとに 1 件報告する
+4. `JSON_TABLE`（`table_function`）は対象外
 
 ## パフォーマンスへの影響
 

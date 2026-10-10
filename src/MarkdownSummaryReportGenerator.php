@@ -73,7 +73,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
             }
 
             $withOpt = $optimizer['with_optimizer'];
-            $baseIssues = $optimizer['without_optimizer']['issues'] ?? [];
+            $issues = $result['issues'];
             $baseName = pathinfo($filename, PATHINFO_FILENAME);
 
             $rows[] = sprintf(
@@ -82,7 +82,7 @@ class MarkdownSummaryReportGenerator implements SummaryReportGeneratorInterface
                 $result['cost'],
                 $withOpt['execution_time'] * 1000,  // Convert to milliseconds
                 $this->classifier->classify($result['cost'], $stats['avg_cost'], $stats['std_dev']),
-                $this->formatIssues($baseIssues),
+                $this->formatIssues($issues),
                 $baseName
             );
         }

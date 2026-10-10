@@ -44,7 +44,7 @@ recommended: true
 
 ### 主な検出条件
 1. `nested_loop` の2番目以降のメンバーであること
-2. `access_type` が `ALL` または `index`、あるいは `using_join_buffer` があること
+2. `access_type` が `ALL` または `index`、あるいは `using_join_buffer` があること（`JSON_TABLE` = `table_function` は除く）
 3. `attached_condition` に `この表.列 = 他の表.列` の形の結合条件があれば、この表の列へのインデックス作成（`index`）を提案。無い場合や、その列で始まるインデックスが既にある場合はレビュー（`review`）を提案
 
 ## パフォーマンスへの影響

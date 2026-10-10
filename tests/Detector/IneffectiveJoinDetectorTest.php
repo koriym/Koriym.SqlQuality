@@ -148,4 +148,25 @@ final class IneffectiveJoinDetectorTest extends TestCase
     {
         return new QueryContext(sql: '', explain: $explain, explainAnalyze: null, warnings: [], schema: $schema);
     }
+
+    public function testIgnoresATableFunction(): void
+    {
+        $findings = (new IneffectiveJoinDetector())->detect(new QueryContext(
+            sql: '',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'nested_loop' => [
+                        ['table' => ['table_name' => 'articles', 'access_type' => 'index', 'key' => 'PRIMARY', 'rows_examined_per_scan' => 45345]],
+                        ['table' => ['table_name' => 'reducebody', 'access_type' => 'ALL', 'table_function' => 'json_table', 'rows_examined_per_scan' => 2, 'rows_produced_per_join' => 90690]],
+                    ],
+                ],
+            ],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
 }

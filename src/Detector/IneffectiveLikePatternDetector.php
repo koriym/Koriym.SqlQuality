@@ -19,7 +19,7 @@ final class IneffectiveLikePatternDetector implements DetectorInterface
     {
         $findings = [];
         foreach ($context->tables() as $table) {
-            if (! isset($table['attached_condition'])) {
+            if (! isset($table['attached_condition']) || isset($table['table_function'])) {
                 continue;
             }
 
