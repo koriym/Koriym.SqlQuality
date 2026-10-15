@@ -28,7 +28,12 @@ final class FakePdo extends PDO
         return false;
     }
 
-    public function exec(string $statement): int
+    public function getAttribute(int $attribute): string
+    {
+        return 'fake';
+    }
+
+    public function exec(string $statement): int|false
     {
         return ($this->exec)($statement);
     }
