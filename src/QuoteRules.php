@@ -41,7 +41,7 @@ final class QuoteRules
     }
 
     /**
-     * @return list<self> every reading a server might apply, for a caller that cannot see sql_mode
+     * @return non-empty-list<self> every reading a server might apply, for a caller that cannot see sql_mode
      *
      * @psalm-pure
      */
