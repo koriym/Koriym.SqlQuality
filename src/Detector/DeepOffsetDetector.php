@@ -24,7 +24,7 @@ final class DeepOffsetDetector implements DetectorInterface
     #[Override]
     public function detect(QueryContext $context): array
     {
-        $offsetLimit = $this->offsetAndLimit($context->sqlWithoutComments());
+        $offsetLimit = $this->offsetAndLimit($context->sqlStructure());
         if ($offsetLimit === null || $offsetLimit['offset'] < self::MIN_OFFSET) {
             return [];
         }

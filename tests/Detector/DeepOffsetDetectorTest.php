@@ -48,6 +48,19 @@ final class DeepOffsetDetectorTest extends TestCase
         $this->assertSame([], $findings);
     }
 
+    public function testIgnoresALimitInsideAStringLiteralOrAQuotedIdentifier(): void
+    {
+        $findings = (new DeepOffsetDetector())->detect(new QueryContext(
+            sql: "SELECT `LIMIT 50000, 10` AS label FROM posts WHERE note = 'LIMIT 50000, 10' ORDER BY created_at DESC LIMIT 10",
+            explain: ['query_block' => ['select_id' => 1]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
+
     public function testOffsetKeywordFormIsDetected(): void
     {
         $findings = (new DeepOffsetDetector())->detect(new QueryContext(

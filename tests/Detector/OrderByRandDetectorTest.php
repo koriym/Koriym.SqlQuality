@@ -44,6 +44,17 @@ final class OrderByRandDetectorTest extends TestCase
         )));
     }
 
+    public function testIgnoresOrderByRandInsideAStringLiteral(): void
+    {
+        $this->assertSame([], (new OrderByRandDetector())->detect(new QueryContext(
+            sql: "SELECT * FROM posts WHERE note = 'ORDER BY RAND()' LIMIT 5",
+            explain: ['query_block' => ['select_id' => 1]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        )));
+    }
+
     public function testRowsExaminedAtCriticalThresholdIsCritical(): void
     {
         $findings = (new OrderByRandDetector())->detect(new QueryContext(

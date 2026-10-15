@@ -288,6 +288,57 @@ final class SqlSafetyClassifier
         return $result;
     }
 
+    /**
+     * Empties every quoted string and backtick identifier of comment-free SQL, keeping the quotes,
+     * so a keyword pattern cannot match text that is data or a name rather than syntax.
+     *
+     * @psalm-pure
+     */
+    public static function stripLiterals(string $sql): string
+    {
+        $result = '';
+        $quote = null;
+        $isEscaped = false;
+        $length = strlen($sql);
+        for ($offset = 0; $offset < $length; $offset++) {
+            $char = $sql[$offset];
+
+            if ($quote === null) {
+                $result .= $char;
+                if ($char === '\'' || $char === '"' || $char === '`') {
+                    $quote = $char;
+                }
+
+                continue;
+            }
+
+            if ($isEscaped) {
+                $isEscaped = false;
+
+                continue;
+            }
+
+            if ($char === '\\' && $quote !== '`') {
+                $isEscaped = true;
+
+                continue;
+            }
+
+            if ($char === $quote) {
+                if ($offset + 1 < $length && $sql[$offset + 1] === $quote) {
+                    $offset++;
+
+                    continue;
+                }
+
+                $result .= $char;
+                $quote = null;
+            }
+        }
+
+        return $result;
+    }
+
     /** @psalm-pure */
     private static function isVersionedCommentStart(string $sql, int $offset, int $length): bool
     {
