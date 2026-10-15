@@ -34,9 +34,13 @@ final class LowCardinalityIndexDetectorTest extends TestCase
         $this->assertSame(1000, $findings[0]->evidence['table_rows']);
     }
 
-    public function testReportsEveryBranchOfAUnion(): void
+    public function testReportsAnIndexOnceAcrossUnionBranches(): void
     {
-        $this->assertCount(2, (new LowCardinalityIndexDetector())->detect(Fixture::load('23_ineffective_union.sql')));
+        $findings = (new LowCardinalityIndexDetector())->detect(Fixture::load('23_ineffective_union.sql'));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('posts', $findings[0]->evidence['table_name']);
+        $this->assertSame('idx_posts_status_created', $findings[0]->evidence['key']);
     }
 
     public function testIgnoresALookupOnASelectiveColumn(): void

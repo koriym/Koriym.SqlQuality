@@ -8,6 +8,7 @@ use Koriym\SqlQuality\QueryContext;
 use Koriym\SqlQuality\Types;
 use Override;
 
+use function array_values;
 use function in_array;
 use function sprintf;
 
@@ -23,15 +24,16 @@ final class LowCardinalityIndexDetector implements DetectorInterface
     #[Override]
     public function detect(QueryContext $context): array
     {
+        // Each UNION branch is a separate table access; the index is the same, so report it once.
         $findings = [];
         foreach ($context->tables() as $table) {
             $finding = $this->lowCardinalityLookup($context, $table);
             if ($finding !== null) {
-                $findings[] = $finding;
+                $findings[$finding->evidence['table_name'] . "\0" . $finding->evidence['key']] ??= $finding;
             }
         }
 
-        return $findings;
+        return array_values($findings);
     }
 
     /** @param ExplainTable $table */

@@ -13,6 +13,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `SqlSafetyClassifier` takes a `QuoteRules`: `SqlFileAnalyzer` reads `@@session.sql_mode` once per public entry point, before any `EXPLAIN`, so a `\'` followed later by `;` is one statement under the default mode and a stacked statement under `NO_BACKSLASH_ESCAPES`, and a `"…"` identifier under `ANSI_QUOTES` cannot hide one either. A classifier built without rules keeps rejecting under every reading.
 - `SqlSafetyClassifier::stripComments()` and `QueryContext::sqlWithoutComments()` follow the same rules
+- `DeepOffsetDetector` and `OrderByRandDetector` match on `QueryContext::sqlStructure()`, the statement with comments removed and every string literal and backtick identifier emptied, so `LIMIT` or `ORDER BY RAND()` inside a value or a name is not a finding
+- `LowCardinalityIndexDetector` reports an index once per table and key, instead of once per `UNION` branch
+
+### Fixed
+- `ReadOnlySession::run()` ran the callback when `SET SESSION TRANSACTION READ ONLY` was refused on a connection in `ERRMODE_SILENT`; it now throws `ReadOnlySessionUnavailable`
+- A failing optimizer-switch restore after a failing no-optimizer pass replaced the pass's exception; the pass's exception now propagates
 
 ## [0.3.0] - 2026-10-05
 

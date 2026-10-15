@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\NotExplainable;
 use PDOException;
+use RuntimeException;
 
 use function array_column;
 use function array_keys;
@@ -191,6 +192,26 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->expectExceptionMessage(RestoreFailingPdo::MESSAGE);
 
         $analyzer->queryContext('1_full_table_scan.sql', ['min_views' => 1000]);
+    }
+
+    public function testTheNoOptimizerPassFailureWinsOverAFailingSettingsRestore(): void
+    {
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: true));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(FailingOptimizerSettings::DISABLE_MESSAGE);
+
+        $analyzer->analyze('1_full_table_scan.sql', ['min_views' => 1000]);
+    }
+
+    public function testAFailingSettingsRestoreAfterASuccessfulNoOptimizerPassPropagates(): void
+    {
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: false));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(FailingOptimizerSettings::RESTORE_MESSAGE);
+
+        $analyzer->analyze('1_full_table_scan.sql', ['min_views' => 1000]);
     }
 
     private function writeSqlFile(string $name, string $sql): void

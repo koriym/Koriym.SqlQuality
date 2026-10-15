@@ -170,10 +170,11 @@ final class CliTest extends MySqlTestCase
         $this->assertStringContainsString('PDOException: SQLSTATE', $stderr);
     }
 
-    public function testExplainWithUnloadableParamsFileExitsWithTwo(): void
+    /** @dataProvider unloadableParamsFileProvider */
+    public function testExplainWithUnloadableParamsFileExitsWithTwo(string $contents): void
     {
         $paramsFile = sys_get_temp_dir() . '/' . uniqid('sqlquality_broken_params_', true) . '.php';
-        file_put_contents($paramsFile, "<?php\nreturn [broken\n");
+        file_put_contents($paramsFile, $contents);
 
         [$exitCode, $stdout, $stderr] = $this->runExplainCli([
             '--sql-file=' . __DIR__ . '/sql/1_full_table_scan.sql',
