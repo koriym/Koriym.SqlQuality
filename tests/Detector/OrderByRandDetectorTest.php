@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Fixture;
 use Koriym\SqlQuality\QueryContext;
+use Koriym\SqlQuality\QuoteRules;
 use PHPUnit\Framework\TestCase;
 
 final class OrderByRandDetectorTest extends TestCase
@@ -53,6 +54,18 @@ final class OrderByRandDetectorTest extends TestCase
             warnings: [],
             schema: [],
         )));
+    }
+
+    public function testABackslashLiteralUnderNoBackslashEscapesDoesNotSwallowTheOrderBy(): void
+    {
+        $rules = QuoteRules::fromSqlMode('NO_BACKSLASH_ESCAPES');
+        $explain = ['query_block' => ['select_id' => 1]];
+
+        $real = (new OrderByRandDetector())->detect(new QueryContext("SELECT '\\' AS s ORDER BY RAND() LIMIT 10000, 10", $explain, null, [], [], null, $rules));
+        $quoted = (new OrderByRandDetector())->detect(new QueryContext("SELECT '\\' AS s, 'ORDER BY RAND()' AS note", $explain, null, [], [], null, $rules));
+
+        $this->assertCount(1, $real);
+        $this->assertSame([], $quoted);
     }
 
     public function testRowsExaminedAtCriticalThresholdIsCritical(): void

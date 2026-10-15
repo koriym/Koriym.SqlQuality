@@ -299,7 +299,7 @@ final class SqlSafetyClassifier
      *
      * @psalm-pure
      */
-    public static function stripLiterals(string $sql): string
+    public static function stripLiterals(string $sql, QuoteRules $rules = new QuoteRules()): string
     {
         $result = '';
         $quote = null;
@@ -323,7 +323,7 @@ final class SqlSafetyClassifier
                 continue;
             }
 
-            if ($char === '\\' && $quote !== '`') {
+            if ($char === '\\' && $rules->backslashEscapesIn($quote)) {
                 $isEscaped = true;
 
                 continue;

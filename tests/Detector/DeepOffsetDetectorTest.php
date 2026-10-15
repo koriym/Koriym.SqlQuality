@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\Fixture;
 use Koriym\SqlQuality\QueryContext;
+use Koriym\SqlQuality\QuoteRules;
 use PHPUnit\Framework\TestCase;
 
 final class DeepOffsetDetectorTest extends TestCase
@@ -59,6 +60,18 @@ final class DeepOffsetDetectorTest extends TestCase
         ));
 
         $this->assertSame([], $findings);
+    }
+
+    public function testABackslashLiteralUnderNoBackslashEscapesDoesNotSwallowTheLimit(): void
+    {
+        $rules = QuoteRules::fromSqlMode('NO_BACKSLASH_ESCAPES');
+        $explain = ['query_block' => ['select_id' => 1]];
+
+        $real = (new DeepOffsetDetector())->detect(new QueryContext("SELECT '\\' AS s ORDER BY RAND() LIMIT 10000, 10", $explain, null, [], [], null, $rules));
+        $quoted = (new DeepOffsetDetector())->detect(new QueryContext("SELECT '\\' AS s, 'LIMIT 50000, 10' AS note", $explain, null, [], [], null, $rules));
+
+        $this->assertCount(1, $real);
+        $this->assertSame([], $quoted);
     }
 
     public function testOffsetKeywordFormIsDetected(): void

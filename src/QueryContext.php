@@ -128,7 +128,7 @@ final class QueryContext
     /** @return string sqlWithoutComments() with every string literal and backtick identifier emptied; for matching keywords, not names */
     public function sqlStructure(): string
     {
-        return SqlSafetyClassifier::stripLiterals($this->sqlWithoutComments());
+        return SqlSafetyClassifier::stripLiterals($this->sqlWithoutComments(), $this->quoteRules);
     }
 
     /** @return array<string, string> alias => table name; a table without alias maps to itself. Derived tables are not included */
