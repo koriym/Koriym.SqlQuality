@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\NotExplainable;
 use PDOException;
 
 use function array_column;
@@ -120,6 +121,32 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         } catch (PDOException $e) {
             $this->assertStringContainsString('no_such_table', $e->getMessage(), 'the EXPLAIN error wins over the restore error');
         }
+    }
+
+    public function testABackslashEscapedQuoteFollowedByASemicolonIsOneStatementUnderTheDefaultSqlMode(): void
+    {
+        $pdo = $this->connect();
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'it\\'s; fine' AS s");
+
+        $context = (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+
+        $this->assertSame(1, $context->explain['query_block']['select_id'] ?? null);
+    }
+
+    public function testTheSameStatementIsRejectedAsStackedUnderNoBackslashEscapes(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
+
+        try {
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+            $this->fail('a second statement hidden by NO_BACKSLASH_ESCAPES must not reach the server');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
     }
 
     public function testARestoreFailureAfterASuccessfulExplainPropagates(): void

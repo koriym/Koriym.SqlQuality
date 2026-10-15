@@ -20,10 +20,12 @@ use function array_shift;
 use function array_sum;
 use function array_values;
 use function count;
+use function explode;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_bool;
 use function is_dir;
@@ -36,6 +38,7 @@ use function pathinfo;
 use function preg_replace;
 use function sort;
 use function strrpos;
+use function strtoupper;
 use function substr;
 use function var_export;
 
@@ -66,8 +69,32 @@ final class SqlFileAnalyzer
         OptimizerSettingsInterface|null $optimizerSettings = null
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
-        $this->sqlSafetyClassifier = new SqlSafetyClassifier();
+        $this->sqlSafetyClassifier = new SqlSafetyClassifier(self::backslashEscapes($pdo));
         $this->readOnlySession = new ReadOnlySession($pdo);
+    }
+
+    /**
+     * null when the connection cannot report sql_mode (another driver, or an error mode that
+     * returns false); the classifier then rejects under either reading.
+     */
+    private static function backslashEscapes(PDO $pdo): bool|null
+    {
+        try {
+            $statement = $pdo->query('SELECT @@session.sql_mode');
+        } catch (PDOException) {
+            return null;
+        }
+
+        if ($statement === false) {
+            return null;
+        }
+
+        $mode = $statement->fetchColumn();
+        if (! is_string($mode)) {
+            return null;
+        }
+
+        return ! in_array('NO_BACKSLASH_ESCAPES', explode(',', strtoupper($mode)), true);
     }
 
     /**

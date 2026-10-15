@@ -82,20 +82,31 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertTrue($result['is_read_only_select']);
     }
 
-    /**
-     * Under sql_mode NO_BACKSLASH_ESCAPES the literal ends at the first quote and the text after the
-     * semicolon is a second statement; the classifier cannot see the server's mode, so it rejects.
-     */
-    public function testSemicolonAfterABackslashEscapedQuoteIsRejectedAsAmbiguous(): void
+    public function testSemicolonAfterABackslashEscapedQuoteIsRejectedWhenTheModeIsUnknown(): void
     {
-        $result = $this->classifier->classify("SELECT 'it\\'s; fine' AS s");
+        $result = (new SqlSafetyClassifier())->classify("SELECT 'it\\'s; fine' AS s");
 
         $this->assertSame('unsafe', $result['kind']);
     }
 
-    public function testBackslashBeforeQuoteIsAlsoReadAsLiteralSoNoBackslashEscapesModeCannotHideAStackedWrite(): void
+    public function testSemicolonAfterABackslashEscapedQuoteIsOneStatementWhenBackslashEscapes(): void
     {
-        $result = $this->classifier->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
+        $result = (new SqlSafetyClassifier(backslashEscapes: true))->classify("SELECT 'it\\'s; fine' AS s");
+
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testSemicolonAfterABackslashIsAStackedStatementUnderNoBackslashEscapes(): void
+    {
+        $result = (new SqlSafetyClassifier(backslashEscapes: false))->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+    }
+
+    public function testBackslashBeforeQuoteCannotHideAStackedWriteWhenTheModeIsUnknown(): void
+    {
+        $result = (new SqlSafetyClassifier())->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
 
         $this->assertSame('unsafe', $result['kind']);
         $this->assertFalse($result['is_explainable']);
