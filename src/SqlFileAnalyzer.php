@@ -456,12 +456,24 @@ final class SqlFileAnalyzer
     private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile): array
     {
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
+        $original = null;
         try {
             $this->optimizerSettings->disableAll();
 
             return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
+        } catch (Throwable $e) {
+            $original = $e;
+
+            throw $e;
         } finally {
-            $this->optimizerSettings->restore($savedSettings);
+            try {
+                $this->optimizerSettings->restore($savedSettings);
+            } catch (Throwable $restoreError) {
+                // A failed restore must not mask the exception the analysis threw.
+                if ($original === null) {
+                    throw $restoreError;
+                }
+            }
         }
     }
 
