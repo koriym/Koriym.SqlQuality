@@ -37,6 +37,19 @@ final class QueryContextTest extends TestCase
         $this->assertCount(2, Fixture::load('10_redundant_join.sql')->warningsWithCode(1276));
     }
 
+    public function testSqlWithoutCommentsFollowsTheQuoteRules(): void
+    {
+        $sql = "SELECT '\\' AS s -- tail\n, 2";
+        $explain = ['query_block' => ['select_id' => 1]];
+
+        $default = new QueryContext($sql, $explain, null, [], []);
+        $noBackslashEscapes = new QueryContext($sql, $explain, null, [], [], null, QuoteRules::fromSqlMode('NO_BACKSLASH_ESCAPES'));
+
+        // under the default rules \' escapes, so the literal never closes and the -- is string content
+        $this->assertSame($sql, $default->sqlWithoutComments());
+        $this->assertSame("SELECT '\\' AS s  , 2", $noBackslashEscapes->sqlWithoutComments());
+    }
+
     public function testIndexColumnsOrdersColumnsBySeqInIndex(): void
     {
         $context = Fixture::load('4_no_index_on_join.sql');
