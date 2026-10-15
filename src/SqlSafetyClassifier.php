@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function array_slice;
 use function ctype_digit;
 use function ord;
 use function preg_match;
@@ -34,19 +35,47 @@ final class SqlSafetyClassifier
     /** @return SqlClassification */
     public function classify(string $sql): array
     {
-        foreach ($this->quoteRules === null ? QuoteRules::every() : [$this->quoteRules] as $rules) {
-            if (self::containsStackedStatement($sql, $rules)) {
-                return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
+        if ($this->quoteRules !== null) {
+            return self::classifyUnder($sql, $this->quoteRules);
+        }
+
+        // Unknown sql_mode: every reading is tried in full, and the least permissive result wins,
+        // because comment and quote boundaries decide what the server executes, not just where
+        // a statement ends.
+        $readings = QuoteRules::every();
+        $result = self::classifyUnder($sql, $readings[0]);
+        foreach (array_slice($readings, 1) as $rules) {
+            if (! $result['is_explainable']) {
+                break;
+            }
+
+            $candidate = self::classifyUnder($sql, $rules);
+            if (! $candidate['is_explainable'] || ($result['is_read_only_select'] && ! $candidate['is_read_only_select'])) {
+                $result = $candidate;
             }
         }
 
-        $normalized = $this->normalize($sql);
+        return $result;
+    }
+
+    /**
+     * @return SqlClassification
+     *
+     * @psalm-pure
+     */
+    private static function classifyUnder(string $sql, QuoteRules $rules): array
+    {
+        if (self::containsStackedStatement($sql, $rules)) {
+            return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
+        }
+
+        $normalized = self::normalizeUnder($sql, $rules);
         if ($normalized === '') {
             return ['kind' => 'empty', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'empty SQL'];
         }
 
         if (preg_match('/^select\b/i', $normalized)) {
-            if ($this->containsUnsafeReadSideEffect($normalized)) {
+            if (self::containsUnsafeReadSideEffect($normalized)) {
                 return ['kind' => 'select', 'is_explainable' => true, 'is_read_only_select' => false, 'reason' => 'execution skipped: unsafe SELECT construct'];
             }
 
@@ -59,7 +88,7 @@ final class SqlSafetyClassifier
             }
 
             if (preg_match('/\bselect\b/i', $normalized)) {
-                if ($this->containsUnsafeReadSideEffect($normalized)) {
+                if (self::containsUnsafeReadSideEffect($normalized)) {
                     return ['kind' => 'select', 'is_explainable' => true, 'is_read_only_select' => false, 'reason' => 'execution skipped: unsafe WITH SELECT construct'];
                 }
 
@@ -95,7 +124,13 @@ final class SqlSafetyClassifier
     /** @psalm-mutation-free */
     public function normalize(string $sql): string
     {
-        $withoutComments = self::stripComments($sql, $this->quoteRules ?? new QuoteRules());
+        return self::normalizeUnder($sql, $this->quoteRules ?? new QuoteRules());
+    }
+
+    /** @psalm-pure */
+    private static function normalizeUnder(string $sql, QuoteRules $rules): string
+    {
+        $withoutComments = self::stripComments($sql, $rules);
         $collapsed = preg_replace('/\s+/', ' ', $withoutComments) ?? $withoutComments;
 
         return trim($collapsed);
@@ -363,7 +398,7 @@ final class SqlSafetyClassifier
     }
 
     /** @psalm-pure */
-    private function containsUnsafeReadSideEffect(string $normalizedSql): bool
+    private static function containsUnsafeReadSideEffect(string $normalizedSql): bool
     {
         $lower = strtolower($normalizedSql);
 

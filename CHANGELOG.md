@@ -13,6 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `SqlSafetyClassifier` takes a `QuoteRules`: `SqlFileAnalyzer` reads `@@session.sql_mode` once per public entry point, before any `EXPLAIN`, so a `\'` followed later by `;` is one statement under the default mode and a stacked statement under `NO_BACKSLASH_ESCAPES`, and a `"…"` identifier under `ANSI_QUOTES` cannot hide one either. A classifier built without rules keeps rejecting under every reading.
 - `SqlSafetyClassifier::stripComments()` and `QueryContext::sqlWithoutComments()` follow the same rules
+- With unknown quote rules the classifier evaluates the whole classification under every reading and keeps the least permissive result, not only the stacked-statement check; a locking construct hidden behind a comment under one reading is still reported as unsafe
 - `DeepOffsetDetector` and `OrderByRandDetector` match on `QueryContext::sqlStructure()`, the statement with comments removed and every string literal and backtick identifier emptied, so `LIMIT` or `ORDER BY RAND()` inside a value or a name is not a finding
 - `LowCardinalityIndexDetector` reports an index once per table and key, instead of once per `UNION` branch
 

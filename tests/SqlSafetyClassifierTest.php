@@ -134,6 +134,17 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertSame('unsafe', $result['kind']);
     }
 
+    public function testAnUnsafeConstructHiddenByOneReadingIsStillUnsafeWhenTheModeIsUnknown(): void
+    {
+        // under the default rules the -- starts a comment and FOR UPDATE disappears;
+        // under NO_BACKSLASH_ESCAPES the first literal ends at \' and FOR UPDATE is live
+        $sql = "SELECT 'x\\'' , 1 -- ' FOR UPDATE";
+
+        $this->assertTrue((new SqlSafetyClassifier(new QuoteRules()))->classify($sql)['is_read_only_select']);
+        $this->assertFalse((new SqlSafetyClassifier(QuoteRules::fromSqlMode('NO_BACKSLASH_ESCAPES')))->classify($sql)['is_read_only_select']);
+        $this->assertFalse((new SqlSafetyClassifier())->classify($sql)['is_read_only_select']);
+    }
+
     public function testSelectWithQuotedLineCommentMarkerAndStackedWriteIsUnsafe(): void
     {
         $result = $this->classifier->classify("SELECT '--'; UPDATE users SET status = 'banned'");
