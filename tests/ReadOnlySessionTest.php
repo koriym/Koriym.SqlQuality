@@ -115,7 +115,7 @@ final class ReadOnlySessionTest extends MySqlTestCase
     {
         $pdo = new FakePdo(
             query: static fn (): FakeStatement => new FakeStatement('0'),
-            exec: static fn (): false => false,
+            exec: static fn (): int|false => false,
         );
         $invoked = false;
 
