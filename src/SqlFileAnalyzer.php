@@ -20,12 +20,10 @@ use function array_shift;
 use function array_sum;
 use function array_values;
 use function count;
-use function explode;
 use function file_exists;
 use function file_get_contents;
 use function file_put_contents;
 use function implode;
-use function in_array;
 use function is_array;
 use function is_bool;
 use function is_dir;
@@ -38,7 +36,6 @@ use function pathinfo;
 use function preg_replace;
 use function sort;
 use function strrpos;
-use function strtoupper;
 use function substr;
 use function var_export;
 
@@ -58,7 +55,6 @@ final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
-    private readonly SqlSafetyClassifier $sqlSafetyClassifier;
     private readonly ReadOnlySession $readOnlySession;
 
     public function __construct(
@@ -69,18 +65,19 @@ final class SqlFileAnalyzer
         OptimizerSettingsInterface|null $optimizerSettings = null
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
-        $this->sqlSafetyClassifier = new SqlSafetyClassifier(self::backslashEscapes($pdo));
         $this->readOnlySession = new ReadOnlySession($pdo);
     }
 
     /**
-     * null when the connection cannot report sql_mode (another driver, or an error mode that
-     * returns false); the classifier then rejects under either reading.
+     * Read once per public entry point, before the EXPLAIN: a caller-owned connection can change
+     * sql_mode between calls, and a SELECT after the EXPLAIN would replace SHOW WARNINGS and the
+     * optimizer trace. null when the connection cannot report sql_mode (another driver, or an
+     * error mode returning false); the classifier then rejects under every reading.
      */
-    private static function backslashEscapes(PDO $pdo): bool|null
+    private function quoteRules(): QuoteRules|null
     {
         try {
-            $statement = $pdo->query('SELECT @@session.sql_mode');
+            $statement = $this->pdo->query('SELECT @@session.sql_mode');
         } catch (PDOException) {
             return null;
         }
@@ -90,11 +87,8 @@ final class SqlFileAnalyzer
         }
 
         $mode = $statement->fetchColumn();
-        if (! is_string($mode)) {
-            return null;
-        }
 
-        return ! in_array('NO_BACKSLASH_ESCAPES', explode(',', strtoupper($mode)), true);
+        return is_string($mode) ? QuoteRules::fromSqlMode($mode) : null;
     }
 
     /**
@@ -198,18 +192,20 @@ final class SqlFileAnalyzer
      */
     public function queryContext(string $sqlFile, array $params): QueryContext
     {
-        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params, withOptimizerTrace: true);
+        return $this->buildQueryContext($this->readSqlFile($sqlFile), $params, $this->quoteRules(), withOptimizerTrace: true);
     }
 
     /**
      * @param array<string, mixed> $params
+     * @param QuoteRules|null      $quoteRules         the connection's quote rules, resolved by the caller before any EXPLAIN
      * @param bool                 $withOptimizerTrace capture information_schema.OPTIMIZER_TRACE for the EXPLAIN; only meaningful with the default optimizer_switch
      *
      * @throws RuntimeException
      */
-    private function buildQueryContext(string $sql, array $params, bool $withOptimizerTrace = false): QueryContext
+    private function buildQueryContext(string $sql, array $params, QuoteRules|null $quoteRules, bool $withOptimizerTrace = false): QueryContext
     {
-        $classification = $this->sqlSafetyClassifier->classify($sql);
+        $classifier = new SqlSafetyClassifier($quoteRules);
+        $classification = $classifier->classify($sql);
         if (! $classification['is_explainable']) {
             throw new NotExplainable($classification['reason']);
         }
@@ -242,10 +238,10 @@ final class SqlFileAnalyzer
             }
         }
 
-        $explainAnalyze = $this->sqlSafetyClassifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
+        $explainAnalyze = $classifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
         $schema = $this->getSchemaInfo($sql);
 
-        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace);
+        return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace, $quoteRules ?? new QuoteRules());
     }
 
     /** @return string|null the optimizer_trace value to restore, null when the server has no optimizer trace to enable */
@@ -444,9 +440,10 @@ final class SqlFileAnalyzer
     public function analyze(string $sqlFile, array $params): array
     {
         $sql = $this->readSqlFile($sqlFile);
+        $quoteRules = $this->quoteRules();
 
-        $defaultAnalysis = $this->analyzeContext($this->buildQueryContext($sql, $params, withOptimizerTrace: true), $sql, $params, $sqlFile);
-        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
+        $defaultAnalysis = $this->analyzeContext($this->buildQueryContext($sql, $params, $quoteRules, withOptimizerTrace: true), $quoteRules, $sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile, $quoteRules);
 
         return $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis);
     }
@@ -464,10 +461,11 @@ final class SqlFileAnalyzer
     public function explain(string $sqlFile, array $params): array
     {
         $sql = $this->readSqlFile($sqlFile);
-        $context = $this->buildQueryContext($sql, $params, withOptimizerTrace: true);
+        $quoteRules = $this->quoteRules();
+        $context = $this->buildQueryContext($sql, $params, $quoteRules, withOptimizerTrace: true);
 
-        $defaultAnalysis = $this->analyzeContext($context, $sql, $params, $sqlFile);
-        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile);
+        $defaultAnalysis = $this->analyzeContext($context, $quoteRules, $sql, $params, $sqlFile);
+        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile, $quoteRules);
 
         return [
             'result' => $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis),
@@ -480,13 +478,13 @@ final class SqlFileAnalyzer
      *
      * @return AnalysisWithSettingsResult
      */
-    private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile): array
+    private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile, QuoteRules|null $quoteRules): array
     {
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         try {
             $this->optimizerSettings->disableAll();
 
-            return $this->analyzeContext($this->buildQueryContext($sql, $params), $sql, $params, $sqlFile);
+            return $this->analyzeContext($this->buildQueryContext($sql, $params, $quoteRules), $quoteRules, $sql, $params, $sqlFile);
         } finally {
             $this->optimizerSettings->restore($savedSettings);
         }
@@ -521,12 +519,12 @@ final class SqlFileAnalyzer
      *
      * @return AnalysisWithSettingsResult
      */
-    private function analyzeContext(QueryContext $context, string $sql, array $params, string $sqlFile): array
+    private function analyzeContext(QueryContext $context, QuoteRules|null $quoteRules, string $sql, array $params, string $sqlFile): array
     {
-        $classification = $this->sqlSafetyClassifier->classify($sql);
+        $classification = (new SqlSafetyClassifier($quoteRules))->classify($sql);
         $executed = $classification['is_read_only_select'];
         $skippedReason = $executed ? null : $classification['reason'];
-        $executionTime = $executed ? $this->getExecutedTime($sql, $params) : 0.0;
+        $executionTime = $executed ? $this->timeExecution($sql, $params) : 0.0;
         $issues = $this->analyzer->analyze($context);
         $cost = $this->calculateCost($context->explain);
 
@@ -555,10 +553,16 @@ final class SqlFileAnalyzer
     /** @param array<string, mixed> $params */
     public function getExecutedTime(string $sql, array $params): float
     {
-        if (! $this->sqlSafetyClassifier->isReadOnlySelect($sql)) {
+        if (! (new SqlSafetyClassifier($this->quoteRules()))->isReadOnlySelect($sql)) {
             throw new NotReadOnlySelect($sql);
         }
 
+        return $this->timeExecution($sql, $params);
+    }
+
+    /** @param array<string, mixed> $params */
+    private function timeExecution(string $sql, array $params): float
+    {
         $interpolatedSql = $this->interpolateQuery($sql, $params);
 
         return $this->readOnlySession->run(fn (): float => $this->measureExecution($interpolatedSql));

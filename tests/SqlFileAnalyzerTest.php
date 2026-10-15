@@ -149,6 +149,39 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
     }
 
+    public function testABackslashInsideAnAnsiQuotedIdentifierIsRejectedAsStacked(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',ANSI_QUOTES')");
+        $this->writeSqlFile('zz_ansi_quotes.sql', 'SELECT 1 AS "x\\"; SET @smuggled = 1 -- "');
+
+        try {
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_ansi_quotes.sql', []);
+            $this->fail('a second statement hidden by ANSI_QUOTES must not reach the server');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
+    }
+
+    public function testASqlModeChangedAfterConstructionIsHonoured(): void
+    {
+        $pdo = $this->connect();
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor(''));
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+
+        try {
+            $analyzer->queryContext('zz_escaped_quote.sql', []);
+            $this->fail('the mode at the time of the call must decide, not the mode at construction');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
+    }
+
     public function testARestoreFailureAfterASuccessfulExplainPropagates(): void
     {
         $pdo = new RestoreFailingPdo($this->connectionSettings());

@@ -89,16 +89,16 @@ final class SqlSafetyClassifierTest extends TestCase
         $this->assertSame('unsafe', $result['kind']);
     }
 
-    public function testSemicolonAfterABackslashEscapedQuoteIsOneStatementWhenBackslashEscapes(): void
+    public function testSemicolonAfterABackslashEscapedQuoteIsOneStatementUnderTheDefaultRules(): void
     {
-        $result = (new SqlSafetyClassifier(backslashEscapes: true))->classify("SELECT 'it\\'s; fine' AS s");
+        $result = (new SqlSafetyClassifier(new QuoteRules()))->classify("SELECT 'it\\'s; fine' AS s");
 
         $this->assertTrue($result['is_read_only_select']);
     }
 
     public function testSemicolonAfterABackslashIsAStackedStatementUnderNoBackslashEscapes(): void
     {
-        $result = (new SqlSafetyClassifier(backslashEscapes: false))->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
+        $result = (new SqlSafetyClassifier(QuoteRules::fromSqlMode('STRICT_TRANS_TABLES,NO_BACKSLASH_ESCAPES')))->classify("SELECT 'x\\'; UPDATE users SET status = 'banned' -- '");
 
         $this->assertSame('unsafe', $result['kind']);
         $this->assertFalse($result['is_explainable']);
@@ -110,6 +110,28 @@ final class SqlSafetyClassifierTest extends TestCase
 
         $this->assertSame('unsafe', $result['kind']);
         $this->assertFalse($result['is_explainable']);
+    }
+
+    public function testBackslashInsideADoubleQuotedIdentifierCannotHideAStackedWriteUnderAnsiQuotes(): void
+    {
+        $result = (new SqlSafetyClassifier(QuoteRules::fromSqlMode('ANSI_QUOTES')))->classify('SELECT 1 AS "x\\"; UPDATE users SET status = \'banned\' -- "');
+
+        $this->assertSame('unsafe', $result['kind']);
+        $this->assertFalse($result['is_explainable']);
+    }
+
+    public function testBackslashInsideADoubleQuotedStringStillEscapesUnderTheDefaultRules(): void
+    {
+        $result = (new SqlSafetyClassifier(new QuoteRules()))->classify('SELECT "it\\"s; fine" AS s');
+
+        $this->assertTrue($result['is_read_only_select']);
+    }
+
+    public function testTheAnsiQuotesBypassIsRejectedWhenTheModeIsUnknown(): void
+    {
+        $result = (new SqlSafetyClassifier())->classify('SELECT 1 AS "x\\"; UPDATE users SET status = \'banned\' -- "');
+
+        $this->assertSame('unsafe', $result['kind']);
     }
 
     public function testSelectWithQuotedLineCommentMarkerAndStackedWriteIsUnsafe(): void
