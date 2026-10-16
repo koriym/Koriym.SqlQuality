@@ -35,7 +35,13 @@ final class ReadOnlySession
         }
 
         $saved = $this->readOnlyFlag();
-        $this->pdo->exec('SET SESSION TRANSACTION READ ONLY');
+        if ($this->pdo->exec('SET SESSION TRANSACTION READ ONLY') === false) {
+            // ERRMODE_SILENT reports a refused SET as false; the callback must not run unprotected.
+            /** @var string $driver */
+            $driver = $this->pdo->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+            throw new ReadOnlySessionUnavailable($driver);
+        }
 
         $original = null;
 

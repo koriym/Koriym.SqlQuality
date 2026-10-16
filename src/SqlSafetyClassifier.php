@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function array_slice;
 use function ctype_digit;
 use function ord;
 use function preg_match;
@@ -22,20 +23,59 @@ use function trim;
  */
 final class SqlSafetyClassifier
 {
+    /**
+     * @param QuoteRules|null $quoteRules how the server lexes quotes (from its sql_mode); null when
+     *                                    unknown, in which case a statement is rejected if any
+     *                                    reading finds a second one
+     */
+    public function __construct(private readonly QuoteRules|null $quoteRules = null)
+    {
+    }
+
     /** @return SqlClassification */
     public function classify(string $sql): array
     {
-        if (self::containsStackedStatement($sql, true) || self::containsStackedStatement($sql, false)) {
+        if ($this->quoteRules !== null) {
+            return self::classifyUnder($sql, $this->quoteRules);
+        }
+
+        // Unknown sql_mode: every reading is tried in full, and the least permissive result wins,
+        // because comment and quote boundaries decide what the server executes, not just where
+        // a statement ends.
+        $readings = QuoteRules::every();
+        $result = self::classifyUnder($sql, $readings[0]);
+        foreach (array_slice($readings, 1) as $rules) {
+            if (! $result['is_explainable']) {
+                break;
+            }
+
+            $candidate = self::classifyUnder($sql, $rules);
+            if (! $candidate['is_explainable'] || ($result['is_read_only_select'] && ! $candidate['is_read_only_select'])) {
+                $result = $candidate;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * @return SqlClassification
+     *
+     * @psalm-pure
+     */
+    private static function classifyUnder(string $sql, QuoteRules $rules): array
+    {
+        if (self::containsStackedStatement($sql, $rules)) {
             return ['kind' => 'unsafe', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'stacked SQL statements are not allowed in WD mode'];
         }
 
-        $normalized = $this->normalize($sql);
+        $normalized = self::normalizeUnder($sql, $rules);
         if ($normalized === '') {
             return ['kind' => 'empty', 'is_explainable' => false, 'is_read_only_select' => false, 'reason' => 'empty SQL'];
         }
 
         if (preg_match('/^select\b/i', $normalized)) {
-            if ($this->containsUnsafeReadSideEffect($normalized)) {
+            if (self::containsUnsafeReadSideEffect($normalized)) {
                 return ['kind' => 'select', 'is_explainable' => true, 'is_read_only_select' => false, 'reason' => 'execution skipped: unsafe SELECT construct'];
             }
 
@@ -48,7 +88,7 @@ final class SqlSafetyClassifier
             }
 
             if (preg_match('/\bselect\b/i', $normalized)) {
-                if ($this->containsUnsafeReadSideEffect($normalized)) {
+                if (self::containsUnsafeReadSideEffect($normalized)) {
                     return ['kind' => 'select', 'is_explainable' => true, 'is_read_only_select' => false, 'reason' => 'execution skipped: unsafe WITH SELECT construct'];
                 }
 
@@ -81,23 +121,23 @@ final class SqlSafetyClassifier
         return $this->classify($sql)['is_read_only_select'];
     }
 
-    /** @psalm-pure */
+    /** @psalm-mutation-free */
     public function normalize(string $sql): string
     {
-        $withoutComments = self::stripComments($sql);
+        return self::normalizeUnder($sql, $this->quoteRules ?? new QuoteRules());
+    }
+
+    /** @psalm-pure */
+    private static function normalizeUnder(string $sql, QuoteRules $rules): string
+    {
+        $withoutComments = self::stripComments($sql, $rules);
         $collapsed = preg_replace('/\s+/', ' ', $withoutComments) ?? $withoutComments;
 
         return trim($collapsed);
     }
 
-    /**
-     * Whether a backslash escapes the next character in a string literal depends on the server's
-     * sql_mode (NO_BACKSLASH_ESCAPES), which a static classifier cannot see; a statement is
-     * rejected when either reading finds a second one.
-     *
-     * @psalm-pure
-     */
-    private static function containsStackedStatement(string $normalizedSql, bool $backslashEscapes): bool
+    /** @psalm-pure */
+    private static function containsStackedStatement(string $normalizedSql, QuoteRules $rules): bool
     {
         $quote = null;
         $isEscaped = false;
@@ -112,7 +152,7 @@ final class SqlSafetyClassifier
             }
 
             if ($quote !== null) {
-                if ($backslashEscapes && $char === '\\' && $quote !== '`') {
+                if ($char === '\\' && $rules->backslashEscapesIn($quote)) {
                     $isEscaped = true;
 
                     continue;
@@ -171,7 +211,7 @@ final class SqlSafetyClassifier
                 continue;
             }
 
-            if ($char === ';' && self::hasExecutableTail(substr($normalizedSql, $offset + 1))) {
+            if ($char === ';' && self::hasExecutableTail(substr($normalizedSql, $offset + 1), $rules)) {
                 return true;
             }
         }
@@ -180,13 +220,13 @@ final class SqlSafetyClassifier
     }
 
     /** @psalm-pure */
-    private static function hasExecutableTail(string $sql): bool
+    private static function hasExecutableTail(string $sql, QuoteRules $rules): bool
     {
-        return trim(self::stripComments($sql)) !== '';
+        return trim(self::stripComments($sql, $rules)) !== '';
     }
 
     /** @psalm-pure */
-    public static function stripComments(string $sql): string
+    public static function stripComments(string $sql, QuoteRules $rules = new QuoteRules()): string
     {
         $result = '';
         $quote = null;
@@ -205,7 +245,7 @@ final class SqlSafetyClassifier
 
             if ($quote !== null) {
                 $result .= $char;
-                if ($char === '\\' && $quote !== '`') {
+                if ($char === '\\' && $rules->backslashEscapesIn($quote)) {
                     $isEscaped = true;
 
                     continue;
@@ -288,6 +328,57 @@ final class SqlSafetyClassifier
         return $result;
     }
 
+    /**
+     * Empties every quoted string and backtick identifier of comment-free SQL, keeping the quotes,
+     * so a keyword pattern cannot match text that is data or a name rather than syntax.
+     *
+     * @psalm-pure
+     */
+    public static function stripLiterals(string $sql, QuoteRules $rules = new QuoteRules()): string
+    {
+        $result = '';
+        $quote = null;
+        $isEscaped = false;
+        $length = strlen($sql);
+        for ($offset = 0; $offset < $length; $offset++) {
+            $char = $sql[$offset];
+
+            if ($quote === null) {
+                $result .= $char;
+                if ($char === '\'' || $char === '"' || $char === '`') {
+                    $quote = $char;
+                }
+
+                continue;
+            }
+
+            if ($isEscaped) {
+                $isEscaped = false;
+
+                continue;
+            }
+
+            if ($char === '\\' && $rules->backslashEscapesIn($quote)) {
+                $isEscaped = true;
+
+                continue;
+            }
+
+            if ($char === $quote) {
+                if ($offset + 1 < $length && $sql[$offset + 1] === $quote) {
+                    $offset++;
+
+                    continue;
+                }
+
+                $result .= $char;
+                $quote = null;
+            }
+        }
+
+        return $result;
+    }
+
     /** @psalm-pure */
     private static function isVersionedCommentStart(string $sql, int $offset, int $length): bool
     {
@@ -307,7 +398,7 @@ final class SqlSafetyClassifier
     }
 
     /** @psalm-pure */
-    private function containsUnsafeReadSideEffect(string $normalizedSql): bool
+    private static function containsUnsafeReadSideEffect(string $normalizedSql): bool
     {
         $lower = strtolower($normalizedSql);
 

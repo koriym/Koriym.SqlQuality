@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
+use Koriym\SqlQuality\Exception\ReadOnlySessionUnavailable;
 use PDO;
 use PDOException;
 use RuntimeException;
@@ -107,6 +108,26 @@ final class ReadOnlySessionTest extends MySqlTestCase
             $this->fail('Expected exception was not thrown');
         } catch (RuntimeException $e) {
             $this->assertSame('original failure', $e->getMessage());
+        }
+    }
+
+    public function testASilentlyRefusedReadOnlySetDoesNotRunTheCallback(): void
+    {
+        $pdo = new FakePdo(
+            query: static fn (): FakeStatement => new FakeStatement('0'),
+            exec: static fn (): int|false => false,
+        );
+        $invoked = false;
+
+        try {
+            (new ReadOnlySession($pdo))->run(static function () use (&$invoked): string {
+                $invoked = true;
+
+                return 'ran';
+            });
+            $this->fail('Expected exception was not thrown');
+        } catch (ReadOnlySessionUnavailable) {
+            $this->assertFalse($invoked);
         }
     }
 

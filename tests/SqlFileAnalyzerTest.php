@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Koriym\SqlQuality\Exception\NotExplainable;
 use PDOException;
+use RuntimeException;
 
 use function array_column;
 use function array_keys;
@@ -122,6 +124,65 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         }
     }
 
+    public function testABackslashEscapedQuoteFollowedByASemicolonIsOneStatementUnderTheDefaultSqlMode(): void
+    {
+        $pdo = $this->connect();
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'it\\'s; fine' AS s");
+
+        $context = (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+
+        $this->assertSame(1, $context->explain['query_block']['select_id'] ?? null);
+    }
+
+    public function testTheSameStatementIsRejectedAsStackedUnderNoBackslashEscapes(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
+
+        try {
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+            $this->fail('a second statement hidden by NO_BACKSLASH_ESCAPES must not reach the server');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
+    }
+
+    public function testABackslashInsideAnAnsiQuotedIdentifierIsRejectedAsStacked(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',ANSI_QUOTES')");
+        $this->writeSqlFile('zz_ansi_quotes.sql', 'SELECT 1 AS "x\\"; SET @smuggled = 1 -- "');
+
+        try {
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_ansi_quotes.sql', []);
+            $this->fail('a second statement hidden by ANSI_QUOTES must not reach the server');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
+    }
+
+    public function testASqlModeChangedAfterConstructionIsHonoured(): void
+    {
+        $pdo = $this->connect();
+        $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor(''));
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+
+        try {
+            $analyzer->queryContext('zz_escaped_quote.sql', []);
+            $this->fail('the mode at the time of the call must decide, not the mode at construction');
+        } catch (NotExplainable $e) {
+            $this->assertStringContainsString('stacked', $e->getMessage());
+        }
+
+        $this->assertNull($pdo->query('SELECT @smuggled')->fetchColumn());
+    }
+
     public function testARestoreFailureAfterASuccessfulExplainPropagates(): void
     {
         $pdo = new RestoreFailingPdo($this->connectionSettings());
@@ -131,6 +192,26 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->expectExceptionMessage(RestoreFailingPdo::MESSAGE);
 
         $analyzer->queryContext('1_full_table_scan.sql', ['min_views' => 1000]);
+    }
+
+    public function testTheNoOptimizerPassFailureWinsOverAFailingSettingsRestore(): void
+    {
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: true));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(FailingOptimizerSettings::DISABLE_MESSAGE);
+
+        $analyzer->analyze('1_full_table_scan.sql', ['min_views' => 1000]);
+    }
+
+    public function testAFailingSettingsRestoreAfterASuccessfulNoOptimizerPassPropagates(): void
+    {
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: false));
+
+        $this->expectException(RuntimeException::class);
+        $this->expectExceptionMessage(FailingOptimizerSettings::RESTORE_MESSAGE);
+
+        $analyzer->analyze('1_full_table_scan.sql', ['min_views' => 1000]);
     }
 
     private function writeSqlFile(string $name, string $sql): void

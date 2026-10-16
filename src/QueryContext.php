@@ -37,6 +37,7 @@ final class QueryContext
      * @param string                     $sql            the statement as sent to MySQL, parameters interpolated
      * @param string|null                $explainAnalyze null unless the statement is a read-only SELECT
      * @param OptimizerTraceExcerpt|null $optimizerTrace null when the trace was not captured, unreadable or truncated
+     * @param QuoteRules                 $quoteRules     how the server lexed the statement's quotes (its sql_mode); MySQL's defaults when unknown
      */
     public function __construct(
         public readonly string $sql,
@@ -45,6 +46,7 @@ final class QueryContext
         public readonly array $warnings,
         public readonly array $schema,
         public readonly array|null $optimizerTrace = null,
+        public readonly QuoteRules $quoteRules = new QuoteRules(),
     ) {
     }
 
@@ -120,7 +122,13 @@ final class QueryContext
     /** @return string the statement with line (--) and block comments removed */
     public function sqlWithoutComments(): string
     {
-        return SqlSafetyClassifier::stripComments($this->sql);
+        return SqlSafetyClassifier::stripComments($this->sql, $this->quoteRules);
+    }
+
+    /** @return string sqlWithoutComments() with every string literal and backtick identifier emptied; for matching keywords, not names */
+    public function sqlStructure(): string
+    {
+        return SqlSafetyClassifier::stripLiterals($this->sqlWithoutComments(), $this->quoteRules);
     }
 
     /** @return array<string, string> alias => table name; a table without alias maps to itself. Derived tables are not included */
