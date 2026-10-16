@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 - `ReadOnlySession::run()` ran the callback when `SET SESSION TRANSACTION READ ONLY` was refused on a connection in `ERRMODE_SILENT`; it now throws `ReadOnlySessionUnavailable`
 - A failing optimizer-switch restore after a failing no-optimizer pass replaced the pass's exception; the pass's exception now propagates
+- `ExplainAnalyzer` falls back to `DEFAULT_MESSAGES` for message keys the caller omits
+- `CartesianProductDetector`, `FullTableScanDetector`, `IneffectiveJoinDetector`, `IneffectiveSortDetector` and `IneffectiveLikePatternDetector` no longer flag `JSON_TABLE`
+- `ExplainAnalyzer` throws `UnknownMessageKey` for a message key it does not know
+- The Issues column of the summary report lists the issues of the default plan, as the detail report does
 
 ## [0.3.0] - 2026-10-05
 

@@ -27,7 +27,7 @@ final class CartesianProductDetector implements DetectorInterface
         $findings = [];
         foreach ($context->nestedLoops() as $group) {
             foreach ($group as $offset => $table) {
-                if ($offset === 0 || ! $this->isCartesianProduct($table, $group, $offset)) {
+                if ($offset === 0 || isset($table['table_function']) || ! $this->isCartesianProduct($table, $group, $offset)) {
                     continue;
                 }
 

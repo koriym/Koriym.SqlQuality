@@ -32,6 +32,7 @@ recommended: true
 2. `ref` が無いか、要素が全て `"const"`（先行テーブルの列を参照していない）
 3. `attached_condition` が無いか、先行テーブルの別名を `` `db`.`alias`.`col` `` の形で参照していない
 4. `access_type` が `eq_ref` ではない（主キー・一意キーでの結合ではない）
+5. `table_function`（`JSON_TABLE`）ではない。行ごとに展開される依存結合で、結合キーを持たないのが通常の形のため対象外
 
 `FROM users u, posts p` のようにカンマ区切りで並べただけで `ON` や `WHERE` に結合条件が無いと、MySQL は各テーブルを自身の条件だけで絞り込んでから掛け合わせます。`using_join_buffer` の有無は判定に使いません（ブロックネステッドループでも直積は直積のため）
 

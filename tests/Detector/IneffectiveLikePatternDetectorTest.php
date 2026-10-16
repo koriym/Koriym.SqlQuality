@@ -53,4 +53,17 @@ final class IneffectiveLikePatternDetectorTest extends TestCase
             schema: [],
         );
     }
+
+    public function testIgnoresATableFunction(): void
+    {
+        $findings = (new IneffectiveLikePatternDetector())->detect(new QueryContext(
+            sql: '',
+            explain: ['query_block' => ['select_id' => 1, 'table' => ['table_name' => 'jt', 'access_type' => 'ALL', 'table_function' => 'json_table', 'attached_condition' => "(`jt`.`x` like '%foo')", 'filtered' => 100.0]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
 }

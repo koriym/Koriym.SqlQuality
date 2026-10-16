@@ -34,7 +34,7 @@ final class FullTableScanDetector implements DetectorInterface
         $walker = new ExplainWalker();
         foreach ($context->tableAccesses() as $access) {
             $table = $access['table'];
-            if ($table['access_type'] !== 'ALL' || str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery'])) {
+            if ($table['access_type'] !== 'ALL' || str_starts_with($table['table_name'], '<') || isset($table['materialized_from_subquery']) || isset($table['table_function'])) {
                 continue;
             }
 

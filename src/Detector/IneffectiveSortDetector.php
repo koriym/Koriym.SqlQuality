@@ -41,7 +41,7 @@ final class IneffectiveSortDetector implements DetectorInterface
             }
 
             $table = $this->sortedTable($context, $path);
-            if ($table === null || ! $this->isLargeScan($table)) {
+            if ($table === null || isset($table['table_function']) || ! $this->isLargeScan($table)) {
                 continue;
             }
 

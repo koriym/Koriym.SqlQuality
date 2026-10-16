@@ -63,4 +63,25 @@ final class CartesianProductDetectorTest extends TestCase
         $this->assertSame('d', $findings[1]->evidence['table_name']);
         $this->assertSame(['a', 'b', 'c'], $findings[1]->evidence['preceding_tables']);
     }
+
+    public function testIgnoresATableFunction(): void
+    {
+        $findings = (new CartesianProductDetector())->detect(new QueryContext(
+            sql: '',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'nested_loop' => [
+                        ['table' => ['table_name' => 'articles', 'access_type' => 'index', 'key' => 'PRIMARY', 'rows_examined_per_scan' => 45345]],
+                        ['table' => ['table_name' => 'reducebody', 'access_type' => 'ALL', 'table_function' => 'json_table', 'rows_examined_per_scan' => 2, 'rows_produced_per_join' => 90690]],
+                    ],
+                ],
+            ],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
 }

@@ -123,4 +123,17 @@ final class IneffectiveSortDetectorTest extends TestCase
     {
         return new QueryContext(sql: '', explain: $explain, explainAnalyze: null, warnings: [], schema: $schema);
     }
+
+    public function testIgnoresATableFunction(): void
+    {
+        $findings = (new IneffectiveSortDetector())->detect(new QueryContext(
+            sql: '',
+            explain: ['query_block' => ['select_id' => 1, 'ordering_operation' => ['using_filesort' => true, 'table' => ['table_name' => 'jt', 'access_type' => 'ALL', 'table_function' => 'json_table', 'rows_examined_per_scan' => 2000]]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $this->assertSame([], $findings);
+    }
 }

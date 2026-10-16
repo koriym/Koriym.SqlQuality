@@ -31,7 +31,7 @@ final class IneffectiveJoinDetector implements DetectorInterface
         foreach ($context->nestedLoops() as $members) {
             // The first member drives the loop; its full scan belongs to FullTableScanDetector.
             foreach (array_slice($members, 1) as $table) {
-                if (! $this->isIneffectiveJoin($table)) {
+                if (isset($table['table_function']) || ! $this->isIneffectiveJoin($table)) {
                     continue;
                 }
 

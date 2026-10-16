@@ -41,7 +41,8 @@ recommended: true
 ### 主な検出条件
 1. `using_filesort` が `true` であること
 2. ソート対象の表の `access_type` が `ALL`、または `rows_examined_per_scan` が 1000 以上であること
-3. 提案は常にレビュー（`review`）。WHERE の等値列に ORDER BY の列を続けた複合インデックスの検討を促し、その列で始まるインデックスが既にある場合はその名前を示します
+3. ソート対象が `JSON_TABLE`（`table_function`）なら検出しない
+4. 提案は常にレビュー（`review`）。WHERE の等値列に ORDER BY の列を続けた複合インデックスの検討を促し、その列で始まるインデックスが既にある場合はその名前を示します
 
 ## 問題のあるクエリの例
 ```sql
