@@ -2,65 +2,145 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://koriym.github.io/Koriym.SqlQuality/schema/explain-report.schema.json",
   "title": "Koriym.SqlQuality explain report",
-  "description": "Output of `sql-quality explain --sql-file=FILE`.",
+  "description": "Output of `sql-quality explain`.",
   "type": "object",
-  "required": ["file", "sql", "executed", "skipped_reason", "cost", "execution_time_ms", "issues", "optimizer_impact", "context"],
+  "required": [
+    "file",
+    "sql",
+    "executed",
+    "skipped_reason",
+    "cost",
+    "execution_time_ms",
+    "issues",
+    "optimizer_impact"
+  ],
   "additionalProperties": false,
   "properties": {
-    "file": { "type": "string" },
-    "sql": { "type": "string" },
-    "executed": { "type": "boolean" },
-    "skipped_reason": { "type": ["string", "null"] },
-    "cost": { "type": "number" },
-    "execution_time_ms": { "type": ["number", "null"] },
+    "file": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "description": "null for --sql or stdin"
+    },
+    "sql": {
+      "type": "string",
+      "description": "The statement with its parameters bound"
+    },
+    "executed": {
+      "type": "boolean",
+      "description": "Whether the statement was run for timing and EXPLAIN ANALYZE; only a read-only SELECT is"
+    },
+    "skipped_reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cost": {
+      "type": "number"
+    },
+    "execution_time_ms": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
     "issues": {
       "type": "array",
-      "items": { "$ref": "#/$defs/issue" }
-    },
-    "optimizer_impact": {
-      "type": "object",
-      "required": ["cost_reduction_percent"],
-      "additionalProperties": false,
-      "properties": {
-        "cost_reduction_percent": { "type": "number" }
+      "items": {
+        "$ref": "#/$defs/issue"
       }
     },
+    "optimizer_impact": {
+      "$ref": "#/$defs/optimizer_impact"
+    },
     "context": {
+      "description": "Present with --detail=full",
       "type": "object",
-      "required": ["sql", "explain", "explain_analyze", "warnings", "schema"],
+      "required": [
+        "sql",
+        "explain",
+        "explain_analyze",
+        "warnings",
+        "schema"
+      ],
       "additionalProperties": false,
       "properties": {
-        "sql": { "type": "string" },
-        "explain": { "type": "object" },
-        "explain_analyze": { "type": ["string", "null"] },
-        "warnings": { "type": "array" },
-        "schema": { "type": "object" },
+        "sql": {
+          "type": "string"
+        },
+        "explain": {
+          "type": "object"
+        },
+        "explain_analyze": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "warnings": {
+          "type": "array"
+        },
+        "schema": {
+          "type": "object"
+        },
         "optimizer_trace": {
           "description": "Excerpt of information_schema.OPTIMIZER_TRACE for the default-optimizer EXPLAIN; null when the trace was unavailable, truncated or not captured.",
           "oneOf": [
-            { "type": "null" },
+            {
+              "type": "null"
+            },
             {
               "type": "object",
-              "required": ["tables", "transformations", "condition_processing"],
+              "required": [
+                "tables",
+                "transformations",
+                "condition_processing"
+              ],
               "additionalProperties": false,
               "properties": {
                 "tables": {
                   "type": "array",
                   "items": {
                     "type": "object",
-                    "required": ["table", "select"],
+                    "required": [
+                      "table",
+                      "select"
+                    ],
                     "additionalProperties": false,
                     "properties": {
-                      "table": { "type": "string" },
-                      "select": { "type": "integer", "description": "select_id of the query block the table belongs to" },
-                      "range_analysis": { "type": "object" },
-                      "considered_access_paths": { "type": "array" },
-                      "rechecking_index_usage": { "type": "object" }
+                      "table": {
+                        "type": "string"
+                      },
+                      "select": {
+                        "type": "integer",
+                        "description": "select_id of the query block the table belongs to"
+                      },
+                      "range_analysis": {
+                        "type": "object"
+                      },
+                      "considered_access_paths": {
+                        "type": "array"
+                      },
+                      "rechecking_index_usage": {
+                        "type": "object"
+                      }
                     }
                   }
                 },
-                "transformations": { "type": "array", "items": { "type": "object" } },
-                "condition_processing": { "type": "array", "items": { "type": "object" } }
+                "transformations": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                },
+                "condition_processing": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
               }
             }
           ]
@@ -69,11 +149,50 @@
     }
   },
   "$defs": {
-    "issue": {
+    "optimizer_impact": {
       "type": "object",
-      "required": ["type", "message", "documentation", "severity", "confidence", "detector", "evidence", "suggestion"],
+      "required": [
+        "cost_without_optimizer",
+        "cost_reduction_percent",
+        "hidden_issues"
+      ],
       "additionalProperties": false,
       "properties": {
+        "cost_without_optimizer": {
+          "type": "number",
+          "description": "query_cost with the optimizer_switch features turned off"
+        },
+        "cost_reduction_percent": {
+          "type": "number",
+          "description": "How much lower the default plan's cost is, in percent; negative when it is higher"
+        },
+        "hidden_issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of issues only the no-optimizer plan has: problems the optimizer currently works around"
+        }
+      }
+    },
+    "issue": {
+      "type": "object",
+      "required": [
+        "id",
+        "type",
+        "message",
+        "documentation",
+        "severity",
+        "confidence",
+        "evidence",
+        "suggestion"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Type and location, e.g. FullTableScan@posts or FunctionInvalidatesIndex@posts.created_at; a repeat at the same place gets #2, #3. Stable across runs while the problem persists."
+        },
         "type": {
           "enum": [
             "CartesianProduct",
@@ -96,31 +215,69 @@
             "UnnecessaryDistinct"
           ]
         },
-        "message": { "type": "string" },
-        "documentation": { "type": "string", "format": "uri" },
-        "severity": { "$ref": "#/$defs/severity" },
-        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-        "detector": { "type": "string" },
-        "evidence": { "type": "object" },
-        "suggestion": { "$ref": "#/$defs/suggestion" }
+        "message": {
+          "type": "string"
+        },
+        "documentation": {
+          "type": "string",
+          "format": "uri"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "object",
+          "description": "The values the detector judged by; EXPLAIN keys keep their EXPLAIN names."
+        },
+        "suggestion": {
+          "$ref": "#/$defs/suggestion"
+        }
       }
     },
     "suggestion": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["kind", "description"],
+          "required": [
+            "kind",
+            "description"
+          ],
           "additionalProperties": false,
           "properties": {
-            "kind": { "enum": ["index", "rewrite", "review"] },
-            "description": { "type": "string" },
-            "ddl": { "type": "string" },
-            "sql": { "type": "string" }
+            "kind": {
+              "enum": [
+                "index",
+                "rewrite",
+                "review"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "ddl": {
+              "type": "string"
+            },
+            "sql": {
+              "type": "string"
+            }
           }
         }
       ]
     },
-    "severity": { "enum": ["Critical", "Warning", "Info"] }
+    "severity": {
+      "enum": [
+        "Critical",
+        "Warning",
+        "Info"
+      ]
+    }
   }
 }

@@ -4,19 +4,15 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use Koriym\SqlQuality\Detector\FullTableScanDetector;
-use Koriym\SqlQuality\Exception\UnknownMessageKey;
 use PHPUnit\Framework\TestCase;
 
 use function array_column;
 
 final class ExplainAnalyzerIssueMetadataTest extends TestCase
 {
-    public function testOmittedMessagesFallBackToDefaults(): void
+    public function testRepeatedFindingsAtTheSamePlaceGetNumberedIds(): void
     {
-        $analyzer = new ExplainAnalyzer(['FullTableScan' => 'custom']);
-
-        $issues = $analyzer->analyze(new QueryContext(
+        $issues = (new ExplainAnalyzer())->analyze(new QueryContext(
             sql: '',
             explain: [
                 'query_block' => [
@@ -32,20 +28,11 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
             schema: [],
         ));
 
-        $messages = array_column($issues, 'message', 'type');
-        $this->assertSame('custom', $messages['FullTableScan']);
-        $this->assertSame(ExplainAnalyzer::DEFAULT_MESSAGES['IneffectiveJoin'], $messages['IneffectiveJoin']);
+        $this->assertSame(['FullTableScan@a', 'FullTableScan@b', 'IneffectiveJoin@b'], array_column($issues, 'id'));
+        $this->assertSame(ExplainAnalyzer::MESSAGES['IneffectiveJoin'], array_column($issues, 'message', 'type')['IneffectiveJoin']);
     }
 
-    public function testUnknownMessageKeyIsRejected(): void
-    {
-        $this->expectException(UnknownMessageKey::class);
-        $this->expectExceptionMessage('FullTableScn, Foo');
-
-        new ExplainAnalyzer(['FullTableScan' => 'custom', 'FullTableScn' => 'typo', 'Foo' => 'bar']);
-    }
-
-    public function testAnalyzeAddsSeverityConfidenceDetectorAndEvidence(): void
+    public function testAnalyzeAddsIdSeverityConfidenceAndEvidence(): void
     {
         $analyzer = new ExplainAnalyzer();
 
@@ -70,7 +57,8 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
         $this->assertSame('FullTableScan', $issues[0]['type']);
         $this->assertSame('Critical', $issues[0]['severity']);
         $this->assertSame(0.95, $issues[0]['confidence']);
-        $this->assertSame(FullTableScanDetector::class, $issues[0]['detector']);
+        $this->assertSame('FullTableScan@users', $issues[0]['id']);
+        $this->assertArrayNotHasKey('detector', $issues[0]);
         $this->assertSame('users', $issues[0]['evidence']['table_name']);
         $this->assertSame(1000, $issues[0]['evidence']['rows_examined_per_scan']);
         $this->assertNull($issues[0]['suggestion']);

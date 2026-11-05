@@ -42,7 +42,7 @@ $pdo = new PDO(
     (string) getenv('SQL_QUALITY_PASSWORD'),
     [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION],
 );
-$analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $sqlDir, new AIQueryAdvisor(''));
+$analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $sqlDir);
 
 foreach ($names as $name) {
     if ($name === 'schema.sql') {

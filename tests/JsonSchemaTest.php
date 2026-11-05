@@ -35,7 +35,7 @@ final class JsonSchemaTest extends MySqlTestCase
 
     public function testSchemaFilesAreDraft202012(): void
     {
-        foreach (['analyze-report.schema.json', 'explain-report.schema.json'] as $file) {
+        foreach (['analyze-report.schema.json', 'explain-report.schema.json', 'compare-report.schema.json', 'try-index-report.schema.json'] as $file) {
             $schema = json_decode((string) file_get_contents(self::SCHEMA_DIR . '/' . $file));
 
             $this->assertIsObject($schema, $file . ' must parse as a JSON object');
@@ -45,7 +45,7 @@ final class JsonSchemaTest extends MySqlTestCase
 
     public function testWarningTypeEnumMatchesDefaultMessages(): void
     {
-        $expected = array_keys(ExplainAnalyzer::DEFAULT_MESSAGES);
+        $expected = array_keys(ExplainAnalyzer::MESSAGES);
         sort($expected);
 
         foreach (['analyze-report.schema.json', 'explain-report.schema.json'] as $file) {
@@ -54,7 +54,7 @@ final class JsonSchemaTest extends MySqlTestCase
             sort($actual);
 
             $message = sprintf(
-                '%s: $defs.issue.properties.type.enum is out of sync with ExplainAnalyzer::DEFAULT_MESSAGES. Missing from schema: [%s]. Extra in schema: [%s].',
+                '%s: $defs.issue.properties.type.enum is out of sync with ExplainAnalyzer::MESSAGES. Missing from schema: [%s]. Extra in schema: [%s].',
                 $file,
                 implode(', ', array_diff($expected, $actual)),
                 implode(', ', array_diff($actual, $expected)),
@@ -85,7 +85,6 @@ final class JsonSchemaTest extends MySqlTestCase
             'analyze',
             '--sql-dir=' . __DIR__ . '/sql',
             '--params=' . __DIR__ . '/params/sql_params.php',
-            '--format=json',
         ]);
 
         $this->assertSame(0, $exitCode);
@@ -104,6 +103,57 @@ final class JsonSchemaTest extends MySqlTestCase
 
         $this->assertSame(0, $exitCode);
         $this->assertValidJsonAgainstSchema($stdout, 'explain-report.schema.json');
+    }
+
+    public function testFakeAnalysisRunWithBaselineValidatesAgainstAnalyzeSchema(): void
+    {
+        $run = FakeAnalysisRun::of(['a.sql' => FakeAnalysisRun::result(1.0, [FakeAnalysisRun::issue('FullTableScan', 'Critical')])]);
+        $diff = Baseline::fromReport(['queries' => ['b.sql' => ['issues' => []]]])->diff($run);
+
+        $this->assertValidJsonAgainstSchema((string) json_encode((new JsonReportGenerator())->generate($run, $diff)), 'analyze-report.schema.json');
+    }
+
+    public function testExplainCliFullDetailValidatesAgainstSchema(): void
+    {
+        $this->connect();
+
+        [$exitCode, $stdout] = $this->runCli([
+            'explain',
+            '--sql-file=' . __DIR__ . '/sql/11_nested_loop.sql',
+            '--params={"email":"example@example.com"}',
+            '--detail=full',
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertValidJsonAgainstSchema($stdout, 'explain-report.schema.json');
+    }
+
+    public function testCompareCliOutputValidatesAgainstSchema(): void
+    {
+        $this->connect();
+
+        [$exitCode, $stdout] = $this->runCli([
+            'compare',
+            '--before-sql=SELECT id FROM users WHERE id <= 3',
+            '--after-sql=SELECT id FROM users WHERE id IN (1, 2, 3)',
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertValidJsonAgainstSchema($stdout, 'compare-report.schema.json');
+    }
+
+    public function testTryIndexCliOutputValidatesAgainstSchema(): void
+    {
+        $this->connect();
+
+        [$exitCode, $stdout] = $this->runCli([
+            'try-index',
+            '--sql=SELECT * FROM posts WHERE view_count > 9900',
+            '--index=posts(view_count)',
+        ]);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertValidJsonAgainstSchema($stdout, 'try-index-report.schema.json');
     }
 
     public function testExplainCliOutputForTableFreeQueryValidatesAgainstSchema(): void
@@ -135,7 +185,6 @@ final class JsonSchemaTest extends MySqlTestCase
             'analyze',
             '--sql-dir=' . $sqlDir,
             '--params=' . $paramsFile,
-            '--format=json',
         ]);
 
         unlink($sqlDir . '/ddl.sql');
@@ -161,7 +210,6 @@ final class JsonSchemaTest extends MySqlTestCase
             'analyze',
             '--sql-dir=' . $sqlDir,
             '--params=' . $paramsFile,
-            '--format=json',
         ]);
 
         unlink($paramsFile);

@@ -44,7 +44,6 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
             new PDO('sqlite::memory:'),
             new ExplainAnalyzer(),
             __DIR__ . '/sql',
-            new AIQueryAdvisor(''),
         );
 
         $this->expectException(NotReadOnlySelect::class);
@@ -62,7 +61,6 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
             new PDO('sqlite::memory:'),
             new ExplainAnalyzer(),
             $this->tempSqlDir,
-            new AIQueryAdvisor(''),
         );
 
         $this->expectException(NotExplainable::class);
@@ -81,7 +79,6 @@ final class SqlFileAnalyzerSafetyTest extends TestCase
             new PDO('sqlite::memory:'),
             new ExplainAnalyzer(),
             $this->tempSqlDir,
-            new AIQueryAdvisor(''),
         );
 
         $run = $analyzer->analyzeSQLFiles(['ddl.sql' => []]);

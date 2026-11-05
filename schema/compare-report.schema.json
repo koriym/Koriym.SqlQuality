@@ -1,0 +1,142 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://koriym.github.io/Koriym.SqlQuality/schema/compare-report.schema.json",
+  "title": "Koriym.SqlQuality compare report",
+  "description": "Output of `sql-quality compare`. Exit 0 when equivalent, 1 when not.",
+  "type": "object",
+  "required": [
+    "equivalent",
+    "same_order",
+    "same_columns",
+    "both_empty",
+    "before",
+    "after",
+    "cost_change_percent",
+    "time_change_percent",
+    "issues"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "equivalent": {
+      "type": "boolean",
+      "description": "Same column names in the same order and the same multiset of rows"
+    },
+    "same_order": {
+      "type": "boolean",
+      "description": "Also the same row order; matters only with ORDER BY"
+    },
+    "same_columns": {
+      "type": "boolean"
+    },
+    "both_empty": {
+      "type": "boolean",
+      "description": "Both result sets are empty, so equivalence says nothing; choose parameters that return rows"
+    },
+    "before": {
+      "$ref": "#/$defs/measurement"
+    },
+    "after": {
+      "$ref": "#/$defs/measurement"
+    },
+    "cost_change_percent": {
+      "type": "number",
+      "description": "Negative is an improvement"
+    },
+    "time_change_percent": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "issues": {
+      "$ref": "#/$defs/issue_diff"
+    }
+  },
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "required": [
+        "file",
+        "columns",
+        "row_count",
+        "checksum",
+        "ordered_checksum",
+        "cost",
+        "execution_time_ms",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "row_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "checksum": {
+          "type": "string",
+          "description": "Order-independent checksum of the rows"
+        },
+        "ordered_checksum": {
+          "type": "string",
+          "description": "Checksum of the rows in the order returned"
+        },
+        "cost": {
+          "type": "number"
+        },
+        "execution_time_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Issue ids"
+        }
+      }
+    },
+    "issue_diff": {
+      "type": "object",
+      "required": [
+        "resolved",
+        "new",
+        "persisting"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resolved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "new": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "persisting": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

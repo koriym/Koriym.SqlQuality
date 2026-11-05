@@ -28,6 +28,7 @@ final class JsonReportGeneratorTest extends TestCase
         $this->assertSame(2, $report['summary']['analyzed']);
         $this->assertSame(1, $report['summary']['skipped']);
         $this->assertSame(300.0, $report['summary']['avg_cost']);
+        $this->assertSame(600.0, $report['summary']['total_cost']);
         $this->assertSame(['14_not_found.sql' => 'SQL file not found: /tmp/14_not_found.sql'], $report['skipped']);
     }
 
@@ -84,19 +85,20 @@ final class JsonReportGeneratorTest extends TestCase
     public function testExecutionTimeIsReportedInMilliseconds(): void
     {
         $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
-            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592),
+            '1_full_table_scan.sql' => FakeAnalysisRun::result(50.0, [], true, 0.00592, 100.0),
         ]));
 
         $query = $report['queries']['1_full_table_scan.sql'];
 
         $this->assertSame(5.92, $query['execution_time_ms']);
-        $this->assertSame(44.91, $query['optimizer_impact']['cost_reduction_percent']);
+        $this->assertSame(100.0, $query['optimizer_impact']['cost_without_optimizer']);
+        $this->assertSame(50.0, $query['optimizer_impact']['cost_reduction_percent']);
     }
 
     public function testCostReductionPercentIsNegativeWhenOptimizerCostIncreases(): void
     {
         $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
-            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592, 10.0),
+            '1_full_table_scan.sql' => FakeAnalysisRun::result(110.0, [], true, 0.00592, 100.0),
         ]));
 
         $query = $report['queries']['1_full_table_scan.sql'];
@@ -107,12 +109,37 @@ final class JsonReportGeneratorTest extends TestCase
     public function testCostReductionPercentIsPositiveZeroNotNegativeZeroWhenCostIsUnchanged(): void
     {
         $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
-            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592, 0.0),
+            '1_full_table_scan.sql' => FakeAnalysisRun::result(497.95, [], true, 0.00592, 497.95),
         ]));
 
         $query = $report['queries']['1_full_table_scan.sql'];
 
         $this->assertSame(0.0, $query['optimizer_impact']['cost_reduction_percent']);
         $this->assertStringNotContainsString('-0', json_encode($query['optimizer_impact'], JSON_THROW_ON_ERROR));
+    }
+
+    public function testHiddenIssuesListTheIssuesOnlyTheNoOptimizerPlanHas(): void
+    {
+        $report = (new JsonReportGenerator())->generate(FakeAnalysisRun::of([
+            '11_nested_loop.sql' => FakeAnalysisRun::result(
+                10.0,
+                [FakeAnalysisRun::issue('FullTableScan', 'Critical', 'users')],
+                true,
+                0.001,
+                100.0,
+                [FakeAnalysisRun::issue('FullTableScan', 'Critical', 'users'), FakeAnalysisRun::issue('FullTableScan', 'Critical', 'posts')],
+            ),
+        ]));
+
+        $this->assertSame(['FullTableScan@posts'], $report['queries']['11_nested_loop.sql']['optimizer_impact']['hidden_issues']);
+    }
+
+    public function testBaselineIsAddedOnlyWhenGiven(): void
+    {
+        $run = FakeAnalysisRun::of(['a.sql' => FakeAnalysisRun::result(1.0)]);
+
+        $this->assertArrayNotHasKey('baseline', (new JsonReportGenerator())->generate($run));
+        $diff = ['new' => [], 'resolved' => [], 'persisting' => [], 'unverified' => []];
+        $this->assertSame($diff, (new JsonReportGenerator())->generate($run, $diff)['baseline']);
     }
 }
