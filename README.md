@@ -139,6 +139,16 @@ was `effective` (used, and the cost fell by `--min-improvement`, default 5%). Ex
 Building an index reads the whole table and needs the ALTER privilege: run it against a development
 database.
 
+- The ALTER and the DROP wait for a metadata lock behind open transactions on the table, and other
+  statements queue behind that wait, so the session's `lock_wait_timeout` is lowered to 10 seconds:
+  a busy table makes the trial fail (exit 2) instead of stalling it.
+- Before the index is added, stderr names the `DROP INDEX` statement that removes it. A run killed
+  mid-trial can leave the `INVISIBLE` index behind; run that statement, or look for
+  `sqlq_trial_%` / your index name in `information_schema.statistics`.
+- A table the statement reads that already has an invisible index is refused
+  (`InvisibleIndexesPresent`): `use_invisible_indexes=on` would enable it too and the result could
+  not be attributed to the trial index.
+
 ### Exit codes
 
 | Code | Meaning |

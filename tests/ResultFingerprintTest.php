@@ -40,4 +40,12 @@ final class ResultFingerprintTest extends MySqlTestCase
 
         $this->assertTrue(ResultFingerprint::of($pdo, 'SELECT 5 AS a')->sameRowsAs(ResultFingerprint::of($pdo, "SELECT '5' AS a")));
     }
+
+    public function testDoublesThatDifferBeyondFourteenDigitsDiffer(): void
+    {
+        $pdo = $this->connect();
+
+        $this->assertFalse(ResultFingerprint::of($pdo, 'SELECT 0.1e0 + 0.2e0 AS v')->sameRowsAs(ResultFingerprint::of($pdo, 'SELECT 0.3e0 AS v')));
+        $this->assertTrue(ResultFingerprint::of($pdo, 'SELECT 0.5e0 AS v')->sameRowsAs(ResultFingerprint::of($pdo, 'SELECT 0.25e0 * 2 AS v')));
+    }
 }

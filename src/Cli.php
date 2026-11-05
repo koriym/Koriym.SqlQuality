@@ -286,13 +286,22 @@ USAGE;
 
         $index = IndexDefinition::parse($definition);
         $minImprovement = $this->stringOption($options, 'min-improvement') ?? (string) IndexTrial::DEFAULT_MIN_IMPROVEMENT;
-        if (! is_numeric($minImprovement)) {
-            throw new UsageError("--min-improvement must be a number, not: {$minImprovement}");
+        if (! is_numeric($minImprovement) || (float) $minImprovement < 0.0) {
+            throw new UsageError("--min-improvement must be a number of percent, 0 or more, not: {$minImprovement}");
         }
+
+        if (array_key_exists('keep', $options) && $options['keep'] !== false) {
+            throw new UsageError('--keep is a flag and takes no value.');
+        }
+
+        $keep = array_key_exists('keep', $options);
 
         $params = $this->params($this->stringOption($options, 'params'), $file);
         $pdo = $this->connect($options);
-        $trial = (new IndexTrial($pdo, new SqlFileAnalyzer($pdo)))->run($sql, $params, $index, array_key_exists('keep', $options), (float) $minImprovement);
+        $notice = function (string $message): void {
+            fwrite($this->stderr, $message . PHP_EOL);
+        };
+        $trial = (new IndexTrial($pdo, new SqlFileAnalyzer($pdo), $notice))->run($sql, $params, $index, $keep, (float) $minImprovement);
 
         $report = [
             'file' => $file,

@@ -67,7 +67,10 @@ $SQ try-index --sql-file=<dir>/<file> --params=<params> --index="<suggestion.ddl
 ```
 
 Pass `--keep` only with `--keep-indexes`. Exit 0 is effective (the plan uses the index and the cost
-fell at least 5%), exit 1 is not. Record `index.ddl`, `cost_change_percent` and `issues.resolved`
+fell at least 5%), exit 1 is not. Exit 2 with `Lock wait timeout`: a transaction holds the table; retry
+later rather than waiting it out. `InvisibleIndexesPresent`: the table already has an invisible index;
+report it and skip the trial. stderr names the `DROP INDEX` that removes the trial index; if a run is
+interrupted, run that statement before anything else. Record `index.ddl`, `cost_change_percent` and `issues.resolved`
 either way. Two suggestions for the same table: try the composite one first.
 
 ### 3. Verify

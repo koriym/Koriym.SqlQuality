@@ -16,6 +16,7 @@ use function hash_update;
 use function hexdec;
 use function implode;
 use function is_array;
+use function is_float;
 use function is_string;
 use function sprintf;
 use function strlen;
@@ -24,7 +25,8 @@ use function substr;
 /**
  * Column names, row count and two checksums of a result set, computed while the rows stream past:
  * one over the rows in order, one over the multiset of rows regardless of order. Every non-NULL value
- * is compared as its string form, so the same value fetched as int or as string matches.
+ * is compared as its string form, so the same value fetched as int or as string matches; a float keeps
+ * all 17 significant digits.
  */
 final class ResultFingerprint
 {
@@ -84,7 +86,13 @@ final class ResultFingerprint
                 return 'N;';
             }
 
-            $string = is_string($value) ? $value : (string) $value;
+            // a float is written with 17 significant digits: (string) keeps only 14 (the precision ini),
+            // so 0.1e0 + 0.2e0 and 0.3e0 would encode alike
+            $string = match (true) {
+                is_string($value) => $value,
+                is_float($value) => sprintf('%.17g', $value),
+                default => (string) $value,
+            };
 
             return 'S' . strlen($string) . ':' . $string;
         }, $row)) . "\n";

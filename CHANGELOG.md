@@ -12,8 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Rebuilt for coding agents and CI: the tool measures and verifies, the caller writes the prose.
 
 ### Added
-- `sql-quality compare`: runs an original and a rewritten SELECT in a read-only session and reports whether they return the same rows (`equivalent`, `same_order`, `same_columns`, `both_empty`, row counts and checksums), with the change in cost, time and issues. Exit 1 when not equivalent
-- `sql-quality try-index`: adds a candidate index `INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE`, measures the statement with `use_invisible_indexes=on` in its own session, and drops the index; `--keep` keeps an effective one, visible. Reports `used` and `effective` (`--min-improvement`, default 5%). Exit 1 when not effective. MySQL 8.0+
+- `sql-quality compare`: runs an original and a rewritten SELECT (floats hashed with 17 significant digits) in a read-only session and reports whether they return the same rows (`equivalent`, `same_order`, `same_columns`, `both_empty`, row counts and checksums), with the change in cost, time and issues. Exit 1 when not equivalent
+- `sql-quality try-index`: adds a candidate index `INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE`, measures the statement with `use_invisible_indexes=on` in its own session, and drops the index; `--keep` keeps an effective one, visible. Reports `used` and `effective` (`--min-improvement`, default 5%). Exit 1 when not effective. MySQL 8.0.18+. The session's `lock_wait_timeout` is 10 seconds during the trial so a table held by a transaction fails the trial instead of queueing behind it; stderr names the `DROP INDEX` before the index is added; a table with an invisible index already is refused (`InvisibleIndexesPresent`)
 - `sql-quality analyze --baseline=FILE`: `baseline.new`, `resolved`, `persisting` and `unverified` against an earlier report; `--fail-on` then counts only the new issues
 - `sql-quality explain --sql=SQL` and `--sql-file=-` (stdin); `--detail=full` for the EXPLAIN, schema and optimizer trace
 - Issue `id`: type and location (`FullTableScan@posts`, `FunctionInvalidatesIndex@posts.created_at`, `#2` for a repeat), stable across runs
@@ -25,6 +25,7 @@ Rebuilt for coding agents and CI: the tool measures and verifies, the caller wri
 - `SqlFileAnalyzer::analyzeDirectory()`, `analyzeSql()`, `explainSql()`, `sqlFiles()` and `hiddenIssues()`; `SchemaReader`, `ParameterBinder`, `RewriteComparator`, `ResultFingerprint`, `IndexTrial`, `IndexDefinition`, `Baseline` and `Cli`
 - `schema/compare-report.schema.json` and `schema/try-index-report.schema.json`
 - `.claude/settings.json` enabling the bundled plugin in this repository
+- `InvalidParameterValue` for an object, or a list holding a list or an object, given as a parameter value
 
 ### Changed
 - `analyze` covers every `*.sql` file of `--sql-dir`, not only the files the params file names; `--params` is optional
@@ -34,7 +35,7 @@ Rebuilt for coding agents and CI: the tool measures and verifies, the caller wri
 - The analysis result carries `without_optimizer` (`cost`, `issues`) instead of `optimizer_comparison`; `execution_time` is `null` for a statement that was not run
 - The no-optimizer pass is no longer timed, which halves the queries each analysis runs
 - `ExplainAnalyzer::MESSAGES` replaces `DEFAULT_MESSAGES`; `ExplainAnalyzer::queryCost()` replaces `calculateQueryCost()`
-- Placeholders are replaced only as whole names (`:id` no longer matches the start of `:id2`), and a value containing `$1` is inserted as is
+- Parameters are bound in one pass that skips string literals, quoted identifiers and comments: `:id` no longer matches the start of `:id2` or text inside `'Re: :id'`, an inserted value is never scanned again (the result no longer depends on the parameter order), and a value containing `$1` is inserted as is
 - The skills use `vendor/bin/sql-quality`, and `sql-quality-fix` applies only rewrites `compare` proves equivalent and recommends only indexes `try-index` proves effective; it no longer runs DDL itself
 - The CLI lives in `src/Cli.php`; `--version` prints the package version
 

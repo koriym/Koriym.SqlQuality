@@ -411,7 +411,7 @@ final class CliTest extends MySqlTestCase
             '--index=posts(view_count)',
         ]);
 
-        $this->assertSame('', $stderr);
+        $this->assertStringContainsString('if this run is interrupted, remove it with: DROP INDEX `sqlq_trial_posts_view_count` ON `posts`', $stderr);
         $this->assertSame(0, $exitCode);
         $report = json_decode($stdout, true);
         $this->assertTrue($report['used']);
@@ -435,6 +435,17 @@ final class CliTest extends MySqlTestCase
         $report = json_decode($stdout, true);
         $this->assertSame(1, $exitCode);
         $this->assertFalse($report['effective']);
+    }
+
+    public function testTryIndexRejectsAValueForKeepAndANegativeMinImprovement(): void
+    {
+        [$exitCode, , $stderr] = $this->runCli(['try-index', '--sql=SELECT 1', '--index=posts(view_count)', '--keep=0']);
+        $this->assertSame(2, $exitCode);
+        $this->assertStringContainsString('--keep is a flag', $stderr);
+
+        [$exitCode, , $stderr] = $this->runCli(['try-index', '--sql=SELECT 1', '--index=posts(view_count)', '--min-improvement=-10']);
+        $this->assertSame(2, $exitCode);
+        $this->assertStringContainsString('--min-improvement', $stderr);
     }
 
     public function testTryIndexRejectsADefinitionThatIsNotAnIndex(): void
