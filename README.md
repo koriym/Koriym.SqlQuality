@@ -121,7 +121,9 @@ Runs both SELECTs in a read-only session and compares the result sets: `equivale
 multiset of rows), `same_order`, the row counts and checksums, the change in cost and time, and the
 issues the rewrite resolved or introduced. `both_empty: true` means neither statement returned a row,
 so the check proves nothing; choose parameters that return rows. `--before-params` / `--after-params`
-override `--params` for one side. Exit 0 when equivalent, 1 when not.
+override `--params` for one side. Exit 0 when equivalent, 1 when not. Floating-point values are
+compared to 17 significant digits, so a rewrite that only changes the order of a `DOUBLE` `SUM()` can
+come out not equivalent: the application would see a different value.
 
 ### try-index
 

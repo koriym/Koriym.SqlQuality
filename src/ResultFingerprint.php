@@ -42,35 +42,35 @@ final class ResultFingerprint
     /** @throws QueryFailed */
     public static function of(PDO $pdo, string $interpolatedSql): self
     {
-        $stmt = $pdo->query($interpolatedSql);
-        if ($stmt === false) {
-            throw new QueryFailed($interpolatedSql);
-        }
-
-        $columns = self::columns($stmt);
+        $columns = [];
         $ordered = hash_init('sha256');
-        // four 32-bit lanes summed per row: a multiset hash that does not depend on row order
-        $lanes = [0, 0, 0, 0];
+        // eight 16-bit lanes summed per row: a multiset hash that does not depend on row order, and whose
+        // sums stay within a 32-bit int
+        $lanes = [0, 0, 0, 0, 0, 0, 0, 0];
         $rowCount = 0;
-        while (is_array($row = $stmt->fetch(PDO::FETCH_NUM))) {
-            $encoded = self::encode($row);
-            hash_update($ordered, $encoded);
-            $rowHash = hash('sha256', $encoded);
-            for ($lane = 0; $lane < 4; $lane++) {
-                $lanes[$lane] = ($lanes[$lane] + (int) hexdec(substr($rowHash, $lane * 8, 8))) % 0x100000000;
-            }
+        UnbufferedQuery::each(
+            $pdo,
+            $interpolatedSql,
+            static function (array $row) use ($ordered, &$lanes, &$rowCount): void {
+                $encoded = self::encode($row);
+                hash_update($ordered, $encoded);
+                $rowHash = hash('sha256', $encoded);
+                for ($lane = 0; $lane < 8; $lane++) {
+                    $lanes[$lane] = ($lanes[$lane] + (int) hexdec(substr($rowHash, $lane * 4, 4))) % 0x10000;
+                }
 
-            $rowCount++;
-        }
-
-        $stmt->closeCursor();
-        /** @var array{0: int, 1: int, 2: int, 3: int} $lanes */
+                $rowCount++;
+            },
+            static function (PDOStatement $stmt) use (&$columns): void {
+                $columns = self::columns($stmt);
+            },
+        );
 
         return new self(
             $columns,
             $rowCount,
             hash_final($ordered),
-            sprintf('%08x%08x%08x%08x', $lanes[0], $lanes[1], $lanes[2], $lanes[3]),
+            implode('', array_map(static fn (int $lane): string => sprintf('%04x', $lane), $lanes)),
         );
     }
 

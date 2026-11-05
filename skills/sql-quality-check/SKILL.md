@@ -30,6 +30,7 @@ to `--password` so the password does not land in the transcript.
 ### 2. Run the analysis
 
 ```bash
+mkdir -p build/sql-quality
 $SQ analyze --sql-dir=<dir> [--params=<params file>] [--baseline=<baseline>] --fail-on=critical > build/sql-quality/report.json
 ```
 

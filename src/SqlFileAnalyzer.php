@@ -22,17 +22,18 @@ use function array_shift;
 use function array_sum;
 use function array_unique;
 use function array_values;
-use function basename;
 use function count;
 use function file_exists;
 use function file_get_contents;
-use function glob;
 use function is_array;
+use function is_file;
 use function is_string;
 use function json_decode;
 use function microtime;
 use function natsort;
+use function scandir;
 use function sort;
+use function str_ends_with;
 use function strrpos;
 use function substr;
 use function var_export;
@@ -99,9 +100,14 @@ final class SqlFileAnalyzer
      */
     public function sqlFiles(): array
     {
+        // scandir, not glob: a directory name with glob metacharacters ([archive]) would change the pattern
         $files = [];
-        foreach (glob($this->sqlDir . '/*.sql') ?: [] as $path) {
-            $files[] = basename($path);
+        foreach (scandir($this->sqlDir) ?: [] as $entry) {
+            if (! str_ends_with($entry, '.sql') || ! is_file($this->sqlDir . '/' . $entry)) {
+                continue;
+            }
+
+            $files[] = $entry;
         }
 
         natsort($files);
@@ -332,7 +338,7 @@ final class SqlFileAnalyzer
         }
 
         $explainAnalyze = $classifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
-        $schema = $this->schemaReader->forSql($sql);
+        $schema = $this->schemaReader->forSql($sql, $quoteRules ?? new QuoteRules());
 
         return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace, $quoteRules ?? new QuoteRules());
     }
@@ -541,14 +547,15 @@ final class SqlFileAnalyzer
         return array_sum($executionTimes) / (float) count($executionTimes);
     }
 
-    /** @throws QueryFailed */
+    /**
+     * Reads the whole result set without keeping it: a large result must not exhaust memory_limit,
+     * a fatal error no report survives.
+     *
+     * @throws QueryFailed
+     */
     private function fetchAll(string $interpolatedSql): void
     {
-        $stmt = $this->pdo->query($interpolatedSql);
-        if ($stmt === false) {
-            throw new QueryFailed($interpolatedSql);
-        }
-
-        $stmt->fetchAll();
+        UnbufferedQuery::each($this->pdo, $interpolatedSql, static function (): void {
+        });
     }
 }

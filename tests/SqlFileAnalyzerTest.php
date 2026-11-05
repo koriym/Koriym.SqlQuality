@@ -262,4 +262,13 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->assertNull($result['execution_time']);
         $this->assertNotNull($result['skipped_reason']);
     }
+
+    public function testADirectoryNameWithGlobCharactersIsReadLiterally(): void
+    {
+        $this->outputDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_[archive]_', true);
+        mkdir($this->outputDir);
+        file_put_contents($this->outputDir . '/a.sql', 'SELECT 1');
+
+        $this->assertSame(['a.sql'], (new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), $this->outputDir))->sqlFiles());
+    }
 }

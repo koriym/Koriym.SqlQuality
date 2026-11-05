@@ -63,4 +63,44 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
         $this->assertSame(1000, $issues[0]['evidence']['rows_examined_per_scan']);
         $this->assertNull($issues[0]['suggestion']);
     }
+
+    public function testASecondFindingAtTheSamePlaceGetsNumberTwo(): void
+    {
+        $issues = (new ExplainAnalyzer())->analyze(new QueryContext(
+            sql: '',
+            explain: [
+                'query_block' => [
+                    'select_id' => 1,
+                    'nested_loop' => [
+                        ['table' => ['table_name' => 'a', 'access_type' => 'ALL', 'rows_examined_per_scan' => 1000]],
+                        ['table' => ['table_name' => 'a', 'access_type' => 'ALL', 'rows_examined_per_scan' => 1000]],
+                    ],
+                ],
+            ],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $ids = array_column($issues, 'id');
+        $this->assertContains('FullTableScan@a', $ids);
+        $this->assertContains('FullTableScan@a#2', $ids);
+    }
+
+    public function testTheCostOfAUnionIsTheSumOfItsBranches(): void
+    {
+        $explain = [
+            'query_block' => [
+                'union_result' => [
+                    'query_specifications' => [
+                        ['query_block' => ['cost_info' => ['query_cost' => '254.80']]],
+                        ['query_block' => ['cost_info' => ['query_cost' => '1447.69']]],
+                    ],
+                ],
+            ],
+        ];
+
+        $this->assertEqualsWithDelta(1702.49, ExplainAnalyzer::queryCost($explain), 1e-9);
+        $this->assertSame(1.0, ExplainAnalyzer::queryCost(['query_block' => ['select_id' => 1]]));
+    }
 }

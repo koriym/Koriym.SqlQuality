@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Exception;
 
 /**
- * The trial index could not be dropped after the measurement. The message carries the DDL to run by hand.
+ * The cleanup after an index trial failed: the trial index could not be checked for or removed (the
+ * message then carries the statement to run by hand), or the session's optimizer_switch or
+ * lock_wait_timeout could not be restored.
  */
 final class IndexCleanupFailed extends RuntimeException
 {

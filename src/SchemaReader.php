@@ -36,10 +36,10 @@ final class SchemaReader
      *
      * @throws RuntimeException
      */
-    public function forSql(string $sql): array
+    public function forSql(string $sql, QuoteRules $rules = new QuoteRules()): array
     {
         $schema = [];
-        foreach (self::tableNames($sql) as $tableName) {
+        foreach (self::tableNames($sql, $rules) as $tableName) {
             $schema[$tableName] = $this->forTable($tableName);
         }
 
@@ -47,9 +47,10 @@ final class SchemaReader
     }
 
     /** @return list<string> */
-    public static function tableNames(string $sql): array
+    public static function tableNames(string $sql, QuoteRules $rules = new QuoteRules()): array
     {
-        $sql = (string) preg_replace('/--.*$/m', '', $sql);
+        // quote-aware: a "--" inside a string literal is not a comment
+        $sql = SqlSafetyClassifier::stripComments($sql, $rules);
         preg_match_all(self::TABLE_LIST, $sql, $matches);
 
         $tables = [];

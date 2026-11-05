@@ -25,6 +25,9 @@ Every `skipped` entry `UnboundParameter: a, b` names the parameters a file still
 
 ### 2. Pick values from the data
 
+Run these lookups against the development or test database `sql-quality` analyzes, never a large
+production one: without an index they read the whole table.
+
 Read the statement, find the column each placeholder is compared with, and take a real value:
 
 ```sql
@@ -32,11 +35,18 @@ SELECT status, COUNT(*) FROM posts GROUP BY status ORDER BY 2 DESC LIMIT 5;
 SELECT MIN(created_at), MAX(created_at) FROM posts;
 ```
 
-- Equality on a key: a value that exists, so the plan is the one production sees.
+- Equality on a key: a value that exists, with a typical row count. MySQL estimates rows per value,
+  so a value much more or less frequent than usual can give a different plan; check a second value
+  before trusting the plan or a `try-index` result.
 - Ranges and dates: bounds inside the data.
 - `IN (:list)`: a JSON array of two to five existing values.
 - `LIMIT` / `OFFSET`: integers, not strings.
 - `LIKE`: the pattern the application builds, wildcards included.
+- A placeholder in an expression (`price * :tax_rate`) has no column to read: take the value the
+  application sets, from its configuration or code, and ask the user when it cannot be found.
+- Personal or secret data (email, name, phone, address, account numbers, tokens): do not copy real
+  values into the file, which is committed. Use a made-up value of the same shape, and say in your
+  report that a value absent from the table can get a lower row estimate than a real one.
 
 Prefer values that return some rows: `/sql-quality-fix` needs rows to check a rewrite.
 

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use PDO;
+
 final class ResultFingerprintTest extends MySqlTestCase
 {
     public function testRowOrderChangesOnlyTheOrderedChecksum(): void
@@ -47,5 +49,23 @@ final class ResultFingerprintTest extends MySqlTestCase
 
         $this->assertFalse(ResultFingerprint::of($pdo, 'SELECT 0.1e0 + 0.2e0 AS v')->sameRowsAs(ResultFingerprint::of($pdo, 'SELECT 0.3e0 AS v')));
         $this->assertTrue(ResultFingerprint::of($pdo, 'SELECT 0.5e0 AS v')->sameRowsAs(ResultFingerprint::of($pdo, 'SELECT 0.25e0 * 2 AS v')));
+    }
+
+    public function testTheSameValuesWithOtherMultiplicitiesDiffer(): void
+    {
+        $pdo = $this->connect();
+        $more1 = ResultFingerprint::of($pdo, 'SELECT 1 AS a UNION ALL SELECT 1 UNION ALL SELECT 2');
+        $more2 = ResultFingerprint::of($pdo, 'SELECT 1 AS a UNION ALL SELECT 2 UNION ALL SELECT 2');
+
+        $this->assertSame($more1->rowCount, $more2->rowCount);
+        $this->assertFalse($more1->sameRowsAs($more2));
+    }
+
+    public function testTheConnectionKeepsBufferingAfterwards(): void
+    {
+        $pdo = $this->connect();
+        ResultFingerprint::of($pdo, 'SELECT id FROM users');
+
+        $this->assertTrue((bool) $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY));
     }
 }

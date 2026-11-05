@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality;
 
 use Closure;
+use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\IndexAlreadyExists;
 use Koriym\SqlQuality\Exception\IndexCleanupFailed;
 use Koriym\SqlQuality\Exception\IndexTrialUnsupported;
@@ -18,15 +19,23 @@ use function array_merge;
 use function array_unique;
 use function array_values;
 use function count;
+use function function_exists;
 use function implode;
+use function in_array;
 use function is_array;
 use function is_numeric;
 use function is_string;
+use function pcntl_sigprocmask;
 use function preg_match;
 use function preg_quote;
 use function round;
 use function stripos;
 use function version_compare;
+
+use const SIG_BLOCK;
+use const SIG_UNBLOCK;
+use const SIGINT;
+use const SIGTERM;
 
 /**
  * Measures a statement with and without a candidate index, without changing the plans of other sessions.
@@ -50,13 +59,16 @@ final class IndexTrial
     public const DEFAULT_MIN_IMPROVEMENT = 5.0;
     public const DEFAULT_LOCK_WAIT_TIMEOUT = 10;
 
+    /** the analyzer runs on $pdo itself: use_invisible_indexes=on is set on that session only */
+    private readonly SqlFileAnalyzer $analyzer;
+
     /** @param (Closure(string): void)|null $notice */
     public function __construct(
         private readonly PDO $pdo,
-        private readonly SqlFileAnalyzer $analyzer,
         private readonly Closure|null $notice = null,
         private readonly int $lockWaitTimeout = self::DEFAULT_LOCK_WAIT_TIMEOUT,
     ) {
+        $this->analyzer = new SqlFileAnalyzer($pdo);
     }
 
     /**
@@ -68,6 +80,11 @@ final class IndexTrial
      */
     public function run(string $sql, array $params, IndexDefinition $index, bool $keep = false, float $minImprovement = self::DEFAULT_MIN_IMPROVEMENT): array
     {
+        // DDL commits an open transaction implicitly; the caller's pending writes would become permanent
+        if ($this->pdo->inTransaction()) {
+            throw new ActiveTransactionRejected();
+        }
+
         $this->assertSupported();
         $this->assertAbsent($index);
         $this->assertNoInvisibleIndexes($sql, $index);
@@ -80,25 +97,25 @@ final class IndexTrial
         $this->exec('SET SESSION lock_wait_timeout = ' . $this->lockWaitTimeout);
 
         $original = null;
-        $added = false;
+        $attempted = false;
         $effective = false;
         try {
             if ($this->notice !== null) {
                 ($this->notice)("Adding INVISIBLE index {$index->table}.{$index->name}; if this run is interrupted, remove it with: {$index->dropStatement()}");
             }
 
+            $attempted = true;
             $this->exec($index->addInvisibleStatement());
-            $added = true;
             $this->exec("SET SESSION optimizer_switch = 'use_invisible_indexes=on'");
-            $after = $this->analyzer->analyzeSql($sql, $params);
-            $used = self::usesIndex($after['explain_result'], $index->name);
+            ['result' => $after, 'context' => $context] = $this->analyzer->explainSql($sql, $params);
+            $used = self::usesIndex($after['explain_result'], $index->name, self::namesOf($index->table, $context->aliases()));
             $effective = self::isEffective($before, $after, $used, $minImprovement);
         } catch (Throwable $e) {
             $original = $e;
 
             throw $e;
         } finally {
-            $this->cleanUp($index, $added, $savedSwitch, $savedLockWait, $keep && $effective, $original);
+            $this->cleanUp($index, $attempted, $savedSwitch, $savedLockWait, $keep && $effective, $original);
         }
 
         return [
@@ -116,7 +133,35 @@ final class IndexTrial
      */
     public static function isEffective(array $before, array $after, bool $used, float $minImprovement = self::DEFAULT_MIN_IMPROVEMENT): bool
     {
-        return $used && self::changePercent($before['cost'], $after['cost']) <= -$minImprovement;
+        if (! $used || $before['cost'] <= 0.0) {
+            return false;
+        }
+
+        // unrounded, with a tolerance, so a reduction of exactly the minimum counts
+        $reduction = ($before['cost'] - $after['cost']) / $before['cost'] * 100.0;
+
+        return $reduction >= $minImprovement - 1e-9;
+    }
+
+    /**
+     * The names a plan can give the table: itself and every alias of it.
+     *
+     * @param array<string, string> $aliases alias => table
+     *
+     * @return list<string>
+     */
+    private static function namesOf(string $table, array $aliases): array
+    {
+        $names = [$table];
+        foreach ($aliases as $alias => $aliasedTable) {
+            if ($aliasedTable !== $table) {
+                continue;
+            }
+
+            $names[] = $alias;
+        }
+
+        return array_values(array_unique($names));
     }
 
     /** Change from $before to $after in percent, rounded to 2 places; 0.0 when $before is not positive. */
@@ -133,19 +178,24 @@ final class IndexTrial
 
     /**
      * Whether a table access of the plan names the index as its key, alone or in an index merge.
+     * With $tableNames, only an access to one of those names (the table and its aliases) counts, so a
+     * same-named index on another table does not.
      *
      * @param array<array-key, mixed> $node
+     * @param list<string>|null       $tableNames
      */
-    public static function usesIndex(array $node, string $indexName): bool
+    public static function usesIndex(array $node, string $indexName, array|null $tableNames = null): bool
     {
         $key = $node['key'] ?? null;
-        if (is_string($key) && preg_match('/(?:^|,)' . preg_quote($indexName, '/') . '(?:,|$)/', $key)) {
+        $tableMatches = $tableNames === null || in_array($node['table_name'] ?? null, $tableNames, true);
+        // the name as a whole token: an index merge reports "union(a,b)", "sort_union(a,b)", "intersect(a,b)"
+        if ($tableMatches && is_string($key) && preg_match('/(?<![\w$])' . preg_quote($indexName, '/') . '(?![\w$])/', $key)) {
             return true;
         }
 
         /** @var mixed $child */
         foreach ($node as $child) {
-            if (is_array($child) && self::usesIndex($child, $indexName)) {
+            if (is_array($child) && self::usesIndex($child, $indexName, $tableNames)) {
                 return true;
             }
         }
@@ -159,20 +209,27 @@ final class IndexTrial
         $stmt = $this->pdo->query('SELECT VERSION()');
         $version = $stmt === false ? false : $stmt->fetchColumn();
         // 8.0.18: EXPLAIN ANALYZE, which the measurement runs; invisible indexes came with 8.0.0
-        if (! is_string($version) || stripos($version, 'mariadb') !== false || version_compare($version, '8.0.18', '<')) {
+        // compare the numeric part only: version_compare() sorts "8.0.18-log" below "8.0.18"
+        $number = is_string($version) && preg_match('/^\d+\.\d+\.\d+/', $version, $match) === 1 ? $match[0] : '0';
+        if (! is_string($version) || stripos($version, 'mariadb') !== false || version_compare($number, '8.0.18', '<')) {
             throw new IndexTrialUnsupported(is_string($version) ? $version : 'unknown');
         }
     }
 
-    /** @throws IndexAlreadyExists */
-    private function assertAbsent(IndexDefinition $index): void
+    private function indexExists(IndexDefinition $index): bool
     {
         $stmt = $this->pdo->prepare('SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND table_name = ? AND index_name = ? LIMIT 1');
         if ($stmt === false || ! $stmt->execute([$index->table, $index->name])) {
             throw new RuntimeException('Failed to look up existing indexes');
         }
 
-        if ($stmt->fetchColumn() !== false) {
+        return $stmt->fetchColumn() !== false;
+    }
+
+    /** @throws IndexAlreadyExists */
+    private function assertAbsent(IndexDefinition $index): void
+    {
+        if ($this->indexExists($index)) {
             throw new IndexAlreadyExists("{$index->table}.{$index->name}");
         }
     }
@@ -217,7 +274,21 @@ final class IndexTrial
      *
      * @throws IndexCleanupFailed
      */
-    private function cleanUp(IndexDefinition $index, bool $added, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
+    private function cleanUp(IndexDefinition $index, bool $attempted, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
+    {
+        // a SIGINT / SIGTERM turned into an exception must not cut the cleanup short; it is delivered afterwards
+        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM]);
+        try {
+            $this->restoreAndRemove($index, $attempted, $savedSwitch, $savedLockWait, $keep, $original);
+        } finally {
+            if ($masked) {
+                pcntl_sigprocmask(SIG_UNBLOCK, [SIGINT, SIGTERM]);
+            }
+        }
+    }
+
+    /** @throws IndexCleanupFailed */
+    private function restoreAndRemove(IndexDefinition $index, bool $attempted, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
     {
         $sessionFailures = [];
         try {
@@ -226,14 +297,16 @@ final class IndexTrial
             $sessionFailures[] = 'optimizer_switch restore: ' . $e->getMessage();
         }
 
+        // whether the ALTER took effect is read from the server, not from how far the PHP code got:
+        // an exception (a signal, a lost reply) can land after the server added the index
         $indexFailure = null;
-        if ($added) {
-            $statement = $keep ? $index->makeVisibleStatement() : $index->dropStatement();
-            try {
+        $statement = $keep ? $index->makeVisibleStatement() : $index->dropStatement();
+        try {
+            if ($attempted && $this->indexExists($index)) {
                 $this->exec($statement);
-            } catch (Throwable $e) {
-                $indexFailure = "run by hand: {$statement}; " . $e->getMessage();
             }
+        } catch (Throwable $e) {
+            $indexFailure = "check for the index and run by hand: {$statement}; " . $e->getMessage();
         }
 
         try {

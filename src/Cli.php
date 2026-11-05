@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use Closure;
 use JsonException;
 use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 use Koriym\SqlQuality\Exception\RuntimeException;
@@ -23,16 +24,23 @@ use function basename;
 use function count;
 use function file_exists;
 use function file_get_contents;
+use function function_exists;
 use function fwrite;
 use function getenv;
 use function in_array;
 use function is_array;
 use function is_dir;
 use function is_file;
+use function is_finite;
 use function is_numeric;
+use function is_readable;
 use function is_string;
 use function json_decode;
 use function json_encode;
+use function ob_get_clean;
+use function ob_start;
+use function pcntl_async_signals;
+use function pcntl_signal;
 use function preg_match;
 use function round;
 use function sort;
@@ -46,6 +54,9 @@ use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 use const JSON_UNESCAPED_UNICODE;
 use const PHP_EOL;
+use const SIG_DFL;
+use const SIGINT;
+use const SIGTERM;
 
 /**
  * The sql-quality command line. stdout carries the JSON report and nothing else; diagnostics go to stderr.
@@ -87,7 +98,7 @@ Commands:
   analyze    Analyze every *.sql file of a directory
   explain    Analyze one statement; --sql-file=- reads it from stdin
   compare    Check that a rewritten SELECT returns the same rows, and compare cost and issues
-  try-index  Measure a statement with a candidate index added INVISIBLE (MySQL 8.0+), then drop it
+  try-index  Measure a statement with a candidate index added INVISIBLE (MySQL 8.0.18+), then drop it
 
 Options:
   --params=FILE|JSON       A PHP or .json file, or an inline JSON object. analyze takes a file keyed by
@@ -198,6 +209,10 @@ USAGE;
             throw new UsageError("SQL directory not found: {$sqlDir}");
         }
 
+        if (! is_readable($sqlDir)) {
+            throw new UsageError("SQL directory is not readable: {$sqlDir}");
+        }
+
         $sqlParams = $this->sqlParams($this->stringOption($options, 'params'));
         $baselineFile = $this->stringOption($options, 'baseline');
         $baseline = $baselineFile === null ? null : Baseline::fromFile($baselineFile);
@@ -286,7 +301,7 @@ USAGE;
 
         $index = IndexDefinition::parse($definition);
         $minImprovement = $this->stringOption($options, 'min-improvement') ?? (string) IndexTrial::DEFAULT_MIN_IMPROVEMENT;
-        if (! is_numeric($minImprovement) || (float) $minImprovement < 0.0) {
+        if (! is_numeric($minImprovement) || ! is_finite((float) $minImprovement) || (float) $minImprovement < 0.0) {
             throw new UsageError("--min-improvement must be a number of percent, 0 or more, not: {$minImprovement}");
         }
 
@@ -301,7 +316,12 @@ USAGE;
         $notice = function (string $message): void {
             fwrite($this->stderr, $message . PHP_EOL);
         };
-        $trial = (new IndexTrial($pdo, new SqlFileAnalyzer($pdo), $notice))->run($sql, $params, $index, $keep, (float) $minImprovement);
+        $restoreSignals = $this->interruptOnSignal();
+        try {
+            $trial = (new IndexTrial($pdo, $notice))->run($sql, $params, $index, $keep, (float) $minImprovement);
+        } finally {
+            $restoreSignals();
+        }
 
         $report = [
             'file' => $file,
@@ -465,11 +485,19 @@ USAGE;
             return $this->decodeJsonObject((string) file_get_contents($path), $path);
         }
 
+        // whatever the file prints (a stray blank line before <?php, a BOM, a debug echo) goes to stderr:
+        // stdout carries the JSON report only
+        ob_start();
         try {
             /** @psalm-suppress UnresolvableInclude */
             $decoded = require $path;
         } catch (Throwable $e) {
             throw new UsageError("Params file could not be loaded: {$path}: {$e->getMessage()}");
+        } finally {
+            $printed = (string) ob_get_clean();
+            if ($printed !== '') {
+                fwrite($this->stderr, $printed);
+            }
         }
 
         if (! is_array($decoded)) {
@@ -482,6 +510,11 @@ USAGE;
     /** @return array<array-key, mixed> */
     private function decodeJsonObject(string $json, string $source): array
     {
+        // json_decode() turns [] and {} into the same empty array; only an object is a parameter map
+        if (! str_starts_with(trim($json), '{')) {
+            throw new UsageError("{$source} must be a JSON object");
+        }
+
         try {
             $decoded = json_decode($json, true, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
@@ -509,6 +542,33 @@ USAGE;
         }
 
         return true;
+    }
+
+    /**
+     * Turns SIGINT and SIGTERM into an exception while the trial runs, so its finally block drops the
+     * index. Without pcntl the default handlers stay, and the notice on stderr is the fallback.
+     *
+     * @return Closure(): void restores the default handlers
+     */
+    private function interruptOnSignal(): Closure
+    {
+        if (! function_exists('pcntl_async_signals') || ! function_exists('pcntl_signal')) {
+            return static function (): void {
+            };
+        }
+
+        $previous = pcntl_async_signals(true);
+        $handler = static function (int $signal): void {
+            throw new RuntimeException("Interrupted by signal {$signal}");
+        };
+        pcntl_signal(SIGINT, $handler);
+        pcntl_signal(SIGTERM, $handler);
+
+        return static function () use ($previous): void {
+            pcntl_signal(SIGINT, SIG_DFL);
+            pcntl_signal(SIGTERM, SIG_DFL);
+            pcntl_async_signals($previous);
+        };
     }
 
     /** @param array<string, string|false> $options */
@@ -546,7 +606,13 @@ USAGE;
         $password = $this->stringOption($options, 'password') ?? self::env('SQL_QUALITY_PASSWORD') ?? '';
 
         try {
-            return new PDO($dsn, $user, $password, [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION]);
+            // one statement per call: a value that ever escaped its literal could not start a second one
+            $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
+            if (str_starts_with($dsn, 'mysql:')) {
+                $options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = false;
+            }
+
+            return new PDO($dsn, $user, $password, $options);
         } catch (PDOException $e) {
             throw new UsageError("Database connection failed: {$e->getMessage()}");
         }

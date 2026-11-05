@@ -25,6 +25,7 @@ use Koriym\SqlQuality\Detector\OrderByRandDetector;
 use Koriym\SqlQuality\Detector\TemporaryTableGroupingDetector;
 use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 
+use function is_array;
 use function is_numeric;
 use function is_string;
 
@@ -174,15 +175,43 @@ final class ExplainAnalyzer
     }
 
     /**
-     * The optimizer's query_cost of the top query block, 1.0 when EXPLAIN reports none.
+     * The optimizer's query_cost of the top query block. A UNION reports no cost of its own, only per
+     * branch under union_result.query_specifications; its cost is the sum of the branches. 1.0 when
+     * EXPLAIN reports no cost at all.
      *
      * @param array<array-key, mixed> $explain
      */
     public static function queryCost(array $explain): float
     {
-        /** @psalm-suppress MixedArrayAccess */
-        $cost = $explain['query_block']['cost_info']['query_cost'] ?? null;
+        $block = $explain['query_block'] ?? null;
 
-        return is_numeric($cost) ? (float) $cost : 1.0;
+        return is_array($block) ? self::blockCost($block) ?? 1.0 : 1.0;
+    }
+
+    /** @param array<array-key, mixed> $block */
+    private static function blockCost(array $block): float|null
+    {
+        /** @psalm-suppress MixedArrayAccess */
+        $cost = $block['cost_info']['query_cost'] ?? null;
+        if (is_numeric($cost)) {
+            return (float) $cost;
+        }
+
+        /** @psalm-suppress MixedArrayAccess */
+        $specifications = $block['union_result']['query_specifications'] ?? null;
+        if (! is_array($specifications)) {
+            return null;
+        }
+
+        $total = null;
+        /** @var mixed $specification */
+        foreach ($specifications as $specification) {
+            $branch = is_array($specification) && is_array($specification['query_block'] ?? null) ? self::blockCost($specification['query_block']) : null;
+            if ($branch !== null) {
+                $total = ($total ?? 0.0) + $branch;
+            }
+        }
+
+        return $total;
     }
 }

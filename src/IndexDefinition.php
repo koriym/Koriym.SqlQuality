@@ -99,7 +99,11 @@ final class IndexDefinition
         return sprintf('CREATE INDEX `%s` ON `%s` (%s)', $this->name, $this->table, $this->columnList());
     }
 
-    /** Adds the index invisible, online: the build fails instead of blocking writes to the table. */
+    /**
+     * Adds the index invisible and online: writes continue while it builds, and a build that cannot run
+     * without locking the table fails instead. The ALTER still waits for a metadata lock behind open
+     * transactions; IndexTrial bounds that wait with lock_wait_timeout.
+     */
     public function addInvisibleStatement(): string
     {
         return sprintf('ALTER TABLE `%s` ADD INDEX `%s` (%s) INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE', $this->table, $this->name, $this->columnList());

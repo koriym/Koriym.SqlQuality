@@ -496,4 +496,27 @@ final class CliTest extends MySqlTestCase
 
         return [proc_close($process), $stdout, $stderr];
     }
+
+    public function testAJsonArrayIsNotAParamsObject(): void
+    {
+        file_put_contents($this->workDir . '/list.json', '[7]');
+
+        [$exitCode, $stdout, $stderr] = $this->runCli(['explain', '--sql=SELECT 1', '--params=' . $this->workDir . '/list.json']);
+
+        $this->assertSame(2, $exitCode);
+        $this->assertSame('', $stdout);
+        $this->assertStringContainsString('must be a JSON object', $stderr);
+    }
+
+    public function testWhatAParamsFilePrintsGoesToStderr(): void
+    {
+        $this->connect();
+        file_put_contents($this->workDir . '/noisy.php', "\n<?php\necho 'debug';\nreturn [];\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runCli(['explain', '--sql=SELECT 1', '--params=' . $this->workDir . '/noisy.php']);
+
+        $this->assertSame(0, $exitCode);
+        $this->assertIsArray(json_decode($stdout, true), 'stdout must stay a JSON report');
+        $this->assertStringContainsString('debug', $stderr);
+    }
 }

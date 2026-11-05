@@ -48,14 +48,15 @@ For each issue whose `suggestion.kind` is `rewrite`, or whose type is fixed by r
 $SQ compare --before=<dir>/<file> --after-sql="<rewritten SQL>" --params=<params>
 ```
 
-- Exit 0, `equivalent: true`, `both_empty: false`: replace the file's statement. Report
-  `cost_change_percent` and `issues.resolved`.
+- Exit 0, `equivalent: true`, `both_empty: false`, and `same_order: true` when the statement has an
+  ORDER BY: replace the file's statement. Report `cost_change_percent` and `issues.resolved`.
 - `both_empty: true`: the parameters return no rows, so the check proves nothing. Pick parameters that
   return rows (`--before-params` / `--after-params` take a JSON object) and compare again.
 - Exit 1: the rows differ. Do not apply it; try another rewrite or list it for manual review.
-- `same_order: false` matters only when the statement has an ORDER BY.
+- `same_order: false` on a statement with an ORDER BY: the rows come back in another order. Do not
+  apply it; list it for manual review. Without an ORDER BY the order is not part of the result.
 
-A rewrite that only reorders rows, changes column names, or depends on `NOW()` / `RAND()` cannot pass;
+A rewrite that changes column names, or a statement that depends on `NOW()` / `RAND()`, cannot pass;
 list it for manual review instead.
 
 ### 2. Indexes

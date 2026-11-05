@@ -29,4 +29,9 @@ final class SchemaReaderTest extends TestCase
     {
         $this->assertSame($expected, SchemaReader::tableNames($sql));
     }
+
+    public function testADoubleDashInsideALiteralIsNotAComment(): void
+    {
+        $this->assertSame(['posts', 'comments'], SchemaReader::tableNames("SELECT * FROM posts p WHERE p.title = 'a -- b' AND EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id)"));
+    }
 }

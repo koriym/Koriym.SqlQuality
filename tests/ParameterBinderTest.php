@@ -10,6 +10,8 @@ use Koriym\SqlQuality\Exception\UnboundParameter;
 use PDO;
 use PHPUnit\Framework\TestCase;
 
+use function str_repeat;
+
 final class ParameterBinderTest extends TestCase
 {
     private ParameterBinder $binder;
@@ -88,9 +90,33 @@ final class ParameterBinderTest extends TestCase
         $this->assertSame("SELECT 'it\\'s 1', :id", $this->binder->bind("SELECT 'it\\'s :id', :id", ['id' => 1], new QuoteRules(backslashEscapes: false)));
     }
 
-    public function testAVersionedCommentIsScannedAsCode(): void
+    public function testAPlaceholderInsideAVersionedCommentIsRefused(): void
     {
-        $this->assertSame('SELECT /*!80000 1, */ 2', $this->binder->bind('SELECT /*!80000 :a, */ 2', ['a' => 1]));
+        // a server older than 99999 skips the body to the first */ regardless of quotes, so the quoted
+        // value would end the comment and the rest of it would run as SQL
+        $this->assertSame(['x'], ParameterBinder::placeholders('SELECT /*!99999 :x */ 1'));
+        $this->expectException(InvalidParameterValue::class);
+        $this->expectExceptionMessage('versioned comment');
+
+        $this->binder->bind('SELECT /*!99999 :x */ 1', ['x' => '*/ 1; SET @v = 42; -- ']);
+    }
+
+    public function testCodeInsideAVersionedCommentWithoutPlaceholdersIsKept(): void
+    {
+        $this->assertSame('SELECT /*!80000 1, */ 2 WHERE a = 3', $this->binder->bind('SELECT /*!80000 1, */ 2 WHERE a = :a', ['a' => 3]));
+    }
+
+    public function testAMegabyteLiteralOrCommentIsKeptWhole(): void
+    {
+        $literal = str_repeat('x', 1_000_000);
+        $sql = "SELECT '{$literal}' AS a /* " . $literal . ' */ WHERE id = :id';
+
+        $this->assertSame("SELECT '{$literal}' AS a /* " . $literal . ' */ WHERE id = 1', $this->binder->bind($sql, ['id' => 1]));
+    }
+
+    public function testADoubleDashFollowedByAnyControlCharacterStartsAComment(): void
+    {
+        $this->assertSame("SELECT 1 --\f:x\nWHERE a = 2", $this->binder->bind("SELECT 1 --\f:x\nWHERE a = :a", ['a' => 2]));
     }
 
     /** @return iterable<string, array{mixed}> */
@@ -108,5 +134,10 @@ final class ParameterBinderTest extends TestCase
         $this->expectExceptionMessage('ids:');
 
         $this->binder->bind('SELECT * FROM t WHERE id IN (:ids)', ['ids' => $value]);
+    }
+
+    public function testAParameterTheStatementDoesNotUseIsIgnored(): void
+    {
+        $this->assertSame('SELECT 1', $this->binder->bind('SELECT :a', ['a' => 1, 'unused' => [], 'other' => ['k' => 'v']]));
     }
 }
