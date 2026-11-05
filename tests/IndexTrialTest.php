@@ -11,6 +11,10 @@ use Koriym\SqlQuality\Exception\UnboundParameter;
 use PDOException;
 use PHPUnit\Framework\TestCase;
 
+use function array_filter;
+use function array_values;
+use function preg_match;
+
 final class IndexTrialTest extends MySqlTestCase
 {
     public function testUsesIndexFindsTheKeyAloneOrInAnIndexMerge(): void
@@ -38,12 +42,15 @@ final class IndexTrialTest extends MySqlTestCase
 
     public function testAnUnboundParameterFailsBeforeTheIndexIsAdded(): void
     {
-        $pdo = $this->connect();
+        $this->connect();
+        $pdo = new RecordingPdo($this->connectionSettings());
 
         try {
             (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > :min', [], IndexDefinition::parse('posts(view_count)'));
             $this->fail('UnboundParameter expected');
         } catch (UnboundParameter) {
+            $ddl = array_filter($pdo->statements, static fn (string $statement): bool => preg_match('/^\s*(ALTER|CREATE|DROP)\b/i', $statement) === 1);
+            $this->assertSame([], array_values($ddl), 'no DDL may run before the parameters bind');
             $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'sqlq_trial_posts_view_count'")->fetchColumn());
         }
     }
