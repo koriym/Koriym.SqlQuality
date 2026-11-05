@@ -1,67 +1,70 @@
 ---
 name: sql-quality-check
-description: Analyze SQL files for performance issues like full table scans, ineffective joins, and inefficient queries. Reports findings in a CI-friendly format without modifying files. Detects critical issues (FullTableScan, IneffectiveJoin) and warnings (IneffectiveSort, TemporaryTableGrouping).
+description: Check SQL files for MySQL performance problems (full table scans, ineffective joins, filesorts, functions on indexed columns, implicit conversions and more) and report them, CI style, without changing anything. Use when asked to check, lint or review the SQL of a project, or to gate a change on new SQL problems.
 ---
 
 # SQL Quality Check
 
-Analyze SQL files for performance issues. Suitable for CI pipelines.
+Report the performance problems of a directory of SQL files. Read-only: change no file and no schema.
 
 ## Arguments
-- `$ARGUMENTS`: SQL directory and params file (e.g., "tests/sql tests/params/sql_params.php")
+
+`$ARGUMENTS`: the SQL directory, then optionally the params file and a baseline report.
+
+- `sql/`
+- `sql/ sql/params.php`
+- `sql/ sql/params.php build/sql-quality/baseline.json`
 
 ## Steps
 
-### 1. Run Analysis
+### 1. Find the command
 
 ```bash
-php bin/sql-quality analyze \
-  --sql-dir="$(echo $ARGUMENTS | cut -d' ' -f1)" \
-  --params="$(echo $ARGUMENTS | cut -d' ' -f2)" \
-  --format=json \
-  --fail-on=critical
+SQ=vendor/bin/sql-quality; [ -x "$SQ" ] || SQ=bin/sql-quality
 ```
 
-Keep the exit status. stdout is the JSON report and nothing else.
+The connection comes from `SQL_QUALITY_DSN`, `SQL_QUALITY_USER` and `SQL_QUALITY_PASSWORD`
+(default `mysql:host=127.0.0.1;dbname=test`, `root`, empty). Prefer the environment variables
+to `--password` so the password does not land in the transcript.
 
-### 2. Report Results
+### 2. Run the analysis
 
-Parse the JSON. Severity comes from the report: `queries[].issues[].severity`
-for each issue, `summary.issues_by_severity` for the totals. Do not classify
-issue types yourself.
+```bash
+$SQ analyze --sql-dir=<dir> [--params=<params file>] [--baseline=<baseline>] --fail-on=critical > build/sql-quality/report.json
+```
 
-**Summary Table:**
-| SQL File | Cost | Issues |
-|----------|------|--------|
-| file.sql | 497.95 | FullTableScan (Critical), IneffectiveSort (Warning) |
+Keep the exit status: 0 nothing reached the level, 1 something did, 2 the run failed (stderr says why;
+stop there). stdout is the JSON report and nothing else; its shape is `schema/analyze-report.schema.json`.
 
-**Skipped files:**
+Every `*.sql` file of the directory is analyzed. A file the params file does not cover runs without
+parameters; if it has placeholders it lands in `skipped` as `UnboundParameter: name, ...`. Run
+`/sql-params-generate` for those.
 
-List every entry of `skipped` with its reason. They were not analyzed.
+With a baseline, `--fail-on` counts only `baseline.new`: known problems do not fail the run.
 
-### 3. Exit Status for CI
+### 3. Report
 
-Report the status the CLI returned:
+Take severity, ids and suggestions from the report; do not classify issues yourself.
 
-- **Exit 0**: no issue reached the `--fail-on` level
-- **Exit 1**: an issue reached the `--fail-on` level
-- **Exit 2**: usage, connection or params file error
-
-Report format for CI:
 ```
 SQL Quality Check: FAILED (exit 1)
-- Critical: 2, Warning: 6, Info: 2
+Critical 2 · Warning 6 · Info 2 · analyzed 30 · skipped 2
 
-Critical:
-  1_full_table_scan.sql: FullTableScan (cost: 497.95)
-  4_no_index_on_join.sql: IneffectiveJoin (cost: 234.50)
+Critical
+  1_full_table_scan.sql   FullTableScan@posts            index: CREATE INDEX idx_posts_view_count ON posts (view_count)
+  26_join_without_index.sql IneffectiveJoin@o            index: ...
 
-Skipped:
-  14_not_found.sql: SQL file not found: tests/sql/14_not_found.sql
+Hidden by the optimizer (optimizer_impact.hidden_issues)
+  11_nested_loop.sql      FullTableScan@posts
 
-Run '/sql-quality-fix' to auto-fix these issues.
+Skipped
+  16_listed_num_parameters.sql  UnboundParameter: listed_params
 ```
 
-### 4. Output
+With a baseline, lead with `baseline.new` and `baseline.resolved`, and list `baseline.unverified`
+files: they were not analyzed this time, so their issues are neither fixed nor known to persist.
 
-DO NOT modify any files. Only report findings.
+`optimizer_impact.hidden_issues` are problems the optimizer currently works around; they can come
+back when statistics or data volume change. Report them, below the issues of the default plan.
+
+Suggest `/sql-quality-fix` when there is something to fix.

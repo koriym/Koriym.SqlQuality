@@ -7,6 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+Rebuilt for coding agents and CI: the tool measures and verifies, the caller writes the prose.
+
+### Added
+- `sql-quality compare`: runs an original and a rewritten SELECT in a read-only session and reports whether they return the same rows (`equivalent`, `same_order`, `same_columns`, `both_empty`, row counts and checksums), with the change in cost, time and issues. Exit 1 when not equivalent
+- `sql-quality try-index`: adds a candidate index `INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE`, measures the statement with `use_invisible_indexes=on` in its own session, and drops the index; `--keep` keeps an effective one, visible. Reports `used` and `effective` (`--min-improvement`, default 5%). Exit 1 when not effective. MySQL 8.0+
+- `sql-quality analyze --baseline=FILE`: `baseline.new`, `resolved`, `persisting` and `unverified` against an earlier report; `--fail-on` then counts only the new issues
+- `sql-quality explain --sql=SQL` and `--sql-file=-` (stdin); `--detail=full` for the EXPLAIN, schema and optimizer trace
+- Issue `id`: type and location (`FullTableScan@posts`, `FunctionInvalidatesIndex@posts.created_at`, `#2` for a repeat), stable across runs
+- `optimizer_impact.cost_without_optimizer` and `optimizer_impact.hidden_issues`, the ids of issues only the no-optimizer plan has
+- `summary.total_cost` in the `analyze` report
+- `.json` params files, for `analyze` and the other commands
+- `SQL_QUALITY_DSN`, `SQL_QUALITY_USER` and `SQL_QUALITY_PASSWORD` for the connection
+- `UnboundParameter` naming the placeholders no parameter was given for, and `EmptyListParameter`
+- `SqlFileAnalyzer::analyzeDirectory()`, `analyzeSql()`, `explainSql()`, `sqlFiles()` and `hiddenIssues()`; `SchemaReader`, `ParameterBinder`, `RewriteComparator`, `ResultFingerprint`, `IndexTrial`, `IndexDefinition`, `Baseline` and `Cli`
+- `schema/compare-report.schema.json` and `schema/try-index-report.schema.json`
+- `.claude/settings.json` enabling the bundled plugin in this repository
+
+### Changed
+- `analyze` covers every `*.sql` file of `--sql-dir`, not only the files the params file names; `--params` is optional
+- `explain` prints a summary by default; `context` needs `--detail=full`
+- An unknown option is a usage error (exit 2) instead of being ignored
+- `SqlFileAnalyzer`'s constructor is `(PDO, ExplainAnalyzer = new ExplainAnalyzer(), string $sqlDir = '.', ?OptimizerSettingsInterface)`
+- The analysis result carries `without_optimizer` (`cost`, `issues`) instead of `optimizer_comparison`; `execution_time` is `null` for a statement that was not run
+- The no-optimizer pass is no longer timed, which halves the queries each analysis runs
+- `ExplainAnalyzer::MESSAGES` replaces `DEFAULT_MESSAGES`; `ExplainAnalyzer::queryCost()` replaces `calculateQueryCost()`
+- Placeholders are replaced only as whole names (`:id` no longer matches the start of `:id2`), and a value containing `$1` is inserted as is
+- The skills use `vendor/bin/sql-quality`, and `sql-quality-fix` applies only rewrites `compare` proves equivalent and recommends only indexes `try-index` proves effective; it no longer runs DDL itself
+- The CLI lives in `src/Cli.php`; `--version` prints the package version
+
+### Removed
+- `AIQueryAdvisor` and the per-query prompt files: the agent reading the JSON is the AI
+- `--format=markdown`, `--output`, `MarkdownSummaryReportGenerator`, `QueryStatisticsCalculator`, `StatisticalQueryLevelClassifier` and their interfaces
+- `--lang` and custom messages for `ExplainAnalyzer`; `UnknownMessageKey`
+- `ExplainParser`, `ExplainTreeVisualizer`, `ExplainExplainer`, `TreeVisualizer` and `TreeNode`
+- `SqlFileAnalyzer::analyzeSqlDirectory()`, `saveReports()` and `generateSummaryReport()`
+- `mode` in the reports and `detector` on issues
+- `.claude/commands/`, duplicates of the skills
+- `demo/`
+
 ## [0.4.0] - 2026-10-16
 
 ### Added

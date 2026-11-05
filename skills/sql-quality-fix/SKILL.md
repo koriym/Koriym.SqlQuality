@@ -1,155 +1,102 @@
 ---
 name: sql-quality-fix
-description: Automatically fix SQL performance issues with step-by-step measurement. Rewrites problematic SQL patterns (functions on columns, implicit conversions), creates indexes, measures their impact, and rolls back ineffective indexes. Reports improvements at each step with cost reduction percentages.
+description: Fix MySQL performance problems in SQL files and prove each fix - rewrites are checked to return the same rows, indexes are measured as invisible indexes before anyone adds them. Use when asked to fix, optimize or speed up the SQL of a project.
 ---
 
 # SQL Quality Fix
 
-Automatically fix SQL performance issues with step-by-step measurement.
+Fix the problems `sql-quality analyze` reports, one at a time, and keep only fixes the tool has verified.
 
 ## Arguments
-- `$ARGUMENTS`: SQL directory and params file
-  - Example: "tests/sql tests/params/sql_params.php"
-  - With flag: "tests/sql tests/params/sql_params.php --no-index"
 
-## Options
-- `--no-index`: Skip index creation, only suggest DDL
+`$ARGUMENTS`: the SQL directory, optionally the params file, and options.
+
+- `sql/ sql/params.php`
+- `sql/ sql/params.php --keep-indexes`
+
+`--keep-indexes`: keep the indexes `try-index` finds effective, in the database. Without it no index
+is left behind; the effective ones are reported as DDL for a migration.
+
+## Ground rules
+
+- A rewrite is kept only when `compare` says `equivalent: true` with `both_empty: false`.
+- An index is recommended only when `try-index` says `effective: true`.
+- Never run `CREATE INDEX`, `DROP INDEX` or any other DDL yourself; `try-index` adds the trial index
+  INVISIBLE, so no other session's plan changes, and drops it again.
+- Work on a development database. `try-index` builds a real index: it reads the whole table.
 
 ## Steps
 
-### Step 0: Initial Analysis
+### 0. Baseline
 
 ```bash
-php bin/sql-quality analyze \
-  --sql-dir="$(echo $ARGUMENTS | cut -d' ' -f1)" \
-  --params="$(echo $ARGUMENTS | cut -d' ' -f2)" \
-  --format=json
+SQ=vendor/bin/sql-quality; [ -x "$SQ" ] || SQ=bin/sql-quality
+mkdir -p build/sql-quality
+$SQ analyze --sql-dir=<dir> --params=<params> > build/sql-quality/baseline.json
 ```
 
-Exit 2 means the run failed (usage, connection or params file) — stop there.
+Exit 2: stop and report stderr. Files in `skipped` with `UnboundParameter` need parameters first
+(`/sql-params-generate`).
 
-Total cost is the sum of `queries[].cost`; the report itself carries only
-`summary.avg_cost`. Files in `skipped` have no cost and stay out of every
-total, so each step compares the same set of queries. Record as baseline,
-including the set of analyzed file names (the keys of `queries`). If a later
-step's analyzed file names differ from the baseline — for example because a
-fix made a query become `skipped` — the comparison is invalid: stop and
-report instead of computing an improvement, since a query dropping out would
-fake one.
+### 1. Rewrites
 
-### Step 1: Fix SQL Files
+For each issue whose `suggestion.kind` is `rewrite`, or whose type is fixed by rewriting
+(`FunctionInvalidatesIndex`, `ImplicitTypeConversion`, `OrderByRand`, `DeepOffset`, `UnnecessaryDistinct`,
+`IneffectiveUnion`, `DependentSubquery`), write the rewritten statement and check it:
 
-Apply SQL fixes:
-
-| Issue | Fix |
-|-------|-----|
-| FullTableScan | Add WHERE with indexed columns |
-| FunctionInvalidatesIndex | Rewrite: `YEAR(col)=2024` → `col >= '2024-01-01'` |
-| IneffectiveLikePattern | Use prefix match if possible |
-| IneffectiveJoin | Reorder JOINs, use explicit syntax |
-
-**Re-analyze and record SQL fix impact.**
-
-### Step 2: Create Indexes (one by one)
-
-For each suggested index:
-
-1. **Create index**
-   ```sql
-   CREATE INDEX idx_name ON table(columns);
-   ```
-
-2. **Re-analyze the target file only**
-   ```bash
-   php bin/sql-quality explain \
-     --sql-file="$(echo $ARGUMENTS | cut -d' ' -f1)/<file>" \
-     --params="$(echo $ARGUMENTS | cut -d' ' -f2)"
-   ```
-
-3. **Evaluate impact**
-   - Compare `cost` against the file's cost before this index, and check
-     whether the table node under `context.explain.query_block.table` (or
-     `nested_loop[*].table`)'s `access_type` / `key` now show the new
-     index being used
-   - Cost improved ≥ 5% → Keep index
-   - Cost not improved → Rollback
-     ```sql
-     DROP INDEX idx_name ON table;
-     ```
-     Record as "ineffective, rolled back"
-
-Once every candidate index has been tried, re-run Step 0's `analyze` over the
-whole directory once to get the final `total_cost` for Step 3.
-
-### Step 3: Generate Report
-
-Save to `build/sql-quality/fix-result.json`:
-
-```json
-{
-  "executed_at": "2024-01-15T10:30:00",
-  "steps": [
-    {
-      "step": "initial",
-      "total_cost": 650.00
-    },
-    {
-      "step": "sql_fix",
-      "total_cost": 450.00,
-      "improvement": "-30.8%",
-      "changes": [
-        {"file": "1_full_table_scan.sql", "change": "Added WHERE user_id = :user_id"}
-      ]
-    },
-    {
-      "step": "index",
-      "total_cost": 57.30,
-      "improvement": "-87.3%",
-      "indexes_created": [
-        {"ddl": "CREATE INDEX idx_posts_user_id ON posts(user_id)", "impact": "-60%"}
-      ],
-      "indexes_rolled_back": [
-        {"ddl": "CREATE INDEX idx_posts_title ON posts(title)", "reason": "no improvement"}
-      ]
-    }
-  ],
-  "final": {
-    "total_cost": 57.30,
-    "total_improvement": "-91.2%"
-  },
-  "manual_review_needed": []
-}
+```bash
+$SQ compare --before=<dir>/<file> --after-sql="<rewritten SQL>" --params=<params>
 ```
 
-Write `build/sql-quality/fix-report.md` from that JSON yourself, in the shape
-of the summary below. The CLI has no report command.
+- Exit 0, `equivalent: true`, `both_empty: false`: replace the file's statement. Report
+  `cost_change_percent` and `issues.resolved`.
+- `both_empty: true`: the parameters return no rows, so the check proves nothing. Pick parameters that
+  return rows (`--before-params` / `--after-params` take a JSON object) and compare again.
+- Exit 1: the rows differ. Do not apply it; try another rewrite or list it for manual review.
+- `same_order: false` matters only when the statement has an ORDER BY.
 
-### Output Summary
+A rewrite that only reorders rows, changes column names, or depends on `NOW()` / `RAND()` cannot pass;
+list it for manual review instead.
+
+### 2. Indexes
+
+For each issue with `suggestion.kind` `index`, try its `suggestion.ddl` against the file:
+
+```bash
+$SQ try-index --sql-file=<dir>/<file> --params=<params> --index="<suggestion.ddl>" [--keep]
+```
+
+Pass `--keep` only with `--keep-indexes`. Exit 0 is effective (the plan uses the index and the cost
+fell at least 5%), exit 1 is not. Record `index.ddl`, `cost_change_percent` and `issues.resolved`
+either way. Two suggestions for the same table: try the composite one first.
+
+### 3. Verify
+
+```bash
+$SQ analyze --sql-dir=<dir> --params=<params> --baseline=build/sql-quality/baseline.json > build/sql-quality/after.json
+```
+
+`baseline.new` must be empty; if a rewrite introduced an issue, revert it. `baseline.unverified` lists
+files that no longer analyze; revert the change that caused it.
+
+### 4. Report
+
+Write `build/sql-quality/fix-report.md`:
 
 ```
-SQL Quality Fix: Complete
+SQL Quality Fix
 
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-Step-by-Step Improvement
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-| Step      | Cost   | Change |
-|-----------|--------|--------|
-| Initial   | 650.00 | -      |
-| SQL Fix   | 450.00 | -30.8% |
-| Index     | 57.30  | -87.3% |
-| **Final** | **57.30** | **-91.2%** |
+Total cost 441706 → 120330 (-72.8%) · issues 47 → 21 · new 0
 
-SQL Changes:
-  ✓ 1_full_table_scan.sql: Added WHERE clause
+Rewrites (verified equivalent)
+  3_function_on_indexed_column.sql  DATE(created_at) = :d → range   resolved FunctionInvalidatesIndex@posts.created_at
 
-Indexes Created:
-  ✓ idx_posts_user_id (-60% cost)
+Indexes (effective, as invisible indexes)
+  CREATE INDEX `idx_posts_view_count` ON `posts` (`view_count`)   -95.8%   kept: no
 
-Indexes Rolled Back (ineffective):
-  ✗ idx_posts_title (no improvement)
-
-Manual Review:
-  (none)
-
-Report: build/sql-quality/fix-report.md
+Not applied
+  30_order_by_rand.sql  OrderByRand@posts  rewrite changes the result (random order); review by hand
+  CREATE INDEX ... ON comments (content)   not used by the plan
 ```
+
+Take every number from the tool's output; do not estimate.

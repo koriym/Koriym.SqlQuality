@@ -249,8 +249,9 @@ USAGE;
         [$beforeFile, $beforeSql] = $this->statement($options, 'before', 'before-sql');
         [$afterFile, $afterSql] = $this->statement($options, 'after', 'after-sql');
         $shared = $this->stringOption($options, 'params');
-        $beforeParams = $this->params($this->stringOption($options, 'before-params') ?? $shared, $beforeFile);
-        $afterParams = $this->params($this->stringOption($options, 'after-params') ?? $shared, $afterFile);
+        // a rewrite given inline takes the params-file entry of the file it rewrites
+        $beforeParams = $this->params($this->stringOption($options, 'before-params') ?? $shared, $beforeFile ?? $afterFile);
+        $afterParams = $this->params($this->stringOption($options, 'after-params') ?? $shared, $afterFile ?? $beforeFile);
         $pdo = $this->connect($options);
         $analyzer = new SqlFileAnalyzer($pdo);
 

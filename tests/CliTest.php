@@ -355,6 +355,23 @@ final class CliTest extends MySqlTestCase
         $this->assertContains('FunctionInvalidatesIndex@posts.created_at', $report['issues']['resolved']);
     }
 
+    public function testCompareGivesAnInlineRewriteTheParamsEntryOfTheFileItRewrites(): void
+    {
+        $this->connect();
+        file_put_contents($this->workDir . '/keyed.php', "<?php\nreturn ['3_function_on_indexed_column.sql' => ['target_date' => '2026-06-07']];\n");
+
+        [$exitCode, $stdout, $stderr] = $this->runCli([
+            'compare',
+            '--before=' . __DIR__ . '/sql/3_function_on_indexed_column.sql',
+            '--after-sql=SELECT * FROM posts WHERE created_at >= :target_date AND created_at < :target_date + INTERVAL 1 DAY',
+            '--params=' . $this->workDir . '/keyed.php',
+        ]);
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+        $this->assertTrue(json_decode($stdout, true)['equivalent']);
+    }
+
     public function testCompareExitsWithOneWhenTheRowsDiffer(): void
     {
         $this->connect();
