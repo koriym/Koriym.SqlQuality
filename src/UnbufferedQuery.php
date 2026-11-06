@@ -25,9 +25,9 @@ final class UnbufferedQuery
     public static function each(PDO $pdo, string $sql, callable $row, callable|null $statement = null): void
     {
         $isMysql = $pdo->getAttribute(PDO::ATTR_DRIVER_NAME) === 'mysql';
-        $buffered = $isMysql ? (bool) $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY) : false;
+        $buffered = $isMysql ? (bool) $pdo->getAttribute(MysqlAttribute::useBufferedQuery()) : false;
         if ($buffered) {
-            $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, false);
+            $pdo->setAttribute(MysqlAttribute::useBufferedQuery(), false);
         }
 
         try {
@@ -51,7 +51,7 @@ final class UnbufferedQuery
             }
         } finally {
             if ($buffered) {
-                $pdo->setAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY, true);
+                $pdo->setAttribute(MysqlAttribute::useBufferedQuery(), true);
             }
         }
     }

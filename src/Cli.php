@@ -611,7 +611,7 @@ USAGE;
             $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
             if (str_starts_with($dsn, 'mysql:')) {
                 // one statement per call: a value that ever escaped its literal could not start a second one
-                $options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = false;
+                $options[MysqlAttribute::multiStatements()] = false;
             }
 
             $pdo = new PDO($dsn, $user, $password, $options);
