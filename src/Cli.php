@@ -7,6 +7,7 @@ namespace Koriym\SqlQuality;
 use Closure;
 use JsonException;
 use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
+use Koriym\SqlQuality\Exception\LogicException;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use Koriym\SqlQuality\Exception\UsageError;
 use PDO;
@@ -168,7 +169,8 @@ USAGE;
             return $this->fail($e->getMessage());
         } catch (PDOException $e) {
             return $this->fail('PDOException: ' . $e->getMessage());
-        } catch (RuntimeException $e) {
+        } catch (RuntimeException | LogicException $e) {
+            // LogicException: a refused precondition such as ActiveTransactionRejected; still exit 2, not 255
             return $this->fail(SqlFileAnalyzer::exceptionLabel($e) . ': ' . $e->getMessage());
         }
     }
@@ -606,13 +608,20 @@ USAGE;
         $password = $this->stringOption($options, 'password') ?? self::env('SQL_QUALITY_PASSWORD') ?? '';
 
         try {
-            // one statement per call: a value that ever escaped its literal could not start a second one
             $options = [PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION];
             if (str_starts_with($dsn, 'mysql:')) {
+                // one statement per call: a value that ever escaped its literal could not start a second one
                 $options[PDO::MYSQL_ATTR_MULTI_STATEMENTS] = false;
             }
 
-            return new PDO($dsn, $user, $password, $options);
+            $pdo = new PDO($dsn, $user, $password, $options);
+            if (str_starts_with($dsn, 'mysql:')) {
+                // a server with autocommit=0 opens a transaction at the first statement, which the read-only
+                // session and the index trial refuse to run inside; PDO assumes autocommit and never sets it
+                $pdo->exec('SET SESSION autocommit = 1');
+            }
+
+            return $pdo;
         } catch (PDOException $e) {
             throw new UsageError("Database connection failed: {$e->getMessage()}");
         }

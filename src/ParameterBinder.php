@@ -19,6 +19,7 @@ use function array_values;
 use function implode;
 use function is_array;
 use function is_bool;
+use function is_finite;
 use function is_float;
 use function is_int;
 use function is_string;
@@ -233,7 +234,10 @@ final class ParameterBinder
         return match (true) {
             $value === null => 'NULL',
             is_bool($value) => $value ? '1' : '0',
-            is_int($value), is_float($value) => var_export($value, true),
+            is_int($value) => (string) $value,
+            // INF and NAN have no SQL literal; var_export() would write the bare word INF, read as a column name
+            is_float($value) && ! is_finite($value) => throw new InvalidParameterValue("{$name}: a float parameter must be finite, not " . var_export($value, true)),
+            is_float($value) => var_export($value, true),
             is_string($value) => $this->pdo->quote($value),
             default => throw new InvalidParameterValue("{$name}: a list item must be a scalar, not a nested list or object"),
         };

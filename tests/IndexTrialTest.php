@@ -10,6 +10,7 @@ use Koriym\SqlQuality\Exception\InvisibleIndexesPresent;
 use Koriym\SqlQuality\Exception\UnboundParameter;
 use PDOException;
 use PHPUnit\Framework\TestCase;
+use RuntimeException;
 
 use function array_filter;
 use function array_values;
@@ -195,5 +196,43 @@ final class IndexTrialTest extends MySqlTestCase
         $this->assertTrue(IndexTrial::isEffective($before, $after, true, 5.0));
         $this->assertFalse(IndexTrial::isEffective($before, FakeAnalysisRun::result(95.01), true, 5.0));
         $this->assertFalse(IndexTrial::isEffective($before, $after, false, 5.0));
+    }
+
+    public function testAnIndexAnotherConnectionAddedMeanwhileIsNotDropped(): void
+    {
+        $other = $this->connect();
+        // between the absence check and this trial's ALTER, another connection adds an index of the same name
+        $pdo = new HookedPdo($this->connectionSettings(), 'ALTER TABLE `posts` ADD INDEX', static function () use ($other): void {
+            $other->exec('ALTER TABLE posts ADD INDEX sqlq_trial_posts_view_count (view_count)');
+        });
+
+        try {
+            (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > 9900', [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('the ALTER must fail with a duplicate key name');
+        } catch (PDOException $e) {
+            $this->assertStringContainsString('Duplicate key name', $e->getMessage());
+            $this->assertSame('YES', $other->query("SELECT IS_VISIBLE FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'sqlq_trial_posts_view_count'")->fetchColumn(), "the other connection's index must survive");
+        } finally {
+            $other->exec('DROP INDEX sqlq_trial_posts_view_count ON posts');
+        }
+    }
+
+    public function testAFailureRightAfterTheFirstSessionChangeStillRestoresTheSession(): void
+    {
+        // stands in for a signal delivered just after SET SESSION lock_wait_timeout returns
+        $pdo = new HookedPdo($this->connectionSettings(), 'SET SESSION lock_wait_timeout = 10', static function (): void {
+            throw new RuntimeException('interrupted');
+        }, after: true);
+        $pdo->exec('SET SESSION lock_wait_timeout = 600');
+
+        try {
+            (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > 9900', [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('the injected failure must propagate');
+        } catch (RuntimeException $e) {
+            $this->assertSame('interrupted', $e->getMessage());
+        }
+
+        $this->assertSame(600, (int) $pdo->query('SELECT @@session.lock_wait_timeout')->fetchColumn());
+        $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'sqlq_trial_posts_view_count'")->fetchColumn());
     }
 }

@@ -94,18 +94,18 @@ final class IndexTrial
         $before = $this->analyzer->analyzeSql($sql, $params);
         $savedSwitch = $this->sessionVariable('optimizer_switch');
         $savedLockWait = $this->sessionVariable('lock_wait_timeout');
-        $this->exec('SET SESSION lock_wait_timeout = ' . $this->lockWaitTimeout);
 
         $original = null;
-        $attempted = false;
+        $added = false;
         $effective = false;
+        // the try starts before the first session change, so a signal after any statement still restores the session
         try {
+            $this->exec('SET SESSION lock_wait_timeout = ' . $this->lockWaitTimeout);
             if ($this->notice !== null) {
                 ($this->notice)("Adding INVISIBLE index {$index->table}.{$index->name}; if this run is interrupted, remove it with: {$index->dropStatement()}");
             }
 
-            $attempted = true;
-            $this->exec($index->addInvisibleStatement());
+            $this->addIndex($index, $added);
             $this->exec("SET SESSION optimizer_switch = 'use_invisible_indexes=on'");
             ['result' => $after, 'context' => $context] = $this->analyzer->explainSql($sql, $params);
             $used = self::usesIndex($after['explain_result'], $index->name, self::namesOf($index->table, $context->aliases()));
@@ -115,7 +115,7 @@ final class IndexTrial
 
             throw $e;
         } finally {
-            $this->cleanUp($index, $attempted, $savedSwitch, $savedLockWait, $keep && $effective, $original);
+            $this->cleanUp($index, $added, $savedSwitch, $savedLockWait, $keep && $effective, $original);
         }
 
         return [
@@ -274,12 +274,35 @@ final class IndexTrial
      *
      * @throws IndexCleanupFailed
      */
-    private function cleanUp(IndexDefinition $index, bool $attempted, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
+
+    /**
+     * Adds the trial index and reports that this run owns it. Signals are held from before the ALTER until
+     * ownership is recorded, so an interrupt cannot land between the server adding the index and this run
+     * knowing it did. A failed ALTER (1061 Duplicate key name: another connection made an index of that name
+     * meanwhile) throws, and the index, not this run's, is left alone. $added is set inside the held region,
+     * so a signal delivered when the mask lifts finds it already true.
+     *
+     * @param-out bool $added
+     */
+    private function addIndex(IndexDefinition $index, bool &$added): void
+    {
+        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM]);
+        try {
+            $this->exec($index->addInvisibleStatement());
+            $added = true;
+        } finally {
+            if ($masked) {
+                pcntl_sigprocmask(SIG_UNBLOCK, [SIGINT, SIGTERM]);
+            }
+        }
+    }
+
+    private function cleanUp(IndexDefinition $index, bool $added, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
     {
         // a SIGINT / SIGTERM turned into an exception must not cut the cleanup short; it is delivered afterwards
         $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM]);
         try {
-            $this->restoreAndRemove($index, $attempted, $savedSwitch, $savedLockWait, $keep, $original);
+            $this->restoreAndRemove($index, $added, $savedSwitch, $savedLockWait, $keep, $original);
         } finally {
             if ($masked) {
                 pcntl_sigprocmask(SIG_UNBLOCK, [SIGINT, SIGTERM]);
@@ -288,7 +311,7 @@ final class IndexTrial
     }
 
     /** @throws IndexCleanupFailed */
-    private function restoreAndRemove(IndexDefinition $index, bool $attempted, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
+    private function restoreAndRemove(IndexDefinition $index, bool $added, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
     {
         $sessionFailures = [];
         try {
@@ -297,16 +320,15 @@ final class IndexTrial
             $sessionFailures[] = 'optimizer_switch restore: ' . $e->getMessage();
         }
 
-        // whether the ALTER took effect is read from the server, not from how far the PHP code got:
-        // an exception (a signal, a lost reply) can land after the server added the index
+        // only an index this run added is touched: a same-named index another connection made is not ours
         $indexFailure = null;
         $statement = $keep ? $index->makeVisibleStatement() : $index->dropStatement();
         try {
-            if ($attempted && $this->indexExists($index)) {
+            if ($added) {
                 $this->exec($statement);
             }
         } catch (Throwable $e) {
-            $indexFailure = "check for the index and run by hand: {$statement}; " . $e->getMessage();
+            $indexFailure = "run by hand: {$statement}; " . $e->getMessage();
         }
 
         try {

@@ -12,6 +12,9 @@ use PHPUnit\Framework\TestCase;
 
 use function str_repeat;
 
+use const INF;
+use const NAN;
+
 final class ParameterBinderTest extends TestCase
 {
     private ParameterBinder $binder;
@@ -139,5 +142,22 @@ final class ParameterBinderTest extends TestCase
     public function testAParameterTheStatementDoesNotUseIsIgnored(): void
     {
         $this->assertSame('SELECT 1', $this->binder->bind('SELECT :a', ['a' => 1, 'unused' => [], 'other' => ['k' => 'v']]));
+    }
+
+    /** @return iterable<string, array{float}> */
+    public static function nonFiniteProvider(): iterable
+    {
+        yield 'INF' => [INF];
+        yield '-INF' => [-INF];
+        yield 'NAN' => [NAN];
+    }
+
+    /** @dataProvider nonFiniteProvider */
+    public function testANonFiniteFloatIsRejected(float $value): void
+    {
+        $this->expectException(InvalidParameterValue::class);
+        $this->expectExceptionMessage('finite');
+
+        $this->binder->bind('SELECT :v AS v', ['v' => $value]);
     }
 }

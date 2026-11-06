@@ -36,11 +36,13 @@ final class ResultFingerprintTest extends MySqlTestCase
         $this->assertFalse(ResultFingerprint::of($pdo, 'SELECT NULL AS a')->sameRowsAs(ResultFingerprint::of($pdo, "SELECT '' AS a")));
     }
 
-    public function testAValueFetchedAsANumberMatchesTheSameValueAsAString(): void
+    public function testAnIntegerAndTheSameDigitsAsAStringDiffer(): void
     {
         $pdo = $this->connect();
 
-        $this->assertTrue(ResultFingerprint::of($pdo, 'SELECT 5 AS a')->sameRowsAs(ResultFingerprint::of($pdo, "SELECT '5' AS a")));
+        // the application receives int 5 from one and string '5' from the other
+        $this->assertFalse(ResultFingerprint::of($pdo, 'SELECT 5 AS a')->sameRowsAs(ResultFingerprint::of($pdo, "SELECT '5' AS a")));
+        $this->assertTrue(ResultFingerprint::of($pdo, 'SELECT 5 AS a')->sameRowsAs(ResultFingerprint::of($pdo, 'SELECT 2 + 3 AS a')));
     }
 
     public function testDoublesThatDifferBeyondFourteenDigitsDiffer(): void
@@ -67,5 +69,18 @@ final class ResultFingerprintTest extends MySqlTestCase
         ResultFingerprint::of($pdo, 'SELECT id FROM users');
 
         $this->assertTrue((bool) $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY));
+    }
+
+    public function testMultiplicitiesThatDifferBy65536AreStillTold(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec('SET SESSION cte_max_recursion_depth = 200000');
+        $cte = 'WITH RECURSIVE cte(n) AS (SELECT 1 UNION ALL SELECT n + 1 FROM cte WHERE n < 131072) ';
+
+        $ones = ResultFingerprint::of($pdo, $cte . 'SELECT 1 AS a FROM cte');
+        $half = ResultFingerprint::of($pdo, $cte . 'SELECT IF(n <= 65536, 1, 2) AS a FROM cte');
+
+        $this->assertSame($ones->rowCount, $half->rowCount);
+        $this->assertFalse($ones->sameRowsAs($half));
     }
 }

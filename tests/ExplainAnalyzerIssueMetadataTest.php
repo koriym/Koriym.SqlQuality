@@ -7,6 +7,10 @@ namespace Koriym\SqlQuality;
 use PHPUnit\Framework\TestCase;
 
 use function array_column;
+use function array_filter;
+use function array_unique;
+use function array_values;
+use function str_starts_with;
 
 final class ExplainAnalyzerIssueMetadataTest extends TestCase
 {
@@ -102,5 +106,21 @@ final class ExplainAnalyzerIssueMetadataTest extends TestCase
 
         $this->assertEqualsWithDelta(1702.49, ExplainAnalyzer::queryCost($explain), 1e-9);
         $this->assertSame(1.0, ExplainAnalyzer::queryCost(['query_block' => ['select_id' => 1]]));
+    }
+
+    public function testANameContainingASeparatorCannotTakeAnotherPlacesId(): void
+    {
+        $scan = static fn (string $table): array => ['table' => ['table_name' => $table, 'access_type' => 'ALL', 'rows_examined_per_scan' => 1000]];
+        $issues = (new ExplainAnalyzer())->analyze(new QueryContext(
+            sql: '',
+            explain: ['query_block' => ['select_id' => 1, 'nested_loop' => [$scan('a'), $scan('a'), $scan('a#2'), $scan('a.b')]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: [],
+        ));
+
+        $ids = array_values(array_filter(array_column($issues, 'id'), static fn (string $id): bool => str_starts_with($id, 'FullTableScan')));
+        $this->assertSame(['FullTableScan@a', 'FullTableScan@a#2', 'FullTableScan@a\#2', 'FullTableScan@a\.b'], $ids);
+        $this->assertSame(array_unique(array_column($issues, 'id')), array_column($issues, 'id'));
     }
 }

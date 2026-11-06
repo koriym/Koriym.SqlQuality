@@ -28,6 +28,7 @@ use Koriym\SqlQuality\Detector\UnnecessaryDistinctDetector;
 use function is_array;
 use function is_numeric;
 use function is_string;
+use function strtr;
 
 /**
  * Runs every detector over a QueryContext.
@@ -109,7 +110,9 @@ final class ExplainAnalyzer
     /**
      * The id names the issue type and where it is: "FullTableScan@posts", "FunctionInvalidatesIndex@posts.created_at".
      * It does not carry row counts or costs, so it stays the same across runs while the problem persists.
-     * A second finding of the same type at the same place gets "#2", and so on.
+     * A second finding of the same type at the same place gets "#2", and so on. The separators @ . # and the
+     * escape \ are backslash-escaped inside a name, so a table called `a#2` or `a.b` cannot produce the id of
+     * another place; ordinary names are unchanged.
      *
      * @param WarningType $type
      */
@@ -121,8 +124,14 @@ final class ExplainAnalyzer
         }
 
         $column = $finding->evidence['column'] ?? null;
+        $place = self::escapeName($table);
 
-        return is_string($column) && $column !== '' ? "{$type}@{$table}.{$column}" : "{$type}@{$table}";
+        return is_string($column) && $column !== '' ? "{$type}@{$place}." . self::escapeName($column) : "{$type}@{$place}";
+    }
+
+    private static function escapeName(string $name): string
+    {
+        return strtr($name, ['\\' => '\\\\', '@' => '\\@', '.' => '\\.', '#' => '\\#']);
     }
 
     /**

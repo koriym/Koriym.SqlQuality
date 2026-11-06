@@ -519,4 +519,20 @@ final class CliTest extends MySqlTestCase
         $this->assertIsArray(json_decode($stdout, true), 'stdout must stay a JSON report');
         $this->assertStringContainsString('debug', $stderr);
     }
+
+    public function testAServerWithAutocommitOffStillAnalyzes(): void
+    {
+        $root = $this->connect();
+        $root->exec('SET GLOBAL autocommit = 0');
+
+        try {
+            [$exitCode, $stdout, $stderr] = $this->runCli(['explain', '--sql=SELECT 1 FROM posts']);
+        } finally {
+            $root->exec('SET GLOBAL autocommit = 1');
+        }
+
+        $this->assertSame('', $stderr);
+        $this->assertSame(0, $exitCode);
+        $this->assertTrue(json_decode($stdout, true)['executed']);
+    }
 }

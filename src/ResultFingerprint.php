@@ -16,7 +16,9 @@ use function hash_update;
 use function hexdec;
 use function implode;
 use function is_array;
+use function is_bool;
 use function is_float;
+use function is_int;
 use function is_string;
 use function sprintf;
 use function strlen;
@@ -24,8 +26,9 @@ use function substr;
 
 /**
  * Column names, row count and two checksums of a result set, computed while the rows stream past:
- * one over the rows in order, one over the multiset of rows regardless of order. Every non-NULL value
- * is compared as its string form, so the same value fetched as int or as string matches; a float keeps
+ * one over the rows in order, one over the multiset of rows regardless of order. Each value is encoded with
+ * the PHP type the driver returned it as (int, float, string, null), so a rewrite that turns an integer
+ * column into a string one is not equivalent: the application would receive another type. A float keeps
  * all 17 significant digits.
  */
 final class ResultFingerprint
@@ -44,8 +47,10 @@ final class ResultFingerprint
     {
         $columns = [];
         $ordered = hash_init('sha256');
-        // eight 16-bit lanes summed per row: a multiset hash that does not depend on row order, and whose
-        // sums stay within a 32-bit int
+        // eight 16-bit lanes of each row's hash, summed without any modulus: a multiset hash that does not
+        // depend on row order and keeps every multiplicity (a modulus would let N copies of a row cancel out).
+        // A sum past PHP_INT_MAX turns into a float, which stays exact up to 2^53, so ~1.3e11 rows.
+        /** @var list<int|float> $lanes */
         $lanes = [0, 0, 0, 0, 0, 0, 0, 0];
         $rowCount = 0;
         UnbufferedQuery::each(
@@ -56,7 +61,7 @@ final class ResultFingerprint
                 hash_update($ordered, $encoded);
                 $rowHash = hash('sha256', $encoded);
                 for ($lane = 0; $lane < 8; $lane++) {
-                    $lanes[$lane] = ($lanes[$lane] + (int) hexdec(substr($rowHash, $lane * 4, 4))) % 0x10000;
+                    $lanes[$lane] += (int) hexdec(substr($rowHash, $lane * 4, 4));
                 }
 
                 $rowCount++;
@@ -70,7 +75,7 @@ final class ResultFingerprint
             $columns,
             $rowCount,
             hash_final($ordered),
-            implode('', array_map(static fn (int $lane): string => sprintf('%04x', $lane), $lanes)),
+            implode('-', array_map(static fn (int|float $lane): string => sprintf('%.0f', $lane), $lanes)),
         );
     }
 
@@ -86,15 +91,17 @@ final class ResultFingerprint
                 return 'N;';
             }
 
-            // a float is written with 17 significant digits: (string) keeps only 14 (the precision ini),
-            // so 0.1e0 + 0.2e0 and 0.3e0 would encode alike
-            $string = match (true) {
-                is_string($value) => $value,
-                is_float($value) => sprintf('%.17g', $value),
-                default => (string) $value,
+            // the type tag keeps 5 and '5' apart; a float is written with 17 significant digits, since
+            // (string) keeps only 14 (the precision ini) and 0.1e0 + 0.2e0 and 0.3e0 would encode alike
+            [$tag, $string] = match (true) {
+                is_string($value) => ['S', $value],
+                is_int($value) => ['I', (string) $value],
+                is_float($value) => ['F', sprintf('%.17g', $value)],
+                is_bool($value) => ['B', $value ? '1' : '0'],
+                default => ['X', (string) $value],
             };
 
-            return 'S' . strlen($string) . ':' . $string;
+            return $tag . strlen($string) . ':' . $string;
         }, $row)) . "\n";
     }
 
