@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- `SchemaReader` keeps `$` in table names, so schema lookup and the invisible-index safety check cover the actual table
+- `IndexTrial` restores the caller's signal mask instead of unconditionally unblocking `SIGINT` and `SIGTERM`
+
 ## [0.5.0] - 2026-11-05
 
 Rebuilt for coding agents and CI: the tool measures and verifies, the caller writes the prose.

@@ -33,7 +33,7 @@ use function stripos;
 use function version_compare;
 
 use const SIG_BLOCK;
-use const SIG_UNBLOCK;
+use const SIG_SETMASK;
 use const SIGINT;
 use const SIGTERM;
 
@@ -268,14 +268,6 @@ final class IndexTrial
     }
 
     /**
-     * Restores the session and removes (or, with $keep, publishes) the index. A failure to remove the
-     * index is always reported, with the statement to run by hand; a failed session restore alone does
-     * not replace the measurement's own exception.
-     *
-     * @throws IndexCleanupFailed
-     */
-
-    /**
      * Adds the trial index and reports that this run owns it. Signals are held from before the ALTER until
      * ownership is recorded, so an interrupt cannot land between the server adding the index and this run
      * knowing it did. A failed ALTER (1061 Duplicate key name: another connection made an index of that name
@@ -286,26 +278,35 @@ final class IndexTrial
      */
     private function addIndex(IndexDefinition $index, bool &$added): void
     {
-        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM]);
+        $oldMask = [];
+        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM], $oldMask);
         try {
             $this->exec($index->addInvisibleStatement());
             $added = true;
         } finally {
             if ($masked) {
-                pcntl_sigprocmask(SIG_UNBLOCK, [SIGINT, SIGTERM]);
+                pcntl_sigprocmask(SIG_SETMASK, $oldMask);
             }
         }
     }
 
+    /**
+     * Restores the session and removes (or, with $keep, publishes) the index. A failure to remove the
+     * index is always reported, with the statement to run by hand; a failed session restore alone does
+     * not replace the measurement's own exception.
+     *
+     * @throws IndexCleanupFailed
+     */
     private function cleanUp(IndexDefinition $index, bool $added, string $savedSwitch, string $savedLockWait, bool $keep, Throwable|null $original): void
     {
         // a SIGINT / SIGTERM turned into an exception must not cut the cleanup short; it is delivered afterwards
-        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM]);
+        $oldMask = [];
+        $masked = function_exists('pcntl_sigprocmask') && pcntl_sigprocmask(SIG_BLOCK, [SIGINT, SIGTERM], $oldMask);
         try {
             $this->restoreAndRemove($index, $added, $savedSwitch, $savedLockWait, $keep, $original);
         } finally {
             if ($masked) {
-                pcntl_sigprocmask(SIG_UNBLOCK, [SIGINT, SIGTERM]);
+                pcntl_sigprocmask(SIG_SETMASK, $oldMask);
             }
         }
     }

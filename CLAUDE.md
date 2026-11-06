@@ -13,7 +13,7 @@ Koriym.SqlQuality is a MySQL query analyzer for coding agents and CI. It analyze
 composer test
 
 # Run a single test
-./vendor/bin/phpunit tests/ExplainExplainerTest.php
+./vendor/bin/phpunit tests/ExplainAnalyzerIssueMetadataTest.php
 ./vendor/bin/phpunit --filter testMethodName
 
 # Check coding standards

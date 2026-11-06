@@ -25,7 +25,7 @@ use function trim;
  */
 final class SchemaReader
 {
-    private const TABLE_LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?(?:\s*,\s*`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?)*)/i';
+    private const TABLE_LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(`?[\w$]+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?[\w$]+`?)?(?:\s*,\s*`?[\w$]+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?[\w$]+`?)?)*)/i';
 
     public function __construct(private readonly PDO $pdo)
     {
@@ -70,7 +70,7 @@ final class SchemaReader
      */
     public function forTable(string $tableName): array
     {
-        if (! preg_match('/^[a-zA-Z0-9_]+$/', $tableName)) {
+        if (! preg_match('/^[a-zA-Z0-9_$]+$/', $tableName)) {
             throw new RuntimeException('Invalid table name');
         }
 
