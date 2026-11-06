@@ -5,239 +5,197 @@
 
 [Japanese](README.ja.md)
 
-A powerful MySQL query analyzer that helps detect potential performance issues in SQL files and provides AI-powered optimization recommendations.
+MySQL query analysis for coding agents and CI. It measures, the agent decides.
 
-## Features
+A coding agent can propose a rewrite or an index, but it cannot tell by reading the SQL whether the
+rewrite returns the same rows, whether MySQL will use the index, or whether a problem is only hidden
+by the optimizer today. `sql-quality` answers those questions against a real database and prints JSON:
 
-- Detects common performance issues (full table scans, inefficient JOINs, etc.)
-- Provides AI-powered optimization recommendations
-- Supports multiple output languages
-- Generates detailed analysis reports in Markdown format
+- **analyze** / **explain**: `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE`, `SHOW WARNINGS`, the schema and the
+  optimizer trace go through 18 detectors. Every issue has a stable id, severity, evidence and, where
+  one applies, a suggested index or rewrite.
+- **compare**: runs the original and the rewritten SELECT and checks that they return the same rows.
+- **try-index**: adds a candidate index *invisible*, measures the statement with it in this session
+  only, and drops it.
+- **--baseline**: tells new issues from known ones, so CI fails only on what a change introduced.
+
+Each statement is also explained with the optimizer features turned off: `optimizer_impact.hidden_issues`
+lists the problems the optimizer currently works around, which can come back when statistics or data
+volume change.
 
 ## Requirements
 
-- PHP 8.1+
-- MySQL 5.7+ or MariaDB 10.2+
-- PDO MySQL extension
+- PHP 8.1+ with PDO MySQL
+- MySQL 8.0.18+ (`EXPLAIN ANALYZE`; `try-index` uses invisible indexes)
 
 ## Installation
 
 ```bash
-composer require koriym/sql-quality
+composer require --dev koriym/sql-quality
 ```
 
-## Usage
+## Commands
 
-```php
-<?php
+The connection is read from `SQL_QUALITY_DSN`, `SQL_QUALITY_USER` and `SQL_QUALITY_PASSWORD`, or from
+`--dsn`, `--user` and `--password` (default `mysql:host=127.0.0.1;dbname=test`, `root`, empty password).
+Prefer the environment variables: a password on the command line ends up in shell history and agent transcripts.
 
-namespace Koriym\SqlQuality;
+stdout carries the JSON report and nothing else; errors go to stderr.
 
-use PDO;
-use function dirname;
-
-require dirname(__DIR__) . '/vendor/autoload.php';
-
-$pdo = new PDO('mysql:host=127.0.0.1;dbname=test', 'root', '', [
-    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
-]);
-
-$sqlParams = require 'path/to/sql_params.php';
-
-//return [
-//    '1_full_table_scan.sql' => ['min_views' => 1000],
-//    '2_filesort.sql' => ['status' => 'published', 'limit' => 10]
-//];
-
-$analyzer = new SqlFileAnalyzer(
-    $pdo,
-    new ExplainAnalyzer(),
-    'path/to/sql_dir',
-    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
-);
-
-// Output to build/sql-quality
-$analyzer->analyzeSqlDirectory($sqlParams, __DIR__ . '/build/sql-quality');
-```
-
-## CLI Usage
+### analyze
 
 ```bash
-sql-quality analyze --sql-dir=sql/ --params=params.php --format=json
-sql-quality analyze --sql-dir=sql/ --params=params.php --format=markdown --output=build/sql-quality
-sql-quality analyze --sql-dir=sql/ --params=params.php --fail-on=critical
-sql-quality analyze --sql-dir=sql/ --params=params.php --dsn="mysql:host=localhost;dbname=mydb" --user=root --password=secret
-sql-quality analyze --sql-dir=sql/ --params=params.php --lang=ja
-sql-quality explain --sql-file=sql/1_full_table_scan.sql --params='{"min_views":1000}'
+vendor/bin/sql-quality analyze --sql-dir=sql/ --params=sql/params.json --fail-on=critical
 ```
 
-### Options
+Analyzes every `*.sql` file in the directory. `--params` maps a file name to its parameters
+(a `.json` file, or a PHP file returning the same array); a file without an entry runs without
+parameters, and one whose `:name` placeholders are not covered is listed in `skipped` as
+`UnboundParameter: name, ...`.
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--sql-dir=DIR` | Directory containing SQL files (required) | |
-| `--params=FILE` | PHP file returning SQL parameters array (required) | |
-| `--dsn=DSN` | Database DSN | `mysql:host=127.0.0.1;dbname=test` |
-| `--user=USER` | Database user | `root` |
-| `--password=PASS` | Database password | (empty) |
-| `--format=FORMAT` | Output format: `json` or `markdown` | `json` |
-| `--output=DIR` | Output directory for markdown reports (required with `--format=markdown`) | |
-| `--fail-on=LEVEL` | Exit 1 when an issue of `critical`, `warning` or `info` level or above is found | none |
-| `--lang=LANG` | Language for messages: `en` or `ja` | `en` |
+```json
+{
+  "1_full_table_scan.sql": {"min_views": 1000},
+  "15_listed_parameters.sql": {"names": ["Alice", "Bob"]}
+}
+```
 
-### `explain`
+`--baseline=FILE` takes an earlier `analyze` report and adds `baseline.new`, `resolved`, `persisting`
+and `unverified` (files the earlier report had and this run did not analyze). With a baseline,
+`--fail-on` counts only the new issues.
 
-Analyzes one SQL file and prints a single structured JSON report, instead of scanning a whole directory. `--dsn`, `--user`, `--password`, `--fail-on` and `--lang` behave the same as for `analyze`.
+```bash
+vendor/bin/sql-quality analyze --sql-dir=sql/ --params=sql/params.json > baseline.json   # on the main branch
+vendor/bin/sql-quality analyze --sql-dir=sql/ --params=sql/params.json --baseline=baseline.json --fail-on=warning
+```
 
-| Option | Description | Default |
-|--------|-------------|---------|
-| `--sql-file=FILE` | Single SQL file to explain (required) | |
-| `--params=JSON\|FILE` | Inline JSON object, or a PHP file in the same format as `analyze`'s `--params` | `{}` |
+### explain
+
+```bash
+vendor/bin/sql-quality explain --sql-file=sql/1_full_table_scan.sql --params='{"min_views":1000}'
+vendor/bin/sql-quality explain --sql="SELECT * FROM posts WHERE user_id = :id" --params='{"id":1}'
+echo "SELECT * FROM posts" | vendor/bin/sql-quality explain --sql-file=-
+```
+
+One statement, as a file, inline or from stdin. The output is a summary: the issues and the optimizer
+impact. `--detail=full` adds the EXPLAIN JSON, `EXPLAIN ANALYZE`, `SHOW WARNINGS`, the schema and the
+optimizer trace.
+
+```json
+{
+  "file": "1_full_table_scan.sql",
+  "sql": "SELECT * FROM posts WHERE view_count > 1000",
+  "executed": true,
+  "skipped_reason": null,
+  "cost": 503.45,
+  "execution_time_ms": 4.87,
+  "issues": [
+    {
+      "id": "FullTableScan@posts",
+      "type": "FullTableScan",
+      "message": "Full table scan detected.",
+      "documentation": "https://koriym.github.io/Koriym.SqlQuality/issues/FullTableScan",
+      "severity": "Critical",
+      "confidence": 0.95,
+      "evidence": {"table_name": "posts", "rows_examined_per_scan": 4952, "filtered": "33.33", "attached_condition": "(`test`.`posts`.`view_count` > 1000)"},
+      "suggestion": {"kind": "index", "description": "Add a composite index covering view_count", "ddl": "CREATE INDEX idx_posts_view_count ON posts (view_count)"}
+    }
+  ],
+  "optimizer_impact": {"cost_without_optimizer": 503.45, "cost_reduction_percent": 0, "hidden_issues": []}
+}
+```
+
+The issue `id` is the type and the place (`FullTableScan@posts`, `FunctionInvalidatesIndex@posts.created_at`);
+it holds no row counts or costs, so it stays the same across runs while the problem persists. A repeat at
+the same place gets `#2`, `#3`; `@`, `.`, `#` and `\` inside a name are backslash-escaped.
+
+### compare
+
+```bash
+vendor/bin/sql-quality compare \
+  --before=sql/3_function_on_indexed_column.sql \
+  --after-sql="SELECT * FROM posts WHERE created_at >= :d AND created_at < :d + INTERVAL 1 DAY" \
+  --params='{"d":"2024-01-01"}'
+```
+
+Runs both SELECTs in a read-only session and compares the result sets: `equivalent` (same columns, same
+multiset of rows), `same_order`, the row counts and checksums, the change in cost and time, and the
+issues the rewrite resolved or introduced. `both_empty: true` means neither statement returned a row,
+so the check proves nothing; choose parameters that return rows. `--before-params` / `--after-params`
+override `--params` for one side. Exit 0 when equivalent, 1 when not. Values are compared with the
+PHP type the driver returns (`5` and `'5'` differ), and floating-point values to 17 significant digits, so a rewrite that only changes the order of a `DOUBLE` `SUM()` can
+come out not equivalent: the application would see a different value.
+
+### try-index
+
+```bash
+vendor/bin/sql-quality try-index --sql-file=sql/1_full_table_scan.sql --params=sql/params.json \
+  --index="CREATE INDEX idx_posts_view_count ON posts (view_count)"
+```
+
+`--index` takes a suggestion's `ddl` or the short `posts(view_count, created_at)`. The index is added
+`INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE`, the statement is measured with `use_invisible_indexes=on` in
+this session only, and the index is dropped. The report says whether the plan `used` it and whether it
+was `effective` (used, and the cost fell by `--min-improvement`, default 5%). Exit 0 when effective, 1 when not.
+
+`--keep` keeps an effective index and makes it visible; an ineffective one is dropped either way.
+Building an index reads the whole table and needs the ALTER privilege: run it against a development
+database.
+
+- The ALTER and the DROP wait for a metadata lock behind open transactions on the table, and other
+  statements queue behind that wait, so the session's `lock_wait_timeout` is lowered to 10 seconds:
+  a busy table makes the trial fail (exit 2) instead of stalling it.
+- Before the index is added, stderr names the `DROP INDEX` statement that removes it. A run killed
+  mid-trial can leave the `INVISIBLE` index behind; run that statement, or look for
+  `sqlq_trial_%` / your index name in `information_schema.statistics`.
+- A table the statement reads that already has an invisible index is refused
+  (`InvisibleIndexesPresent`): `use_invisible_indexes=on` would enable it too and the result could
+  not be attributed to the trial index.
 
 ### Exit codes
 
 | Code | Meaning |
 |------|---------|
-| `0` | No issue reached the `--fail-on` level |
-| `1` | An issue reached the `--fail-on` level |
-| `2` | Usage, database connection, params file, or unknown `--format` error; for `explain`, also a query that cannot be explained (e.g. DDL) or that MySQL rejects (e.g. a missing table) |
-
-For `analyze`, a file that cannot be analyzed does not change the exit code — it is listed with its reason under `skipped` in the JSON output. For `explain`, the same kind of failure has no file to skip into, so it exits with code `2` and prints the reason to stderr instead.
+| `0` | The check passed |
+| `1` | An issue reached `--fail-on`, a rewrite is not equivalent, or an index is not effective |
+| `2` | The command could not run: usage, connection, parameters, or a statement MySQL rejects. stderr names the exception, e.g. `UnboundParameter: target_date` |
 
 ### JSON Schema
 
-Both commands' JSON output conforms to a schema in [`schema/`](schema/): [`analyze-report.schema.json`](schema/analyze-report.schema.json) for `analyze --format=json`, [`explain-report.schema.json`](schema/explain-report.schema.json) for `explain`. An agent can validate the CLI output against either schema before acting on it.
+Every command's output follows a schema in [`schema/`](schema/): `analyze-report`, `explain-report`,
+`compare-report` and `try-index-report`.
 
-## Claude Code Skills
+## Claude Code plugin
 
-For [Claude Code](https://claude.ai/code) users, automated SQL optimization skills are available:
+The plugin bundles three skills that drive the commands:
 
-### Installation
-
-**From Marketplace:**
 ```bash
-# Add marketplace
 /plugin marketplace add koriym/Koriym.SqlQuality
-
-# Install plugin (includes all 3 skills)
 /plugin install sql-quality@sql-quality
 ```
 
-**For Project Developers:**
-When you trust this project folder, Claude Code will automatically prompt you to add the marketplace and enable the plugins (configured in `.claude/settings.json`).
+| Skill | What it does |
+|-------|--------------|
+| `/sql-quality-check sql/ sql/params.json [baseline.json]` | Reports the issues, CI style; changes nothing |
+| `/sql-quality-fix sql/ sql/params.json [--keep-indexes]` | Rewrites only what `compare` proves equivalent, recommends only indexes `try-index` proves effective |
+| `/sql-params-generate sql/` | Writes the params file from values that exist in the database |
 
-### Usage
+In this repository, `.claude/settings.json` enables the plugin when you trust the folder.
 
-```bash
-# Analyze SQL files (CI-friendly)
-/sql-quality-check tests/sql tests/params/sql_params.php
-
-# Auto-fix issues with step-by-step measurement
-/sql-quality-fix tests/sql tests/params/sql_params.php
-
-# Generate parameter bindings from SQL files
-/sql-params-generate tests/sql
-```
-
-### Features
-
-These AI-powered skills:
-- Detect performance issues (FullTableScan, IneffectiveJoin, CartesianProduct, EstimateDivergence, etc.)
-- Rewrite problematic SQL patterns (functions on columns, implicit conversions)
-- Create indexes and measure their impact in real-time
-- Roll back ineffective indexes automatically
-- Generate detailed improvement reports with cost reductions
-
-See `skills/*/SKILL.md` for detailed documentation.
-
-## Analysis Reports
-
-Example:
-
-* [SQL Analysis Summary](demo/build/sql-quality/summary_report.md)
-
-The analyzer generates two types of analysis reports in the specified output directory (e.g., `build/sql-quality`).
-
-### 1. Query Analysis List
-
-Shows the overall analysis of each SQL query:
-
-| Column | Description |
-|--------|-------------|
-| SQL File | Name of the SQL file |
-| Cost | Estimated query cost |
-| Level | Performance level based on statistical analysis (μ = mean, σ = standard deviation) |
-| Issues | Detected performance issues |
-| Report | Link to detailed analysis |
-
-Example:
-
-| SQL File | Cost | Exec Time (ms) | Level | Issues | Report |
-|----------|------|----------------|-------|---------|--------|
-| 1\_full\_table\_scan.sql | 497.95 | 5.92 | Medium (μ ± σ) | FullTableScan | [Details](1\_full\_table\_scan.md) |
-
-### 2. Queries with Optimizer Impact
-
-The MySQL Query Optimizer is a crucial component that automatically optimizes query execution plans. Even when SQL and index design are not optimal, the optimizer attempts to improve performance at runtime.
-
-| Column | Description |
-|--------|-------------|
-| SQL File | Name of the SQL file |
-| Base Access | Access method, row count, and scan percentage with optimizer disabled |
-| Optimized Access | Access method, row count, and scan percentage with optimizer enabled |
-| Cost Impact | Cost reduction percentage by optimizer (negative values indicate improvement) |
-| Base Issues | Issues detected when optimizer is disabled |
-| Plan Changes | Detailed execution plan changes (filtering ratio, cost changes, etc.) |
-
-#### Example Interpretation
-
-Let's look at this example:
-
-| SQL File | Base Access | Optimized Access | Cost Impact | Base Issues | Plan Changes |
-|:----------|:------------|:----------------|:------------|:------------|:-------------|
-| 11\_nested\_loop.sql | ALL, 4897 rows, 100.0% | ALL, 1000 rows, 10.0% → ref, using idx\_posts\_user\_id, 4 rows, 100.0% | -44.9% | FullTableScan | - |
-
-In this example, without the optimizer, the query performs a full table scan processing 4,897 rows. With the optimizer enabled, it uses an index to access only 4 rows. The cost reduction of -44.9% indicates a significant improvement through optimizer intervention.
-
-### Understanding Optimizer Impact
-
-While the optimizer improves performance, relying on it may mask potential underlying issues. Additionally, there are risks of unstable performance as data volume grows or statistics change. This feature aims to detect such issues early and guide appropriate solutions by comparing execution plans and performance with and without the optimizer.
-
-## Project Statistics
-
-The summary report also includes overall project statistics:
-
-- Total SQL queries analyzed
-- Average query cost
-- Standard deviation of costs
-
-## Multilingual Support
-
-SQL query analysis results support multilingual output in both `ExplainAnalyzer` and `AIQueryAdvisor`.
-
-### Language Customization in ExplainAnalyzer
-
-While English is the default language, you can customize error messages in `ExplainAnalyzer` constructor for other languages:
+## Library
 
 ```php
-// Japanese error messages
-$analyzer = new ExplainAnalyzer([
-    'FullTableScan' => 'フルテーブルスキャンが検出されました。',
-    'IneffectiveJoin' => '非効率的な結合が検出されました。',
-    'FunctionInvalidatesIndex' => '関数の使用によりインデックスが無効化されています。',
-    // ... other messages
-]);
+use Koriym\SqlQuality\JsonReportGenerator;
+use Koriym\SqlQuality\SqlFileAnalyzer;
 
-// Combined with AI Advisor for complete Japanese output
-$analyzer = new SqlFileAnalyzer(
-    $pdo,
-    $analyzer,
-    $sqlDirectory,
-    new AIQueryAdvisor('以上の分析を日本語で記述してください。')
-);
+$analyzer = new SqlFileAnalyzer($pdo, sqlDir: __DIR__ . '/sql');
+$run = $analyzer->analyzeDirectory(['1_full_table_scan.sql' => ['min_views' => 1000]]);
+$report = (new JsonReportGenerator())->generate($run);
+
+$result = $analyzer->analyzeSql('SELECT * FROM posts WHERE user_id = :id', ['id' => 1]);
 ```
 
-This allows you to generate the entire analysis report in your preferred language. Both error messages and AI analysis results will be output in the specified language.
+`RewriteComparator`, `IndexTrial` and `Baseline` are the classes behind `compare`, `try-index` and `--baseline`.
 
 ## Writing a Detector
 
@@ -263,6 +221,6 @@ final class FullTableScanDetector implements DetectorInterface
 
 `QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`), `schema` (information_schema per table) and `optimizerTrace` (an excerpt of `information_schema.OPTIMIZER_TRACE` for the default-optimizer `EXPLAIN`, `null` when the trace is unavailable: not captured, unreadable or truncated). `tables()`, `tableAccesses()`, `nestedLoops()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()`, `primaryKeyColumns()` and `optimizerTraceFor()` read them.
 
-`Finding::$evidence` holds the values the detector based its decision on: use the EXPLAIN key names for values taken from the plan, and include `table_name` when the finding is about one table. It is reported as `evidence` on the issue. `severity`, `confidence` and `suggestion` are optional; when set they replace the defaults for the warning type.
+`Finding::$evidence` holds the values the detector based its decision on: use the EXPLAIN key names for values taken from the plan, and include `table_name` when the finding is about one table, and `column` when it is about one column; the issue id is built from them. It is reported as `evidence` on the issue. `severity`, `confidence` and `suggestion` are optional; when set they replace the defaults for the warning type.
 
-Test a detector against the recorded plans in `tests/fixtures/`: `Fixture::load('1_full_table_scan.sql')` returns the `QueryContext` for `tests/sql/1_full_table_scan.sql`, and `tests/fixtures/expected.php` lists the types every fixture must produce. To register a detector, add it to the `ExplainAnalyzer` constructor, its type to `WarningType` and `WarningMessages` in `src/Types.php`, its default message to `ExplainAnalyzer::DEFAULT_MESSAGES`, and its page to `docs/issues/`.
+Test a detector against the recorded plans in `tests/fixtures/`: `Fixture::load('1_full_table_scan.sql')` returns the `QueryContext` for `tests/sql/1_full_table_scan.sql`, and `tests/fixtures/expected.php` lists the types every fixture must produce. To register a detector, add it to the `ExplainAnalyzer` constructor, its type to `WarningType` in `src/Types.php` and to the `type` enum of `schema/analyze-report.schema.json` and `schema/explain-report.schema.json`, its message to `ExplainAnalyzer::MESSAGES`, and its page to `docs/issues/`.

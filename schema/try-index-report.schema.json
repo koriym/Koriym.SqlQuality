@@ -1,0 +1,149 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://koriym.github.io/Koriym.SqlQuality/schema/try-index-report.schema.json",
+  "title": "Koriym.SqlQuality try-index report",
+  "description": "Output of `sql-quality try-index`. Exit 0 when the index is effective, 1 when not.",
+  "type": "object",
+  "required": [
+    "file",
+    "index",
+    "used",
+    "effective",
+    "kept",
+    "min_improvement_percent",
+    "before",
+    "after",
+    "cost_change_percent",
+    "time_change_percent",
+    "issues"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "file": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "index": {
+      "type": "object",
+      "required": [
+        "table",
+        "name",
+        "columns",
+        "ddl"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "table": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "columns": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "ddl": {
+          "type": "string",
+          "description": "CREATE INDEX statement that adds the index for good"
+        }
+      }
+    },
+    "used": {
+      "type": "boolean",
+      "description": "The plan with the index names it as a key"
+    },
+    "effective": {
+      "type": "boolean",
+      "description": "Used, and the cost fell by at least min_improvement_percent"
+    },
+    "kept": {
+      "type": "boolean",
+      "description": "--keep was given and the index was effective, so it was made visible instead of dropped"
+    },
+    "min_improvement_percent": {
+      "type": "number"
+    },
+    "before": {
+      "$ref": "#/$defs/measurement"
+    },
+    "after": {
+      "$ref": "#/$defs/measurement"
+    },
+    "cost_change_percent": {
+      "type": "number",
+      "description": "Negative is an improvement"
+    },
+    "time_change_percent": {
+      "type": [
+        "number",
+        "null"
+      ]
+    },
+    "issues": {
+      "$ref": "#/$defs/issue_diff"
+    }
+  },
+  "$defs": {
+    "measurement": {
+      "type": "object",
+      "required": [
+        "cost",
+        "execution_time_ms",
+        "issues"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cost": {
+          "type": "number"
+        },
+        "execution_time_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Issue ids"
+        }
+      }
+    },
+    "issue_diff": {
+      "type": "object",
+      "required": [
+        "resolved",
+        "new",
+        "persisting"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "resolved": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "new": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "persisting": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

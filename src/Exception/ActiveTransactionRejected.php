@@ -12,4 +12,8 @@ namespace Koriym\SqlQuality\Exception;
  */
 final class ActiveTransactionRejected extends LogicException
 {
+    public function __construct(string $message = 'The connection has an open transaction; commit or roll it back first (with autocommit=0 every statement opens one)')
+    {
+        parent::__construct($message);
+    }
 }

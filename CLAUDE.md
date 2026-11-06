@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Koriym.SqlQuality is a MySQL query analyzer that detects potential performance issues in SQL files and provides AI-powered optimization recommendations. It analyzes SQL queries using `EXPLAIN FORMAT=JSON` and `EXPLAIN ANALYZE`, comparing execution plans with and without MySQL optimizer to identify performance bottlenecks.
+Koriym.SqlQuality is a MySQL query analyzer for coding agents and CI. It analyzes SQL with `EXPLAIN FORMAT=JSON`, `EXPLAIN ANALYZE` and the optimizer trace, with and without the optimizer features, and prints JSON. It also verifies fixes: `compare` checks that a rewritten SELECT returns the same rows, `try-index` measures a candidate index as an invisible index and drops it, and `--baseline` separates new issues from known ones. The tool measures; the agent calling it decides and writes the prose.
 
 ## Common Commands
 
@@ -39,15 +39,15 @@ composer pcov
 
 ### Core Classes
 
-- **SqlFileAnalyzer** (`src/SqlFileAnalyzer.php`): Main entry point. Orchestrates SQL analysis by:
-  - Reading SQL files and interpolating parameters
-  - Executing `EXPLAIN FORMAT=JSON` and `EXPLAIN ANALYZE`
-  - Running analysis with and without MySQL optimizer to compare execution plans
-  - Generating Markdown reports with AI prompts
-
-- **ExplainAnalyzer** (`src/ExplainAnalyzer.php`): Runs every detector over a `QueryContext` and returns the detected warnings with severity, confidence, evidence and documentation links.
-
-- **AIQueryAdvisor** (`src/AIQueryAdvisor.php`): Generates AI prompts containing SQL, schema info, EXPLAIN results, and detected issues. Extracts table names and schema information from the database.
+- **Cli** (`src/Cli.php`, run by `bin/sql-quality`): the `analyze`, `explain`, `compare` and `try-index` commands. stdout is JSON only; exit 0 pass, 1 the check failed, 2 could not run. Each command accepts a fixed option list; anything else is a usage error.
+- **SqlFileAnalyzer** (`src/SqlFileAnalyzer.php`): builds the `QueryContext` (EXPLAIN, EXPLAIN ANALYZE in a read-only session, SHOW WARNINGS, schema, optimizer trace), runs the detectors, times read-only SELECTs, and repeats the EXPLAIN with the optimizer features off (`without_optimizer`, `hiddenIssues()`).
+- **ExplainAnalyzer** (`src/ExplainAnalyzer.php`): runs every detector over a `QueryContext` and returns the issues with a stable `id` (`Type@table.column`), severity, confidence, evidence and suggestion.
+- **ParameterBinder**: binds `:name` placeholders; throws `UnboundParameter` naming the missing ones.
+- **SchemaReader**: information_schema rows for the tables a statement references.
+- **RewriteComparator** / **ResultFingerprint**: the `compare` command; result sets are compared by row count and ordered / order-independent checksums.
+- **IndexTrial** / **IndexDefinition**: the `try-index` command. Only plain `CREATE INDEX name ON table (cols)` or `table(cols)` is accepted; the index is added INVISIBLE and always dropped (or, with keep and an effective result, made visible).
+- **Baseline**: diffs an `AnalysisRun` against an earlier `analyze` report by file and issue id.
+- **JsonReportGenerator**: the `analyze` report; `query()` is the per-statement part `explain` shares.
 
 ### Detector Pattern
 
@@ -88,12 +88,10 @@ Psalm type definitions are centralized in `src/Types.php`. Import types using:
 /** @psalm-import-type ExplainResult from Types */
 ```
 
-### Reporting
+### Output contract
 
-- **QueryStatisticsCalculator**: Calculates statistical metrics across analyzed queries
-- **StatisticalQueryLevelClassifier**: Classifies query performance levels using mean and standard deviation
-- **MarkdownSummaryReportGenerator**: Generates summary reports comparing all analyzed queries
+The JSON of every command follows `schema/*.schema.json`; `JsonSchemaTest` validates real CLI output against them. A change to the output needs the schema, `src/Types.php`, the skills in `skills/` and both READMEs updated together.
 
 ## Testing
 
-Tests require a MySQL database connection. Test SQL files and parameters are in `tests/sql/` and `tests/params/`.
+Tests require a MySQL 8.0 database with `tests/sql/schema.sql` loaded (`SQL_QUALITY_DSN`, `SQL_QUALITY_USER`, `SQL_QUALITY_PASSWORD`, default `mysql:host=127.0.0.1;dbname=test` as root); without one the database tests are skipped, and `SQL_QUALITY_REQUIRE_DB=1` makes them fail instead. Test SQL files and parameters are in `tests/sql/` and `tests/params/`.

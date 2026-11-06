@@ -1,6 +1,6 @@
 {
     "name": "koriym/sql-quality",
-    "description": "",
+    "description": "MySQL query analysis for coding agents and CI: detects performance issues, verifies rewrites and measures candidate indexes",
     "license": "MIT",
     "authors": [
         {

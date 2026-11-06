@@ -8,7 +8,10 @@ use Koriym\SqlQuality\Exception\InvalidSeverityThreshold;
 
 use function strtolower;
 
-/** @psalm-import-type AnalysisRun from Types */
+/**
+ * @psalm-import-type AnalysisRun from Types
+ * @psalm-import-type WarningSeverity from Types
+ */
 final class SeverityThreshold
 {
     private const LEVELS = ['info' => 0, 'warning' => 1, 'critical' => 2];
@@ -29,11 +32,22 @@ final class SeverityThreshold
     /** @param AnalysisRun $run */
     public function isMetBy(array $run): bool
     {
+        $severities = [];
         foreach ($run['results'] as $result) {
             foreach ($result['issues'] as $issue) {
-                if (self::SEVERITIES[$issue['severity']] >= $this->level) {
-                    return true;
-                }
+                $severities[] = $issue['severity'];
+            }
+        }
+
+        return $this->isMetBySeverities($severities);
+    }
+
+    /** @param iterable<WarningSeverity> $severities */
+    public function isMetBySeverities(iterable $severities): bool
+    {
+        foreach ($severities as $severity) {
+            if (self::SEVERITIES[$severity] >= $this->level) {
+                return true;
             }
         }
 

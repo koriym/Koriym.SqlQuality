@@ -24,6 +24,7 @@ final class FakeAnalysisRun
 
     /**
      * @param list<DetectedWarning> $issues
+     * @param list<DetectedWarning> $issuesWithoutOptimizer
      *
      * @return AnalysisResult
      */
@@ -32,22 +33,17 @@ final class FakeAnalysisRun
         array $issues = [],
         bool $executed = true,
         float $executionTime = 0.0059,
-        float $costPercent = -44.911
+        float|null $costWithoutOptimizer = null,
+        array $issuesWithoutOptimizer = [],
     ): array {
         return [
-            'mode' => 'wd',
             'executed' => $executed,
             'skipped_reason' => $executed ? null : 'execution skipped: write statement',
             'issues' => $issues,
-            'explain_result' => ['query_block' => ['select_id' => 1], 'analyze_result' => []],
-            'ai_suggestions' => '',
+            'explain_result' => ['query_block' => ['select_id' => 1]],
             'cost' => $cost,
-            'execution_time' => $executionTime,
-            'optimizer_comparison' => [
-                'with_optimizer' => [],
-                'without_optimizer' => [],
-                'difference' => ['cost_percent' => $costPercent, 'time_percent' => 0.0],
-            ],
+            'execution_time' => $executed ? $executionTime : null,
+            'without_optimizer' => ['cost' => $costWithoutOptimizer ?? $cost, 'issues' => $issuesWithoutOptimizer],
         ];
     }
 
@@ -56,16 +52,16 @@ final class FakeAnalysisRun
      *
      * @return DetectedWarning
      */
-    public static function issue(string $type, string $severity): array
+    public static function issue(string $type, string $severity, string $table = 'posts'): array
     {
         return [
+            'id' => $type . '@' . $table,
             'type' => $type,
             'message' => $type . ' detected.',
             'documentation' => 'https://koriym.github.io/Koriym.SqlQuality/issues/' . $type,
             'severity' => $severity,
             'confidence' => 0.95,
-            'detector' => 'Koriym\\SqlQuality\\Detector\\' . $type . 'Detector',
-            'evidence' => ['table_name' => 'posts'],
+            'evidence' => ['table_name' => $table],
             'suggestion' => null,
         ];
     }

@@ -1,0 +1,13 @@
+{
+  "extraKnownMarketplaces": {
+    "sql-quality": {
+      "source": {
+        "source": "directory",
+        "path": "./"
+      }
+    }
+  },
+  "enabledPlugins": {
+    "sql-quality@sql-quality": true
+  }
+}

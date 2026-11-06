@@ -9,7 +9,7 @@
       "name": "sql-quality",
       "source": "./",
       "description": "Claude Skills for SQL quality analysis and optimization",
-      "version": "1.0.0"
+      "version": "0.5.0"
     }
   ]
 }

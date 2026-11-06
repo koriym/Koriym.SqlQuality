@@ -13,59 +13,61 @@ use PDO;
 use PDOException;
 use Throwable;
 
+use function array_column;
+use function array_diff;
 use function array_keys;
-use function array_map;
+use function array_merge;
 use function array_pop;
 use function array_shift;
 use function array_sum;
+use function array_unique;
 use function array_values;
 use function count;
 use function file_exists;
 use function file_get_contents;
-use function file_put_contents;
-use function implode;
 use function is_array;
-use function is_bool;
-use function is_dir;
-use function is_null;
+use function is_file;
 use function is_string;
 use function json_decode;
 use function microtime;
-use function mkdir;
-use function pathinfo;
-use function preg_replace;
+use function natsort;
+use function scandir;
 use function sort;
+use function str_ends_with;
 use function strrpos;
 use function substr;
 use function var_export;
 
-use const PATHINFO_FILENAME;
-
 /**
+ * Analyzes SQL statements with EXPLAIN FORMAT=JSON and EXPLAIN ANALYZE, once with the default
+ * optimizer_switch and once with the optimizer features turned off.
+ *
  * @psalm-import-type SqlParams from Types
  * @psalm-import-type ExplainResult from Types
  * @psalm-import-type AnalysisResult from Types
  * @psalm-import-type AnalysisRun from Types
- * @psalm-import-type AnalysisWithSettingsResult from Types
- * @psalm-import-type SchemaInfo from Types
  * @psalm-import-type ShowWarning from Types
  * @psalm-import-type OptimizerTraceExcerpt from Types
+ * @psalm-import-type DetectedWarning from Types
  */
 final class SqlFileAnalyzer
 {
     private const TRIAL_COUNT = 10;
     private readonly OptimizerSettingsInterface $optimizerSettings;
     private readonly ReadOnlySession $readOnlySession;
+    private readonly ParameterBinder $binder;
+    private readonly SchemaReader $schemaReader;
 
     public function __construct(
         private readonly PDO $pdo,
-        private readonly ExplainAnalyzer $analyzer,
-        private readonly string $sqlDir,
-        private readonly AIQueryAdvisor $aiAdvisor,
-        OptimizerSettingsInterface|null $optimizerSettings = null
+        private readonly ExplainAnalyzer $analyzer = new ExplainAnalyzer(),
+        private readonly string $sqlDir = '.',
+        OptimizerSettingsInterface|null $optimizerSettings = null,
     ) {
         $this->optimizerSettings = $optimizerSettings ?? new OptimizerSettings($pdo);
         $this->readOnlySession = new ReadOnlySession($pdo);
+        $this->binder = new ParameterBinder($pdo);
+        $this->schemaReader = new SchemaReader($pdo);
     }
 
     /**
@@ -74,7 +76,7 @@ final class SqlFileAnalyzer
      * optimizer trace. null when the connection cannot report sql_mode (another driver, or an
      * error mode returning false); the classifier then rejects under every reading.
      */
-    private function quoteRules(): QuoteRules|null
+    public function quoteRules(): QuoteRules|null
     {
         try {
             $statement = $this->pdo->query('SELECT @@session.sql_mode');
@@ -92,48 +94,50 @@ final class SqlFileAnalyzer
     }
 
     /**
-     * Analyzes the SQL files contained in the specified parameters, generates statistical analyses,
-     * outputs detailed Markdown reports for each SQL file, and creates a summary report.
+     * File names of the *.sql files in the SQL directory, in natural order.
      *
-     * @param SqlParams $sqlParams An associative array of SQL parameters, such as file paths and configurations, to be analyzed.
-     * @param string    $outputDir The directory where output reports, including individual Markdown files and a summary report, will be saved.
-     *
-     *               example: $sqlParams [
-     *                  1_full_table_scan.sql' => ['min_views' => 1000],
-     *                  2_filesort.sql' => ['status' => 'published', 'limit' => 10],
-     *               ]
-     *
-     * @return array<string, array<string, mixed>> Returns an associative array where the keys are SQL file paths and the values are their respective analysis results, including AI suggestions and identified issues.
+     * @return list<string>
      */
-    public function analyzeSqlDirectory(array $sqlParams, string $outputDir): array
+    public function sqlFiles(): array
     {
-        $results = $this->analyzeSQLFiles($sqlParams)['results'];
-        $this->saveReports($results, $outputDir);
+        // scandir, not glob: a directory name with glob metacharacters ([archive]) would change the pattern
+        $files = [];
+        foreach (scandir($this->sqlDir) ?: [] as $entry) {
+            if (! str_ends_with($entry, '.sql') || ! is_file($this->sqlDir . '/' . $entry)) {
+                continue;
+            }
 
-        return $results;
-    }
-
-    /**
-     * @param array<string, AnalysisResult> $results
-     *
-     * @throws RuntimeException
-     */
-    public function saveReports(array $results, string $outputDir): void
-    {
-        $statistics = new QueryStatisticsCalculator();
-        $statistics->calculate($results);
-
-        $classifier = new StatisticalQueryLevelClassifier();
-        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
-
-        foreach ($results as $sqlFile => $analysisResult) {
-            $this->savePromptToMarkdown($sqlFile, $analysisResult['ai_suggestions'], $outputDir);
+            $files[] = $entry;
         }
 
-        $reportGenerator->saveSummaryReport($outputDir, 'summary_report.md');
+        natsort($files);
+
+        return array_values($files);
     }
 
     /**
+     * Analyzes every *.sql file of the SQL directory, and every file $sqlParams names.
+     * A file with no entry in $sqlParams is analyzed without parameters.
+     *
+     * @param SqlParams $sqlParams
+     *
+     * @return AnalysisRun
+     */
+    public function analyzeDirectory(array $sqlParams = []): array
+    {
+        $files = array_values(array_unique(array_merge($this->sqlFiles(), array_keys($sqlParams))));
+        $params = [];
+        foreach ($files as $file) {
+            $params[$file] = $sqlParams[$file] ?? [];
+        }
+
+        return $this->analyzeSQLFiles($params);
+    }
+
+    /**
+     * Analyzes the files $sqlParams names, each with its parameters. A file that cannot be
+     * analyzed is listed in skipped with the exception's short class name and message.
+     *
      * @param SqlParams $sqlParams
      *
      * @return AnalysisRun
@@ -162,15 +166,8 @@ final class SqlFileAnalyzer
         return $separator === false ? $class : substr($class, $separator + 1);
     }
 
-    /** @param ExplainResult $explainResult */
-    private function calculateCost(array $explainResult): float
-    {
-        $cost = $this->analyzer->calculateQueryCost($explainResult);
-
-        return $cost['total_cost'];
-    }
-
-    private function readSqlFile(string $filename): string
+    /** @throws RuntimeException */
+    public function readSqlFile(string $filename): string
     {
         $path = $this->sqlDir . '/' . $filename;
         if (! file_exists($path)) {
@@ -186,6 +183,8 @@ final class SqlFileAnalyzer
     }
 
     /**
+     * The QueryContext the detectors receive for the default optimizer_switch.
+     *
      * @param array<string, mixed> $params
      *
      * @throws RuntimeException
@@ -193,6 +192,106 @@ final class SqlFileAnalyzer
     public function queryContext(string $sqlFile, array $params): QueryContext
     {
         return $this->buildQueryContext($this->readSqlFile($sqlFile), $params, $this->quoteRules(), withOptimizerTrace: true);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisResult
+     *
+     * @throws RuntimeException
+     */
+    public function analyze(string $sqlFile, array $params): array
+    {
+        return $this->explain($sqlFile, $params)['result'];
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return AnalysisResult
+     *
+     * @throws RuntimeException
+     */
+    public function analyzeSql(string $sql, array $params): array
+    {
+        return $this->explainSql($sql, $params)['result'];
+    }
+
+    /**
+     * Analyzes one SQL file and returns the QueryContext built for the optimizer-enabled pass alongside
+     * the result, so a caller that needs both does not trigger a third EXPLAIN / EXPLAIN ANALYZE round trip.
+     *
+     * @param array<string, mixed> $params
+     *
+     * @return array{result: AnalysisResult, context: QueryContext}
+     *
+     * @throws RuntimeException
+     */
+    public function explain(string $sqlFile, array $params): array
+    {
+        return $this->explainSql($this->readSqlFile($sqlFile), $params);
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @return array{result: AnalysisResult, context: QueryContext}
+     *
+     * @throws RuntimeException
+     */
+    public function explainSql(string $sql, array $params): array
+    {
+        $quoteRules = $this->quoteRules();
+        $context = $this->buildQueryContext($sql, $params, $quoteRules, withOptimizerTrace: true);
+        $issues = $this->analyzer->analyze($context);
+        $classification = (new SqlSafetyClassifier($quoteRules))->classify($sql);
+        $executed = $classification['is_read_only_select'];
+        $executionTime = $executed ? $this->timeExecution($context->sql) : null;
+        $withoutOptimizer = $this->withoutOptimizer($sql, $params, $quoteRules);
+
+        return [
+            'result' => [
+                'executed' => $executed,
+                'skipped_reason' => $executed ? null : $classification['reason'],
+                'issues' => $issues,
+                'explain_result' => $context->explain,
+                'cost' => ExplainAnalyzer::queryCost($context->explain),
+                'execution_time' => $executionTime,
+                'without_optimizer' => $withoutOptimizer,
+            ],
+            'context' => $context,
+        ];
+    }
+
+    /**
+     * Ids of the issues the no-optimizer plan has and the default plan does not: problems the optimizer
+     * currently works around, which can come back when statistics or data volume change.
+     *
+     * @param AnalysisResult $result
+     *
+     * @return list<string>
+     */
+    public static function hiddenIssues(array $result): array
+    {
+        $ids = array_diff(
+            array_column($result['without_optimizer']['issues'], 'id'),
+            array_column($result['issues'], 'id'),
+        );
+        $ids = array_values(array_unique($ids));
+        sort($ids);
+
+        return $ids;
+    }
+
+    /**
+     * @param array<string, mixed> $params
+     *
+     * @throws RuntimeException
+     */
+    public function bind(string $sql, array $params): string
+    {
+        return $this->binder->bind($sql, $params, $this->quoteRules() ?? new QuoteRules());
     }
 
     /**
@@ -210,7 +309,7 @@ final class SqlFileAnalyzer
             throw new NotExplainable($classification['reason']);
         }
 
-        $interpolatedSql = $this->interpolateQuery($sql, $params);
+        $interpolatedSql = $this->binder->bind($sql, $params, $quoteRules ?? new QuoteRules());
         $savedTrace = $withOptimizerTrace ? $this->enableOptimizerTrace() : null;
         $original = null;
         try {
@@ -239,7 +338,7 @@ final class SqlFileAnalyzer
         }
 
         $explainAnalyze = $classifier->isReadOnlySelect($sql) ? $this->executeExplainAnalyze($interpolatedSql) : null;
-        $schema = $this->getSchemaInfo($sql);
+        $schema = $this->schemaReader->forSql($sql, $quoteRules ?? new QuoteRules());
 
         return new QueryContext($interpolatedSql, $explain, $explainAnalyze, $warnings, $schema, $optimizerTrace, $quoteRules ?? new QuoteRules());
     }
@@ -298,7 +397,6 @@ final class SqlFileAnalyzer
      */
     private function executeExplain(string $interpolatedSql): array
     {
-        // FORMAT=JSON の EXPLAIN を実行
         $stmt = $this->pdo->query('EXPLAIN FORMAT=JSON ' . $interpolatedSql);
         if ($stmt === false) {
             throw new RuntimeException('Failed to execute EXPLAIN query');
@@ -369,123 +467,27 @@ final class SqlFileAnalyzer
         return $warnings;
     }
 
-    /** @param array<string, mixed> $params */
-    private function interpolateQuery(string $sql, array $params): string
-    {
-        $keys = array_map(
-            static fn (string $key): string => "/:$key/",
-            array_keys($params),
-        );
-
-        $values = array_map(
-            function (mixed $value): string {
-                if (is_array($value) && count($value) === 0) {
-                    throw new RuntimeException('Empty list given');
-                }
-
-                return match (true) {
-                    is_null($value) => 'NULL',
-                    is_bool($value) => $value ? '1' : '0',
-                    is_string($value) => $this->pdo->quote($value),
-                    is_array($value) => implode(',', array_map(fn ($v) => is_string($v) ? $this->pdo->quote($v) : (string) $v, $value)),
-                    default => (string) $value
-                };
-            },
-            array_values($params),
-        );
-
-        return (string) preg_replace($keys, $values, $sql);
-    }
-
-    /** @return array<string, SchemaInfo> */
-    private function getSchemaInfo(string $sql): array
-    {
-        $tableNames = $this->aiAdvisor->extractTableNames($sql);
-        $schemaInfo = [];
-        foreach ($tableNames as $tableName) {
-            $schemaInfo[$tableName] = $this->aiAdvisor->extractSchemaInfo($this->pdo, $tableName);
-        }
-
-        return $schemaInfo;
-    }
-
-    /** @throws RuntimeException */
-    private function savePromptToMarkdown(string $sqlFile, string $prompt, string $outputDir): void
-    {
-        if (! is_dir($outputDir) && ! mkdir($outputDir, 0777, true)) {
-            throw new RuntimeException("Failed to create directory: {$outputDir}");
-        }
-
-        $promptFile = $outputDir . '/' . pathinfo($sqlFile, PATHINFO_FILENAME) . '.md';
-        if (file_put_contents($promptFile, $prompt) === false) {
-            throw new RuntimeException("Failed to save prompt to file: {$promptFile}");
-        }
-    }
-
-    /** @param array<string, AnalysisResult> $results */
-    public function generateSummaryReport(array $results, string $outputDir): string
-    {
-        $statistics = new QueryStatisticsCalculator();
-        $classifier = new StatisticalQueryLevelClassifier();
-        $reportGenerator = new MarkdownSummaryReportGenerator($statistics, $classifier);
-
-        return $reportGenerator->generate($results);
-    }
-
     /**
-     * @param array<string, mixed> $params
-     *
-     * @return AnalysisResult
-     */
-    public function analyze(string $sqlFile, array $params): array
-    {
-        $sql = $this->readSqlFile($sqlFile);
-        $quoteRules = $this->quoteRules();
-
-        $defaultAnalysis = $this->analyzeContext($this->buildQueryContext($sql, $params, $quoteRules, withOptimizerTrace: true), $quoteRules, $sql, $params, $sqlFile);
-        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile, $quoteRules);
-
-        return $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis);
-    }
-
-    /**
-     * Analyzes one SQL file and returns the QueryContext built for the optimizer-enabled pass alongside
-     * the result, so a caller that needs both does not trigger a third EXPLAIN / EXPLAIN ANALYZE round trip.
+     * Cost and issues of the plan with the optimizer features turned off. The statement is not timed here.
      *
      * @param array<string, mixed> $params
      *
-     * @return array{result: AnalysisResult, context: QueryContext}
+     * @return array{cost: float, issues: list<DetectedWarning>}
      *
      * @throws RuntimeException
      */
-    public function explain(string $sqlFile, array $params): array
-    {
-        $sql = $this->readSqlFile($sqlFile);
-        $quoteRules = $this->quoteRules();
-        $context = $this->buildQueryContext($sql, $params, $quoteRules, withOptimizerTrace: true);
-
-        $defaultAnalysis = $this->analyzeContext($context, $quoteRules, $sql, $params, $sqlFile);
-        $noOptimizerAnalysis = $this->analyzeWithoutOptimizer($sql, $params, $sqlFile, $quoteRules);
-
-        return [
-            'result' => $this->combineOptimizerComparison($defaultAnalysis, $noOptimizerAnalysis),
-            'context' => $context,
-        ];
-    }
-
-    /**
-     * @param array<string, mixed> $params
-     *
-     * @return AnalysisWithSettingsResult
-     */
-    private function analyzeWithoutOptimizer(string $sql, array $params, string $sqlFile, QuoteRules|null $quoteRules): array
+    private function withoutOptimizer(string $sql, array $params, QuoteRules|null $quoteRules): array
     {
         $savedSettings = $this->optimizerSettings->saveCurrentSettings();
         $original = null;
         try {
             $this->optimizerSettings->disableAll();
+            $context = $this->buildQueryContext($sql, $params, $quoteRules);
 
-            return $this->analyzeContext($this->buildQueryContext($sql, $params, $quoteRules), $quoteRules, $sql, $params, $sqlFile);
+            return [
+                'cost' => ExplainAnalyzer::queryCost($context->explain),
+                'issues' => $this->analyzer->analyze($context),
+            ];
         } catch (Throwable $e) {
             $original = $e;
 
@@ -503,116 +505,39 @@ final class SqlFileAnalyzer
     }
 
     /**
-     * @param AnalysisWithSettingsResult $defaultAnalysis
-     * @param AnalysisWithSettingsResult $noOptimizerAnalysis
+     * Average wall-clock seconds of a read-only SELECT, run in a read-only session.
      *
-     * @return AnalysisResult
-     */
-    private function combineOptimizerComparison(array $defaultAnalysis, array $noOptimizerAnalysis): array
-    {
-        $noOptimizerCost = (float) $noOptimizerAnalysis['cost'];
-        $noOptimizerTime = (float) $noOptimizerAnalysis['execution_time'];
-
-        return [
-            ...$defaultAnalysis,
-            'optimizer_comparison' => [
-                'with_optimizer' => $defaultAnalysis,
-                'without_optimizer' => $noOptimizerAnalysis,
-                'difference' => [
-                    'cost_percent' => $noOptimizerCost > 0.0 ? ((float) $defaultAnalysis['cost'] - $noOptimizerCost) / $noOptimizerCost * 100.0 : 0.0,
-                    'time_percent' => $noOptimizerTime > 0.0 ? ((float) $defaultAnalysis['execution_time'] - $noOptimizerTime) / $noOptimizerTime * 100.0 : 0.0,
-                ],
-            ],
-        ];
-    }
-
-    /**
      * @param array<string, mixed> $params
      *
-     * @return AnalysisWithSettingsResult
+     * @throws RuntimeException
      */
-    private function analyzeContext(QueryContext $context, QuoteRules|null $quoteRules, string $sql, array $params, string $sqlFile): array
-    {
-        $classification = (new SqlSafetyClassifier($quoteRules))->classify($sql);
-        $executed = $classification['is_read_only_select'];
-        $skippedReason = $executed ? null : $classification['reason'];
-        $executionTime = $executed ? $this->timeExecution($sql, $params) : 0.0;
-        $issues = $this->analyzer->analyze($context);
-        $cost = $this->calculateCost($context->explain);
-
-        $aiPrompt = $this->aiAdvisor->generatePrompt(
-            $sqlFile,
-            $sql,
-            $context->explain,
-            $context->explainAnalyze ?? 'N/A (EXPLAIN ANALYZE skipped: statement is not a read-only SELECT)',
-            $context->warnings,
-            $issues,
-            $context->schema,
-        );
-
-        return [
-            'mode' => 'wd',
-            'executed' => $executed,
-            'skipped_reason' => $skippedReason,
-            'issues' => $issues,
-            'explain_result' => $context->explain,
-            'ai_suggestions' => $aiPrompt,
-            'cost' => $cost,
-            'execution_time' => $executionTime,
-        ];
-    }
-
-    /** @param array<string, mixed> $params */
     public function getExecutedTime(string $sql, array $params): float
     {
         if (! (new SqlSafetyClassifier($this->quoteRules()))->isReadOnlySelect($sql)) {
             throw new NotReadOnlySelect($sql);
         }
 
-        return $this->timeExecution($sql, $params);
+        return $this->timeExecution($this->bind($sql, $params));
     }
 
-    /** @param array<string, mixed> $params */
-    private function timeExecution(string $sql, array $params): float
+    private function timeExecution(string $interpolatedSql): float
     {
-        $interpolatedSql = $this->interpolateQuery($sql, $params);
-
         return $this->readOnlySession->run(fn (): float => $this->measureExecution($interpolatedSql));
     }
 
     private function measureExecution(string $interpolatedSql): float
     {
-        // warm up the cache
-        $warmupStmt = $this->pdo->query($interpolatedSql);
-        if ($warmupStmt === false) {
-            throw new QueryFailed($interpolatedSql);
+        // two warm-up runs fill the buffer pool before anything is timed
+        for ($i = 0; $i < 2; $i++) {
+            $this->fetchAll($interpolatedSql);
         }
-
-        $warmupStmt->fetchAll();
-
-        $secondWarmupStmt = $this->pdo->query($interpolatedSql);
-        if ($secondWarmupStmt === false) {
-            throw new QueryFailed($interpolatedSql);
-        }
-
-        $secondWarmupStmt->fetchAll();
 
         $executionTimes = [];
         for ($i = 0; $i < self::TRIAL_COUNT; $i++) {
             $startTime = microtime(true);
-            $stmt = $this->pdo->query($interpolatedSql);
-            if ($stmt === false) {
-                throw new QueryFailed($interpolatedSql);
-            }
-
-            // Fetch all results to ensure:
-            // 1. The query is fully executed
-            // 2. The result set is fully retrieved
-            // 3. The database cache is properly warmed up
-            // This helps in getting consistent execution times across trials
-            $stmt->fetchAll();
-            $endTime = microtime(true);
-            $executionTimes[] = $endTime - $startTime;
+            // the whole result set is fetched, so the time covers transferring it
+            $this->fetchAll($interpolatedSql);
+            $executionTimes[] = microtime(true) - $startTime;
         }
 
         sort($executionTimes);
@@ -620,5 +545,17 @@ final class SqlFileAnalyzer
         array_pop($executionTimes);   // Remove the maximum value
 
         return array_sum($executionTimes) / (float) count($executionTimes);
+    }
+
+    /**
+     * Reads the whole result set without keeping it: a large result must not exhaust memory_limit,
+     * a fatal error no report survives.
+     *
+     * @throws QueryFailed
+     */
+    private function fetchAll(string $interpolatedSql): void
+    {
+        UnbufferedQuery::each($this->pdo, $interpolatedSql, static function (): void {
+        });
     }
 }

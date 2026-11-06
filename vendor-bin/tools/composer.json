@@ -8,6 +8,9 @@
         "vimeo/psalm": "^5.4 || dev-master"
     },
     "config": {
+        "platform": {
+            "php": "8.3"
+        },
         "allow-plugins": {
             "composer/package-versions-deprecated": true,
             "dealerdirect/phpcodesniffer-composer-installer": true

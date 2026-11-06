@@ -2,72 +2,234 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://koriym.github.io/Koriym.SqlQuality/schema/analyze-report.schema.json",
   "title": "Koriym.SqlQuality analyze report",
-  "description": "Output of `sql-quality analyze --format=json`.",
+  "description": "Output of `sql-quality analyze`.",
   "type": "object",
-  "required": ["summary", "queries", "skipped"],
+  "required": [
+    "summary",
+    "queries",
+    "skipped"
+  ],
   "additionalProperties": false,
   "properties": {
     "summary": {
       "type": "object",
-      "required": ["total_queries", "analyzed", "skipped", "avg_cost", "total_issues", "issues_by_severity"],
+      "required": [
+        "total_queries",
+        "analyzed",
+        "skipped",
+        "total_cost",
+        "avg_cost",
+        "total_issues",
+        "issues_by_severity"
+      ],
       "additionalProperties": false,
       "properties": {
-        "total_queries": { "type": "integer", "minimum": 0 },
-        "analyzed": { "type": "integer", "minimum": 0 },
-        "skipped": { "type": "integer", "minimum": 0 },
-        "avg_cost": { "type": "number" },
-        "total_issues": { "type": "integer", "minimum": 0 },
+        "total_queries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "analyzed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "skipped": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_cost": {
+          "type": "number"
+        },
+        "avg_cost": {
+          "type": "number"
+        },
+        "total_issues": {
+          "type": "integer",
+          "minimum": 0
+        },
         "issues_by_severity": {
           "type": "object",
-          "required": ["Critical", "Warning", "Info"],
+          "required": [
+            "Critical",
+            "Warning",
+            "Info"
+          ],
           "additionalProperties": false,
           "properties": {
-            "Critical": { "type": "integer", "minimum": 0 },
-            "Warning": { "type": "integer", "minimum": 0 },
-            "Info": { "type": "integer", "minimum": 0 }
+            "Critical": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Warning": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "Info": {
+              "type": "integer",
+              "minimum": 0
+            }
           }
         }
       }
     },
     "queries": {
       "type": "object",
-      "additionalProperties": { "$ref": "#/$defs/query" }
+      "additionalProperties": {
+        "$ref": "#/$defs/query"
+      }
     },
     "skipped": {
       "type": "object",
-      "additionalProperties": { "type": "string" }
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "File name => reason, prefixed with the exception's short class name"
+    },
+    "baseline": {
+      "type": "object",
+      "description": "Present with --baseline: the issues against the earlier report",
+      "required": [
+        "new",
+        "resolved",
+        "persisting",
+        "unverified"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "new": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseline_issue"
+          }
+        },
+        "resolved": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseline_issue"
+          }
+        },
+        "persisting": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/baseline_issue"
+          }
+        },
+        "unverified": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Baseline files this run did not analyze; their issues are neither resolved nor persisting"
+        }
+      }
     }
   },
   "$defs": {
     "query": {
       "type": "object",
-      "required": ["mode", "executed", "skipped_reason", "cost", "execution_time_ms", "issues", "optimizer_impact"],
+      "required": [
+        "executed",
+        "skipped_reason",
+        "cost",
+        "execution_time_ms",
+        "issues",
+        "optimizer_impact"
+      ],
       "additionalProperties": false,
       "properties": {
-        "mode": { "const": "wd" },
-        "executed": { "type": "boolean" },
-        "skipped_reason": { "type": ["string", "null"] },
-        "cost": { "type": "number" },
-        "execution_time_ms": { "type": ["number", "null"] },
+        "executed": {
+          "type": "boolean",
+          "description": "Whether the statement was run for timing and EXPLAIN ANALYZE; only a read-only SELECT is"
+        },
+        "skipped_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cost": {
+          "type": "number"
+        },
+        "execution_time_ms": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
         "issues": {
           "type": "array",
-          "items": { "$ref": "#/$defs/issue" }
+          "items": {
+            "$ref": "#/$defs/issue"
+          }
         },
         "optimizer_impact": {
-          "type": "object",
-          "required": ["cost_reduction_percent"],
-          "additionalProperties": false,
-          "properties": {
-            "cost_reduction_percent": { "type": "number" }
-          }
+          "$ref": "#/$defs/optimizer_impact"
+        }
+      }
+    },
+    "optimizer_impact": {
+      "type": "object",
+      "required": [
+        "cost_without_optimizer",
+        "cost_reduction_percent",
+        "hidden_issues"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "cost_without_optimizer": {
+          "type": "number",
+          "description": "query_cost with the optimizer_switch features turned off"
+        },
+        "cost_reduction_percent": {
+          "type": "number",
+          "description": "How much lower the default plan's cost is, in percent; negative when it is higher"
+        },
+        "hidden_issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Ids of issues only the no-optimizer plan has: problems the optimizer currently works around"
+        }
+      }
+    },
+    "baseline_issue": {
+      "type": "object",
+      "required": [
+        "file",
+        "id",
+        "severity"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "file": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
         }
       }
     },
     "issue": {
       "type": "object",
-      "required": ["type", "message", "documentation", "severity", "confidence", "detector", "evidence", "suggestion"],
+      "required": [
+        "id",
+        "type",
+        "message",
+        "documentation",
+        "severity",
+        "confidence",
+        "evidence",
+        "suggestion"
+      ],
       "additionalProperties": false,
       "properties": {
+        "id": {
+          "type": "string",
+          "description": "Type and location, e.g. FullTableScan@posts or FunctionInvalidatesIndex@posts.created_at; a repeat at the same place gets #2, #3. Stable across runs while the problem persists."
+        },
         "type": {
           "enum": [
             "CartesianProduct",
@@ -90,31 +252,69 @@
             "UnnecessaryDistinct"
           ]
         },
-        "message": { "type": "string" },
-        "documentation": { "type": "string", "format": "uri" },
-        "severity": { "$ref": "#/$defs/severity" },
-        "confidence": { "type": "number", "minimum": 0, "maximum": 1 },
-        "detector": { "type": "string" },
-        "evidence": { "type": "object" },
-        "suggestion": { "$ref": "#/$defs/suggestion" }
+        "message": {
+          "type": "string"
+        },
+        "documentation": {
+          "type": "string",
+          "format": "uri"
+        },
+        "severity": {
+          "$ref": "#/$defs/severity"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "evidence": {
+          "type": "object",
+          "description": "The values the detector judged by; EXPLAIN keys keep their EXPLAIN names."
+        },
+        "suggestion": {
+          "$ref": "#/$defs/suggestion"
+        }
       }
     },
     "suggestion": {
       "oneOf": [
-        { "type": "null" },
+        {
+          "type": "null"
+        },
         {
           "type": "object",
-          "required": ["kind", "description"],
+          "required": [
+            "kind",
+            "description"
+          ],
           "additionalProperties": false,
           "properties": {
-            "kind": { "enum": ["index", "rewrite", "review"] },
-            "description": { "type": "string" },
-            "ddl": { "type": "string" },
-            "sql": { "type": "string" }
+            "kind": {
+              "enum": [
+                "index",
+                "rewrite",
+                "review"
+              ]
+            },
+            "description": {
+              "type": "string"
+            },
+            "ddl": {
+              "type": "string"
+            },
+            "sql": {
+              "type": "string"
+            }
           }
         }
       ]
     },
-    "severity": { "enum": ["Critical", "Warning", "Info"] }
+    "severity": {
+      "enum": [
+        "Critical",
+        "Warning",
+        "Info"
+      ]
+    }
   }
 }

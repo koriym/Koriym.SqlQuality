@@ -10,7 +10,6 @@ use RuntimeException;
 
 use function array_column;
 use function array_keys;
-use function file_exists;
 use function file_put_contents;
 use function is_dir;
 use function mkdir;
@@ -45,7 +44,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     {
         $pdo = $this->connect();
 
-        return new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''));
+        return new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql');
     }
 
     public function testAnalyzeSqlFilesReportsSkippedFilesWithoutWritingToStdout(): void
@@ -59,7 +58,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         ]);
 
         $this->assertCount(1, $run['results']);
-        $this->assertArrayHasKey('optimizer_comparison', $run['results']['1_full_table_scan.sql']);
+        $this->assertArrayHasKey('without_optimizer', $run['results']['1_full_table_scan.sql']);
         $this->assertContains('FullTableScan', array_column($run['results']['1_full_table_scan.sql']['issues'], 'type'));
 
         $this->assertCount(2, $run['skipped']);
@@ -92,7 +91,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     {
         $pdo = $this->connect();
         $pdo->exec("SET optimizer_trace = 'enabled=off,one_line=on'");
-        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''));
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql');
 
         $context = $analyzer->queryContext('9_inefficient_in_query.sql', ['status1' => 'draft', 'status2' => 'published', 'status3' => 'archived', 'status4' => 'deleted', 'status5' => 'pending']);
 
@@ -107,7 +106,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->writeSqlFile('zz_missing_table.sql', 'SELECT * FROM no_such_table');
 
         try {
-            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_missing_table.sql', []);
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir))->queryContext('zz_missing_table.sql', []);
             $this->fail('EXPLAIN on a missing table must throw');
         } catch (PDOException $e) {
             $this->assertStringContainsString('no_such_table', $e->getMessage());
@@ -117,7 +116,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
 
         $failingRestore = new RestoreFailingPdo($this->connectionSettings());
         try {
-            (new SqlFileAnalyzer($failingRestore, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_missing_table.sql', []);
+            (new SqlFileAnalyzer($failingRestore, new ExplainAnalyzer(), $this->outputDir))->queryContext('zz_missing_table.sql', []);
             $this->fail('EXPLAIN on a missing table must throw');
         } catch (PDOException $e) {
             $this->assertStringContainsString('no_such_table', $e->getMessage(), 'the EXPLAIN error wins over the restore error');
@@ -129,7 +128,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $pdo = $this->connect();
         $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'it\\'s; fine' AS s");
 
-        $context = (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+        $context = (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir))->queryContext('zz_escaped_quote.sql', []);
 
         $this->assertSame(1, $context->explain['query_block']['select_id'] ?? null);
     }
@@ -141,7 +140,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
 
         try {
-            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_escaped_quote.sql', []);
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir))->queryContext('zz_escaped_quote.sql', []);
             $this->fail('a second statement hidden by NO_BACKSLASH_ESCAPES must not reach the server');
         } catch (NotExplainable $e) {
             $this->assertStringContainsString('stacked', $e->getMessage());
@@ -157,7 +156,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         $this->writeSqlFile('zz_ansi_quotes.sql', 'SELECT 1 AS "x\\"; SET @smuggled = 1 -- "');
 
         try {
-            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor('')))->queryContext('zz_ansi_quotes.sql', []);
+            (new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir))->queryContext('zz_ansi_quotes.sql', []);
             $this->fail('a second statement hidden by ANSI_QUOTES must not reach the server');
         } catch (NotExplainable $e) {
             $this->assertStringContainsString('stacked', $e->getMessage());
@@ -170,7 +169,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     {
         $pdo = $this->connect();
         $this->writeSqlFile('zz_escaped_quote.sql', "SELECT 'x\\'; SET @smuggled = 1 -- '");
-        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir, new AIQueryAdvisor(''));
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), $this->outputDir);
         $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
 
         try {
@@ -186,7 +185,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     public function testARestoreFailureAfterASuccessfulExplainPropagates(): void
     {
         $pdo = new RestoreFailingPdo($this->connectionSettings());
-        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''));
+        $analyzer = new SqlFileAnalyzer($pdo, new ExplainAnalyzer(), __DIR__ . '/sql');
 
         $this->expectException(PDOException::class);
         $this->expectExceptionMessage(RestoreFailingPdo::MESSAGE);
@@ -196,7 +195,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
 
     public function testTheNoOptimizerPassFailureWinsOverAFailingSettingsRestore(): void
     {
-        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: true));
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new FailingOptimizerSettings(disableFails: true));
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(FailingOptimizerSettings::DISABLE_MESSAGE);
@@ -206,7 +205,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
 
     public function testAFailingSettingsRestoreAfterASuccessfulNoOptimizerPassPropagates(): void
     {
-        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new AIQueryAdvisor(''), new FailingOptimizerSettings(disableFails: false));
+        $analyzer = new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), __DIR__ . '/sql', new FailingOptimizerSettings(disableFails: false));
 
         $this->expectException(RuntimeException::class);
         $this->expectExceptionMessage(FailingOptimizerSettings::RESTORE_MESSAGE);
@@ -226,20 +225,50 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         ['result' => $result, 'context' => $context] = $this->createAnalyzer()
             ->explain('11_nested_loop.sql', ['email' => 'example@example.com']);
 
-        $this->assertNotSame($result['cost'], $result['optimizer_comparison']['without_optimizer']['cost']);
+        $this->assertNotSame($result['cost'], $result['without_optimizer']['cost']);
+        $this->assertContains('FullTableScan@posts', SqlFileAnalyzer::hiddenIssues($result));
         $this->assertSame($result['cost'], (float) $context->explain['query_block']['cost_info']['query_cost']);
         $this->assertStringContainsString("'example@example.com'", $context->sql);
         $this->assertStringStartsWith('-> ', (string) $context->explainAnalyze);
     }
 
-    public function testAnalyzeSqlDirectoryWritesReportPerQueryAndSummary(): void
+    public function testAnalyzeDirectoryCoversEverySqlFileAndEveryParamsEntry(): void
     {
-        $this->outputDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_report_', true);
+        $this->writeSqlFile('a.sql', 'SELECT * FROM posts WHERE view_count > :min_views');
+        file_put_contents($this->outputDir . '/b.sql', 'SELECT 1');
+        file_put_contents($this->outputDir . '/notes.txt', 'not sql');
+
+        $run = (new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), $this->outputDir))->analyzeDirectory(['missing.sql' => []]);
+
+        $this->assertSame(['b.sql'], array_keys($run['results']));
+        $this->assertSame('UnboundParameter: min_views', $run['skipped']['a.sql']);
+        $this->assertStringStartsWith('RuntimeException: SQL file not found', $run['skipped']['missing.sql']);
+    }
+
+    public function testAnalyzeSqlTakesTheStatementText(): void
+    {
+        $result = $this->createAnalyzer()->analyzeSql('SELECT * FROM posts WHERE view_count > :min_views', ['min_views' => 1000]);
+
+        $this->assertTrue($result['executed']);
+        $this->assertIsFloat($result['execution_time']);
+        $this->assertSame(['FullTableScan@posts'], array_column($result['issues'], 'id'));
+    }
+
+    public function testAWriteStatementIsExplainedButNotTimed(): void
+    {
+        $result = $this->createAnalyzer()->analyze('20_multi_table_update.sql', []);
+
+        $this->assertFalse($result['executed']);
+        $this->assertNull($result['execution_time']);
+        $this->assertNotNull($result['skipped_reason']);
+    }
+
+    public function testADirectoryNameWithGlobCharactersIsReadLiterally(): void
+    {
+        $this->outputDir = sys_get_temp_dir() . '/' . uniqid('sqlquality_[archive]_', true);
         mkdir($this->outputDir);
+        file_put_contents($this->outputDir . '/a.sql', 'SELECT 1');
 
-        $this->createAnalyzer()->analyzeSqlDirectory(['1_full_table_scan.sql' => ['min_views' => 1000]], $this->outputDir);
-
-        $this->assertTrue(file_exists($this->outputDir . '/1_full_table_scan.md'));
-        $this->assertTrue(file_exists($this->outputDir . '/summary_report.md'));
+        $this->assertSame(['a.sql'], (new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), $this->outputDir))->sqlFiles());
     }
 }

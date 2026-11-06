@@ -7,6 +7,54 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-11-05
+
+Rebuilt for coding agents and CI: the tool measures and verifies, the caller writes the prose.
+
+### Added
+- `sql-quality compare`: runs an original and a rewritten SELECT (values hashed with their PHP type, floats with 17 significant digits; the order-independent checksum sums row hashes without a modulus, so multiplicities never cancel; both result sets read in one consistent-snapshot, read-only transaction and streamed unbuffered) in a read-only session and reports whether they return the same rows (`equivalent`, `same_order`, `same_columns`, `both_empty`, row counts and checksums), with the change in cost, time and issues. Exit 1 when not equivalent
+- `sql-quality try-index`: adds a candidate index `INVISIBLE, ALGORITHM=INPLACE, LOCK=NONE`, measures the statement with `use_invisible_indexes=on` in its own session, and drops the index; `--keep` keeps an effective one, visible. Reports `used` and `effective` (`--min-improvement`, default 5%). Exit 1 when not effective. MySQL 8.0.18+. The session's `lock_wait_timeout` is 10 seconds during the trial so a table held by a transaction fails the trial instead of queueing behind it; stderr names the `DROP INDEX` before the index is added; a table with an invisible index already is refused (`InvisibleIndexesPresent`); an open transaction on the connection is refused (DDL would commit it); only an index this run added is dropped, so a same-named index another connection made meanwhile survives; the session is restored even when the run fails right after its first session change; SIGINT / SIGTERM drop the index before the process ends; an index merge (`union(a,b)`) counts as using the index, and only an access to the indexed table does
+- `sql-quality analyze --baseline=FILE`: `baseline.new`, `resolved`, `persisting` and `unverified` against an earlier report; `--fail-on` then counts only the new issues
+- `sql-quality explain --sql=SQL` and `--sql-file=-` (stdin); `--detail=full` for the EXPLAIN, schema and optimizer trace
+- Issue `id`: type and location (`FullTableScan@posts`, `FunctionInvalidatesIndex@posts.created_at`, `#2` for a repeat; `@ . # \` inside a name are backslash-escaped so no two places share an id), stable across runs
+- `optimizer_impact.cost_without_optimizer` and `optimizer_impact.hidden_issues`, the ids of issues only the no-optimizer plan has
+- `summary.total_cost` in the `analyze` report
+- `.json` params files, for `analyze` and the other commands
+- `SQL_QUALITY_DSN`, `SQL_QUALITY_USER` and `SQL_QUALITY_PASSWORD` for the connection
+- `UnboundParameter` naming the placeholders no parameter was given for, and `EmptyListParameter`
+- `SqlFileAnalyzer::analyzeDirectory()`, `analyzeSql()`, `explainSql()`, `sqlFiles()` and `hiddenIssues()`; `SchemaReader`, `ParameterBinder`, `RewriteComparator`, `ResultFingerprint`, `IndexTrial`, `IndexDefinition`, `Baseline` and `Cli`
+- `schema/compare-report.schema.json` and `schema/try-index-report.schema.json`
+- `.claude/settings.json` enabling the bundled plugin in this repository
+- `InvalidParameterValue` for an object, or a list holding a list or an object, given as a parameter value
+
+### Changed
+- `analyze` covers every `*.sql` file of `--sql-dir`, not only the files the params file names; `--params` is optional
+- `explain` prints a summary by default; `context` needs `--detail=full`
+- An unknown option is a usage error (exit 2) instead of being ignored
+- `SqlFileAnalyzer`'s constructor is `(PDO, ExplainAnalyzer = new ExplainAnalyzer(), string $sqlDir = '.', ?OptimizerSettingsInterface)`
+- The analysis result carries `without_optimizer` (`cost`, `issues`) instead of `optimizer_comparison`; `execution_time` is `null` for a statement that was not run
+- The no-optimizer pass is no longer timed, which halves the queries each analysis runs
+- `ExplainAnalyzer::MESSAGES` replaces `DEFAULT_MESSAGES`; `ExplainAnalyzer::queryCost()` replaces `calculateQueryCost()`
+- Parameters are bound in one character-scanning pass (no regular expression, which emptied a statement with a literal or comment over ~16 KB) that skips string literals, quoted identifiers and comments: `:id` no longer matches the start of `:id2` or text inside `'Re: :id'`, an inserted value is never scanned again (the result no longer depends on the parameter order), and a value containing `$1` is inserted as is. Only the parameters the statement uses are checked, and a placeholder inside a `/*!NNNNN ... */` versioned comment is refused, since an older server skips that body regardless of quotes
+- The CLI connects with `PDO::MYSQL_ATTR_MULTI_STATEMENTS` off and sets `autocommit = 1` for its session, so a server with `autocommit=0` works; a refused precondition (`ActiveTransactionRejected`) exits 2 instead of 255
+- `INF` and `NAN` parameter values are refused (`InvalidParameterValue`)
+- The cost of a `UNION` is the sum of its branches' `query_cost` instead of the 1.0 fallback
+- Read-only SELECTs are timed with unbuffered, streamed fetches, so a large result set no longer exhausts `memory_limit`
+- `analyze` lists `--sql-dir` with `scandir()` (a directory name with glob characters was not matched) and refuses an unreadable directory; the referenced tables are found with quote-aware comment stripping
+- Output a PHP params file prints goes to stderr, and a `.json` params file must hold an object
+- The skills use `vendor/bin/sql-quality`, and `sql-quality-fix` applies only rewrites `compare` proves equivalent and recommends only indexes `try-index` proves effective; it no longer runs DDL itself
+- The CLI lives in `src/Cli.php`; `--version` prints the package version
+
+### Removed
+- `AIQueryAdvisor` and the per-query prompt files: the agent reading the JSON is the AI
+- `--format=markdown`, `--output`, `MarkdownSummaryReportGenerator`, `QueryStatisticsCalculator`, `StatisticalQueryLevelClassifier` and their interfaces
+- `--lang` and custom messages for `ExplainAnalyzer`; `UnknownMessageKey`
+- `ExplainParser`, `ExplainTreeVisualizer`, `ExplainExplainer`, `TreeVisualizer` and `TreeNode`
+- `SqlFileAnalyzer::analyzeSqlDirectory()`, `saveReports()` and `generateSummaryReport()`
+- `mode` in the reports and `detector` on issues
+- `.claude/commands/`, duplicates of the skills
+- `demo/`
+
 ## [0.4.0] - 2026-10-16
 
 ### Added
