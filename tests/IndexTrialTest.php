@@ -14,7 +14,9 @@ use RuntimeException;
 
 use function array_filter;
 use function array_values;
+use function bin2hex;
 use function preg_match;
+use function random_bytes;
 
 final class IndexTrialTest extends MySqlTestCase
 {
@@ -105,6 +107,34 @@ final class IndexTrialTest extends MySqlTestCase
         } finally {
             $pdo->exec('DROP INDEX sqlq_test_hidden ON posts');
         }
+    }
+
+    public function testAnInvisibleIndexOnAQualifiedTableOfAnotherSchemaIsRefused(): void
+    {
+        $pdo = $this->connect();
+        $schema = 'sqlquality_other_' . bin2hex(random_bytes(4));
+        $pdo->exec("CREATE DATABASE {$schema}");
+
+        try {
+            $pdo->exec("CREATE TABLE {$schema}.comments (id INT PRIMARY KEY, post_id INT, INDEX sqlq_test_hidden (post_id) INVISIBLE)");
+            (new IndexTrial($pdo))->run("SELECT * FROM posts p JOIN {$schema}.comments c ON c.post_id = p.id WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('InvisibleIndexesPresent expected');
+        } catch (InvisibleIndexesPresent $e) {
+            $this->assertSame("{$schema}.comments.sqlq_test_hidden", $e->getMessage());
+        } finally {
+            $pdo->exec("DROP DATABASE {$schema}");
+        }
+    }
+
+    public function testAnAliasQualifiedWithTheConnectionDatabaseCountsAsTheTable(): void
+    {
+        $pdo = $this->connect();
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $this->assertIsString($database);
+
+        $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$database}.posts p WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+
+        $this->assertTrue($trial['used']);
     }
 
     public function testTheNoticeNamesTheDropStatementBeforeTheIndexIsAdded(): void

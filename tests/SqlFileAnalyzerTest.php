@@ -10,9 +10,11 @@ use RuntimeException;
 
 use function array_column;
 use function array_keys;
+use function bin2hex;
 use function file_put_contents;
 use function is_dir;
 use function mkdir;
+use function random_bytes;
 use function rmdir;
 use function scandir;
 use function sprintf;
@@ -276,25 +278,27 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     public function testATableOfAnotherSchemaGetsItsOwnSchemaAndTheSameFindings(): void
     {
         $pdo = $this->connect();
-        $pdo->exec('CREATE DATABASE IF NOT EXISTS sqlquality_reporting');
-        $pdo->exec('CREATE TABLE IF NOT EXISTS sqlquality_reporting.posts LIKE posts');
-        $pdo->exec('TRUNCATE sqlquality_reporting.posts');
-        $pdo->exec('INSERT INTO sqlquality_reporting.posts SELECT * FROM posts');
-        $pdo->query('ANALYZE TABLE sqlquality_reporting.posts')->fetchAll();
+        // a database of this test's own: created without IF NOT EXISTS, so the finally drops nothing else
+        $schema = 'sqlquality_reporting_' . bin2hex(random_bytes(4));
+        $pdo->exec("CREATE DATABASE {$schema}");
 
         try {
+            $pdo->exec("CREATE TABLE {$schema}.posts LIKE posts");
+            $pdo->exec("INSERT INTO {$schema}.posts SELECT * FROM posts");
+            $pdo->query("ANALYZE TABLE {$schema}.posts")->fetchAll();
+
             $analyzer = new SqlFileAnalyzer($pdo);
             $sql = "SELECT * FROM %s p WHERE DATE(p.created_at) = '2026-06-07'";
-            ['result' => $qualified, 'context' => $context] = $analyzer->explainSql(sprintf($sql, 'sqlquality_reporting.posts'), []);
+            ['result' => $qualified, 'context' => $context] = $analyzer->explainSql(sprintf($sql, $schema . '.posts'), []);
             $local = $analyzer->analyzeSql(sprintf($sql, 'posts'), []);
 
-            $this->assertSame(['sqlquality_reporting.posts'], array_keys($context->schema));
-            $this->assertSame(['p' => 'sqlquality_reporting.posts'], $context->aliases());
+            $this->assertSame([$schema . '.posts'], array_keys($context->schema));
+            $this->assertSame(['p' => $schema . '.posts'], $context->aliases());
             $this->assertNotSame([], $context->indexColumns('p'));
             $this->assertSame(array_column($local['issues'], 'id'), array_column($qualified['issues'], 'id'));
             $this->assertContains('FunctionInvalidatesIndex@p.created_at', array_column($qualified['issues'], 'id'));
         } finally {
-            $pdo->exec('DROP DATABASE sqlquality_reporting');
+            $pdo->exec("DROP DATABASE {$schema}");
         }
     }
 }

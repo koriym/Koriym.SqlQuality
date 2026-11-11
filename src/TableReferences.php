@@ -38,26 +38,17 @@ final class TableReferences
      */
     public static function aliases(string $sqlWithoutComments): array
     {
-        preg_match_all(self::LIST, $sqlWithoutComments, $matches, PREG_SET_ORDER);
-
         $aliases = [];
-        foreach ($matches as $match) {
-            foreach (explode(',', $match[1]) as $reference) {
-                if (preg_match(self::ITEM, trim($reference), $item) !== 1) {
-                    continue;
-                }
-
-                $schema = $item[1];
-                $table = $item[2];
-                $alias = ($item[3] ?? '') === '' ? $table : $item[3];
-                $aliases[$alias] = $schema === '' ? $table : $schema . '.' . $table;
-            }
+        foreach (self::references($sqlWithoutComments) as [$alias, $key]) {
+            $aliases[$alias] = $key;
         }
 
         return $aliases;
     }
 
     /**
+     * Every table referenced, also when two references share an alias (a subquery reusing "p").
+     *
      * @param string $sqlWithoutComments the statement with comments already stripped, quote-aware
      *
      * @return list<string> table keys, each once, in order of appearance
@@ -67,11 +58,37 @@ final class TableReferences
     public static function keys(string $sqlWithoutComments): array
     {
         $keys = [];
-        foreach (self::aliases($sqlWithoutComments) as $key) {
+        foreach (self::references($sqlWithoutComments) as [, $key]) {
             $keys[$key] = $key;
         }
 
         return array_values($keys);
+    }
+
+    /**
+     * @return list<array{0: string, 1: string}> [alias or bare table name, table key] per reference
+     *
+     * @psalm-pure
+     */
+    private static function references(string $sqlWithoutComments): array
+    {
+        preg_match_all(self::LIST, $sqlWithoutComments, $matches, PREG_SET_ORDER);
+
+        $references = [];
+        foreach ($matches as $match) {
+            foreach (explode(',', $match[1]) as $reference) {
+                if (preg_match(self::ITEM, trim($reference), $item) !== 1) {
+                    continue;
+                }
+
+                $schema = $item[1];
+                $table = $item[2];
+                $alias = ($item[3] ?? '') === '' ? $table : $item[3];
+                $references[] = [$alias, $schema === '' ? $table : $schema . '.' . $table];
+            }
+        }
+
+        return $references;
     }
 
     /** @return array{0: string|null, 1: string} the schema (null when unqualified) and the table of a key */

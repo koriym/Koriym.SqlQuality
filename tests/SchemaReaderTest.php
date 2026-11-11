@@ -40,4 +40,9 @@ final class SchemaReaderTest extends TestCase
         $this->assertSame(['reporting.posts', 'users'], SchemaReader::tableNames('SELECT * FROM reporting.posts p JOIN users u ON u.id = p.user_id'));
         $this->assertSame(['reporting.posts'], SchemaReader::tableNames('SELECT * FROM `reporting`.`posts` WHERE id = 1'));
     }
+
+    public function testTablesSharingAnAliasAreAllListed(): void
+    {
+        $this->assertSame(['posts', 'comments'], SchemaReader::tableNames('SELECT * FROM posts p WHERE EXISTS (SELECT 1 FROM comments p WHERE p.id = 1)'));
+    }
 }
