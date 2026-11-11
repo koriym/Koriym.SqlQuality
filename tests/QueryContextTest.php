@@ -78,6 +78,15 @@ final class QueryContextTest extends TestCase
         $this->assertSame(['u' => 'users', 'p' => 'posts'], $context->aliases());
     }
 
+    public function testAnAliasMayStartWithAKeywordFollowedByADollarSign(): void
+    {
+        $bare = new QueryContext('SELECT * FROM posts on$1 WHERE on$1.id = 1', ['query_block' => []], null, [], []);
+        $withAs = new QueryContext('SELECT * FROM posts AS set$1 WHERE set$1.id = 1', ['query_block' => []], null, [], []);
+
+        $this->assertSame(['on$1' => 'posts'], $bare->aliases());
+        $this->assertSame(['set$1' => 'posts'], $withAs->aliases());
+    }
+
     public function testAliasesExcludeDerivedTables(): void
     {
         $aliases = Fixture::load('22_excessive_derived_tables.sql')->aliases();

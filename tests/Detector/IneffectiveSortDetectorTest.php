@@ -48,6 +48,20 @@ final class IneffectiveSortDetectorTest extends TestCase
         $this->assertStringContainsString('posts (created_at)', $findings[0]->suggestion['description'] ?? '');
     }
 
+    public function testReadsAnOrderByItemContainingADollarSign(): void
+    {
+        $findings = (new IneffectiveSortDetector())->detect(new QueryContext(
+            sql: 'SELECT * FROM posts p$1 ORDER BY p$1.created$at',
+            explain: ['query_block' => ['select_id' => 1, 'ordering_operation' => ['using_filesort' => true, 'table' => ['table_name' => 'p$1', 'access_type' => 'ALL', 'rows_examined_per_scan' => 2000]]]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: ['posts' => ['columns' => [['COLUMN_NAME' => 'created$at', 'DATA_TYPE' => 'datetime']], 'indexes' => []]],
+        ));
+
+        $this->assertCount(1, $findings);
+        $this->assertStringContainsString('posts (created$at)', $findings[0]->suggestion['description'] ?? '');
+    }
+
     public function testNamesAnExistingIndexTheOptimizerDidNotUse(): void
     {
         $findings = (new IneffectiveSortDetector())->detect(Fixture::load('9_inefficient_in_query.sql'));

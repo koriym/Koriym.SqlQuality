@@ -26,9 +26,9 @@ final class TableReferences
 {
     private const KEYWORDS = 'WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE';
     private const TABLE = '(?:`?[\w$]+`?\s*\.\s*)?`?[\w$]+`?';
-    private const ALIAS = '(?:\s+(?:AS\s+)?(?!(?:' . self::KEYWORDS . ')\b)`?[\w$]+`?)?';
+    private const ALIAS = '(?:\s+(?:AS\s+)?(?!(?:' . self::KEYWORDS . ')(?![\w$]))`?[\w$]+`?)?';
     private const REFERENCE = self::TABLE . self::ALIAS;
-    private const LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(' . self::REFERENCE . '(?:\s*,\s*' . self::REFERENCE . ')*)/i';
+    private const LIST = '/(?<![\w$])(?:FROM|JOIN|UPDATE)\s+(' . self::REFERENCE . '(?:\s*,\s*' . self::REFERENCE . ')*)/i';
     private const ITEM = '/^(?:`?([\w$]+)`?\s*\.\s*)?`?([\w$]+)`?(?:\s+(?:AS\s+)?`?([\w$]+)`?)?$/i';
 
     /**

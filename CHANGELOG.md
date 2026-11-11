@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The `PDO::MYSQL_ATTR_*` constants PHP 8.5 deprecates are no longer used: `MysqlAttribute` reads `Pdo\Mysql::ATTR_*` where that class exists (PHP 8.4+), and the old constants before PHP 8.4
 - `SchemaReader` keeps `$` in table names, so schema lookup and the invisible-index safety check cover the actual table
 - `IndexTrial` restores the caller's signal mask instead of unconditionally unblocking `SIGINT` and `SIGTERM`
+- Aliases and columns containing `$` are read whole: `FunctionInvalidatesIndex`, `IneffectiveJoin`, `IneffectiveSort` and `UnnecessaryDistinct` now report on a statement such as `FROM posts p$1 WHERE YEAR(p$1.created_at) = 2024`. An alias like `on$1` and a column like `price$from` are no longer taken for the keyword they contain.
 
 ## [0.5.0] - 2026-11-05
 

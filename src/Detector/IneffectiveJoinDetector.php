@@ -22,7 +22,7 @@ use const PREG_SET_ORDER;
  */
 final class IneffectiveJoinDetector implements DetectorInterface
 {
-    private const JOIN_PREDICATE = '/`\w+`\.`(?<left>\w+)`\.`(?<leftColumn>\w+)`\s*=\s*`\w+`\.`(?<right>\w+)`\.`(?<rightColumn>\w+)`/';
+    private const JOIN_PREDICATE = '/`[\w$]+`\.`(?<left>[\w$]+)`\.`(?<leftColumn>[\w$]+)`\s*=\s*`[\w$]+`\.`(?<right>[\w$]+)`\.`(?<rightColumn>[\w$]+)`/';
 
     #[Override]
     public function detect(QueryContext $context): array

@@ -38,6 +38,21 @@ final class FunctionInvalidatesIndexDetectorTest extends TestCase
         $this->assertArrayNotHasKey('sql', $findings[0]->suggestion ?? []);
     }
 
+    public function testReportsATableAliasedWithADollarSign(): void
+    {
+        $findings = (new FunctionInvalidatesIndexDetector())->detect(new QueryContext(
+            sql: 'SELECT * FROM posts p$1 WHERE YEAR(p$1.created_at) = 2024',
+            explain: ['query_block' => ['select_id' => 1, 'table' => ['table_name' => 'p$1', 'access_type' => 'ALL', 'attached_condition' => '(year(`test`.`p$1`.`created_at`) = 2024)']]],
+            explainAnalyze: null,
+            warnings: [],
+            schema: ['posts' => ['columns' => [], 'indexes' => [['INDEX_NAME' => 'idx_posts_created', 'COLUMN_NAME' => 'created_at', 'SEQ_IN_INDEX' => 1]]]],
+        ));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('p$1', $findings[0]->evidence['table_name']);
+        $this->assertSame('created_at', $findings[0]->evidence['column']);
+    }
+
     public function testReportsAColumnUnderAnOr(): void
     {
         $findings = (new FunctionInvalidatesIndexDetector())->detect(self::condition("((cast(`test`.`posts`.`created_at` as date) = '2024-01-01') or (`test`.`posts`.`status` = 'draft'))"));

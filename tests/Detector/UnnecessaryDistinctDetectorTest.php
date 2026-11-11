@@ -63,6 +63,14 @@ final class UnnecessaryDistinctDetectorTest extends TestCase
         $this->assertSame('SELECT * FROM orders WHERE user_id = 1', $findings[0]->suggestion['sql'] ?? null);
     }
 
+    public function testReadsSelectItemsContainingADollarSign(): void
+    {
+        $findings = (new UnnecessaryDistinctDetector())->detect(self::context('SELECT DISTINCT o$1.id AS id$1 FROM orders o$1', self::distinctScan('o$1')));
+
+        $this->assertCount(1, $findings);
+        $this->assertSame('o$1', $findings[0]->evidence['table_name']);
+    }
+
     public function testRequiresEveryColumnOfACompositeKey(): void
     {
         $schema = ['post_tags' => ['columns' => [['COLUMN_NAME' => 'post_id', 'COLUMN_KEY' => 'PRI'], ['COLUMN_NAME' => 'tag_id', 'COLUMN_KEY' => 'PRI']]]];

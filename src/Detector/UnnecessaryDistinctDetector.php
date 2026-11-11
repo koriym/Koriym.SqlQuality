@@ -21,7 +21,7 @@ use function trim;
 final class UnnecessaryDistinctDetector implements DetectorInterface
 {
     private const SELECT_DISTINCT = '/^SELECT\s+DISTINCT\s+(?<list>.+?)\s+FROM\b/is';
-    private const SELECT_ITEM = '/^(?:`?\w+`?\.)?(?:`?(?<column>\w+)`?|(?<star>\*))(?:\s+(?:AS\s+)?`?\w+`?)?$/i';
+    private const SELECT_ITEM = '/^(?:`?[\w$]+`?\.)?(?:`?(?<column>[\w$]+)`?|(?<star>\*))(?:\s+(?:AS\s+)?`?[\w$]+`?)?$/i';
 
     #[Override]
     public function detect(QueryContext $context): array

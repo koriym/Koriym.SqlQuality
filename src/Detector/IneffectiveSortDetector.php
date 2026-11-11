@@ -161,7 +161,7 @@ final class IneffectiveSortDetector implements DetectorInterface
 
         $columns = [];
         foreach (preg_split('/\s*,\s*/', trim($matches['list'][0])) ?: [] as $item) {
-            if (preg_match('/^(?:`?\w+`?\.)*`?(?<column>\w+)`?(?:\s+(?:ASC|DESC))?$/i', trim($item), $match) !== 1) {
+            if (preg_match('/^(?:`?[\w$]+`?\.)*`?(?<column>[\w$]+)`?(?:\s+(?:ASC|DESC))?$/i', trim($item), $match) !== 1) {
                 continue;
             }
 

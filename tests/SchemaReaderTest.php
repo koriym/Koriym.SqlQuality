@@ -51,6 +51,11 @@ final class SchemaReaderTest extends MySqlTestCase
         }
     }
 
+    public function testAColumnEndingInDollarFromDoesNotStartATableList(): void
+    {
+        $this->assertSame(['posts'], SchemaReader::tableNames('SELECT d.price$from p FROM posts JOIN (SELECT 1 AS price$from) d ON d.price$from = posts.id'));
+    }
+
     public function testASchemaQualifiedTableKeepsItsQualifier(): void
     {
         $this->assertSame(['reporting.posts', 'users'], SchemaReader::tableNames('SELECT * FROM reporting.posts p JOIN users u ON u.id = p.user_id'));

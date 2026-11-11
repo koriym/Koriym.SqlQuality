@@ -28,8 +28,8 @@ use const PREG_SET_ORDER;
 final class ConditionColumns
 {
     private const OR_JOINED = '/\)\s*or\s*\(/i';
-    private const FUNCTION_WRAPPED = '/(?<function>\w+)\(\s*`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`(?:[^()]*\)\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*))?/i';
-    private const PREDICATE = '/`\w+`\.`(?<qualifier>\w+)`\.`(?<column>\w+)`\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*)/i';
+    private const FUNCTION_WRAPPED = '/(?<function>\w+)\(\s*`[\w$]+`\.`(?<qualifier>[\w$]+)`\.`(?<column>[\w$]+)`(?:[^()]*\)\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*))?/i';
+    private const PREDICATE = '/`[\w$]+`\.`(?<qualifier>[\w$]+)`\.`(?<column>[\w$]+)`\s*(?<operator>>=|<=|<>|!=|=|>|<|in\s*\(|between|like|is)\s*(?<literal>[^)]*)/i';
     private const NUMBER = '/^-?\d+(?:\.\d+)?$/';
 
     /** @return ConditionColumnGroups */
