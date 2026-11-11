@@ -8,6 +8,9 @@ use function array_values;
 use function explode;
 use function preg_match;
 use function preg_match_all;
+use function preg_replace_callback;
+use function str_repeat;
+use function strlen;
 use function substr;
 use function trim;
 
@@ -81,11 +84,13 @@ final class TableReferences
      */
     private static function references(string $sqlWithoutComments): array
     {
-        preg_match_all(self::LIST, $sqlWithoutComments, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
+        // string literals blanked to the same length: a "(" or "FROM" inside one is not syntax
+        $sql = self::blankLiterals($sqlWithoutComments);
+        preg_match_all(self::LIST, $sql, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
 
         $references = [];
         foreach ($matches as $match) {
-            if (self::isFunctionArgument($sqlWithoutComments, $match[0][1])) {
+            if (self::isFunctionArgument($sql, $match[0][1])) {
                 continue;
             }
 
@@ -105,8 +110,9 @@ final class TableReferences
     }
 
     /**
-     * Whether the keyword at $offset is the FROM of EXTRACT(YEAR FROM t.c), TRIM(x FROM t.c) or SUBSTRING(t.c FROM 2):
-     * inside parentheses that are not a subquery. "t.c" there is a column, not a schema-qualified table.
+     * Whether the keyword at $offset is the FROM of EXTRACT(YEAR FROM t.c), TRIM(x FROM t.c) or
+     * SUBSTRING(t.c FROM 2): "t.c" there is a column, not a schema-qualified table. A parenthesised join
+     * ("JOIN (posts p JOIN comments c ...)") or a subquery is not a function call.
      *
      * @psalm-pure
      */
@@ -118,7 +124,7 @@ final class TableReferences
                 $depth++;
             } elseif ($sql[$i] === '(') {
                 if ($depth === 0) {
-                    return preg_match('/\bSELECT\b/i', substr($sql, $i + 1, $offset - $i - 1)) !== 1;
+                    return preg_match('/\b(?:EXTRACT|TRIM|SUBSTRING|SUBSTR)\s*$/i', substr($sql, 0, $i)) === 1;
                 }
 
                 $depth--;
@@ -126,6 +132,16 @@ final class TableReferences
         }
 
         return false;
+    }
+
+    /** @psalm-pure */
+    private static function blankLiterals(string $sql): string
+    {
+        return (string) preg_replace_callback(
+            "/'(?:[^'\\\\]++|\\\\.|'')*+'|\"(?:[^\"\\\\]++|\\\\.|\"\")*+\"/s",
+            static fn (array $literal): string => str_repeat(' ', strlen($literal[0])),
+            $sql,
+        );
     }
 
     /** @return array{0: string|null, 1: string} the schema (null when unqualified) and the table of a key */

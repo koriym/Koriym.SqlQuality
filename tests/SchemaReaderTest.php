@@ -45,4 +45,17 @@ final class SchemaReaderTest extends TestCase
     {
         $this->assertSame(['posts', 'comments'], SchemaReader::tableNames('SELECT * FROM posts p WHERE EXISTS (SELECT 1 FROM comments p WHERE p.id = 1)'));
     }
+
+    public function testAParenthesisOrFromInsideAStringLiteralIsNotSyntax(): void
+    {
+        $this->assertSame(['posts'], SchemaReader::tableNames("SELECT 'total (' AS label, p.* FROM posts p WHERE DATE(p.created_at) = '2026-06-07'"));
+        $this->assertSame(['posts', 'users', 'comments'], SchemaReader::tableNames("SELECT * FROM posts p JOIN users u ON u.name = 'x (' JOIN comments c ON c.post_id = p.id"));
+        $this->assertSame(['posts'], SchemaReader::tableNames("SELECT TRIM(')' FROM p.title) FROM posts p WHERE p.title <> 'a FROM b.c'"));
+    }
+
+    public function testAJoinInsideParenthesesIsStillATableReference(): void
+    {
+        $this->assertSame(['users', 'comments'], SchemaReader::tableNames('SELECT * FROM users u JOIN (posts p JOIN comments c ON c.post_id = p.id) ON p.user_id = u.id'));
+        $this->assertSame(['users', 'posts'], SchemaReader::tableNames('SELECT TRIM((SELECT name FROM users LIMIT 1)) FROM posts'));
+    }
 }
