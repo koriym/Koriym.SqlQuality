@@ -15,7 +15,9 @@ use RuntimeException;
 
 use function array_filter;
 use function array_values;
+use function assert;
 use function function_exists;
+use function is_array;
 use function pcntl_sigprocmask;
 use function preg_match;
 
@@ -349,8 +351,10 @@ final class IndexTrialTest extends MySqlTestCase
 
             $currentMask = [];
             pcntl_sigprocmask(SIG_BLOCK, [SIGTERM], $currentMask);
+            assert(is_array($currentMask));
             $this->assertContains(SIGTERM, $currentMask);
         } finally {
+            assert(is_array($previousMask));
             pcntl_sigprocmask(SIG_SETMASK, $previousMask);
         }
     }
