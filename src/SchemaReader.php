@@ -43,7 +43,7 @@ final class SchemaReader
     public static function tableNames(string $sql, QuoteRules $rules = new QuoteRules()): array
     {
         // quote-aware: a "--" inside a string literal is not a comment
-        return TableReferences::keys(SqlSafetyClassifier::stripComments($sql, $rules));
+        return TableReferences::keys(SqlSafetyClassifier::stripComments($sql, $rules), $rules);
     }
 
     /**

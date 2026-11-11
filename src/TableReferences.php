@@ -8,9 +8,6 @@ use function array_values;
 use function explode;
 use function preg_match;
 use function preg_match_all;
-use function preg_replace_callback;
-use function str_repeat;
-use function strlen;
 use function substr;
 use function trim;
 
@@ -35,16 +32,17 @@ final class TableReferences
     private const ITEM = '/^(?:`?(\w+)`?\s*\.\s*)?`?(\w+)`?(?:\s+(?:AS\s+)?`?(\w+)`?)?$/i';
 
     /**
-     * @param string $sqlWithoutComments the statement with comments already stripped, quote-aware
+     * @param string     $sqlWithoutComments the statement with comments already stripped, quote-aware
+     * @param QuoteRules $rules              how the server lexes quotes, so literals and identifiers are told apart
      *
      * @return array<string, string> alias (or bare table name) => table key
      *
      * @psalm-pure
      */
-    public static function aliases(string $sqlWithoutComments): array
+    public static function aliases(string $sqlWithoutComments, QuoteRules $rules = new QuoteRules()): array
     {
         $aliases = [];
-        foreach (self::references($sqlWithoutComments) as [$alias, $key, $explicit]) {
+        foreach (self::references($sqlWithoutComments, $rules) as [$alias, $key, $explicit]) {
             // "FROM posts ... FROM other.posts": both are reported as "posts"; the unqualified table keeps the name
             if (! $explicit && $key !== $alias) {
                 $aliases[$alias] ??= $key;
@@ -61,16 +59,17 @@ final class TableReferences
     /**
      * Every table referenced, also when two references share an alias (a subquery reusing "p").
      *
-     * @param string $sqlWithoutComments the statement with comments already stripped, quote-aware
+     * @param string     $sqlWithoutComments the statement with comments already stripped, quote-aware
+     * @param QuoteRules $rules              how the server lexes quotes, so literals and identifiers are told apart
      *
      * @return list<string> table keys, each once, in order of appearance
      *
      * @psalm-pure
      */
-    public static function keys(string $sqlWithoutComments): array
+    public static function keys(string $sqlWithoutComments, QuoteRules $rules = new QuoteRules()): array
     {
         $keys = [];
-        foreach (self::references($sqlWithoutComments) as [, $key]) {
+        foreach (self::references($sqlWithoutComments, $rules) as [, $key]) {
             $keys[$key] = $key;
         }
 
@@ -82,10 +81,10 @@ final class TableReferences
      *
      * @psalm-pure
      */
-    private static function references(string $sqlWithoutComments): array
+    private static function references(string $sqlWithoutComments, QuoteRules $rules): array
     {
         // string literals blanked to the same length: a "(" or "FROM" inside one is not syntax
-        $sql = self::blankLiterals($sqlWithoutComments);
+        $sql = SqlSafetyClassifier::blankStringLiterals($sqlWithoutComments, $rules);
         preg_match_all(self::LIST, $sql, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
 
         $references = [];
@@ -111,7 +110,7 @@ final class TableReferences
 
     /**
      * Whether the keyword at $offset is the FROM of EXTRACT(YEAR FROM t.c), TRIM(x FROM t.c) or
-     * SUBSTRING(t.c FROM 2): "t.c" there is a column, not a schema-qualified table. A parenthesised join
+     * SUBSTRING / MID(t.c FROM 2): "t.c" there is a column, not a schema-qualified table. A parenthesised join
      * ("JOIN (posts p JOIN comments c ...)") or a subquery is not a function call.
      *
      * @psalm-pure
@@ -124,7 +123,7 @@ final class TableReferences
                 $depth++;
             } elseif ($sql[$i] === '(') {
                 if ($depth === 0) {
-                    return preg_match('/\b(?:EXTRACT|TRIM|SUBSTRING|SUBSTR)\s*$/i', substr($sql, 0, $i)) === 1;
+                    return preg_match('/\b(?:EXTRACT|TRIM|SUBSTRING|SUBSTR|MID)\s*$/i', substr($sql, 0, $i)) === 1;
                 }
 
                 $depth--;
@@ -132,16 +131,6 @@ final class TableReferences
         }
 
         return false;
-    }
-
-    /** @psalm-pure */
-    private static function blankLiterals(string $sql): string
-    {
-        return (string) preg_replace_callback(
-            "/'(?:[^'\\\\]++|\\\\.|'')*+'|\"(?:[^\"\\\\]++|\\\\.|\"\")*+\"/s",
-            static fn (array $literal): string => str_repeat(' ', strlen($literal[0])),
-            $sql,
-        );
     }
 
     /** @return array{0: string|null, 1: string} the schema (null when unqualified) and the table of a key */

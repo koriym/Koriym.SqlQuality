@@ -379,6 +379,68 @@ final class SqlSafetyClassifier
         return $result;
     }
 
+    /**
+     * The statement with every string literal replaced by spaces of the same length, so offsets survive and
+     * a "(" or "FROM" inside a literal is not read as syntax. Identifiers (backticks, and "..." under
+     * ANSI_QUOTES) are kept as they are. An unterminated literal is blanked to the end.
+     *
+     * @psalm-pure
+     */
+    public static function blankStringLiterals(string $sql, QuoteRules $rules = new QuoteRules()): string
+    {
+        $result = $sql;
+        $quote = null;
+        $blank = false;
+        $isEscaped = false;
+        $length = strlen($sql);
+        for ($offset = 0; $offset < $length; $offset++) {
+            $char = $sql[$offset];
+
+            if ($quote === null) {
+                if ($char === '\'' || $char === '"' || $char === '`') {
+                    $quote = $char;
+                    $blank = $char === '\'' || ($char === '"' && ! $rules->ansiQuotes);
+                    if ($blank) {
+                        $result[$offset] = ' ';
+                    }
+                }
+
+                continue;
+            }
+
+            if ($blank) {
+                $result[$offset] = ' ';
+            }
+
+            if ($isEscaped) {
+                $isEscaped = false;
+
+                continue;
+            }
+
+            if ($char === '\\' && $rules->backslashEscapesIn($quote)) {
+                $isEscaped = true;
+
+                continue;
+            }
+
+            if ($char === $quote) {
+                if ($offset + 1 < $length && $sql[$offset + 1] === $quote) {
+                    $offset++;
+                    if ($blank) {
+                        $result[$offset] = ' ';
+                    }
+
+                    continue;
+                }
+
+                $quote = null;
+            }
+        }
+
+        return $result;
+    }
+
     /** @psalm-pure */
     private static function isVersionedCommentStart(string $sql, int $offset, int $length): bool
     {

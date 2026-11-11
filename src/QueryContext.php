@@ -128,7 +128,7 @@ final class QueryContext
      */
     public function aliases(): array
     {
-        return TableReferences::aliases($this->sqlWithoutComments());
+        return TableReferences::aliases($this->sqlWithoutComments(), $this->quoteRules);
     }
 
     /** @return SchemaInfo|null */

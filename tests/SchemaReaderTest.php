@@ -58,4 +58,23 @@ final class SchemaReaderTest extends TestCase
         $this->assertSame(['users', 'comments'], SchemaReader::tableNames('SELECT * FROM users u JOIN (posts p JOIN comments c ON c.post_id = p.id) ON p.user_id = u.id'));
         $this->assertSame(['users', 'posts'], SchemaReader::tableNames('SELECT TRIM((SELECT name FROM users LIMIT 1)) FROM posts'));
     }
+
+    public function testAQuoteInsideABacktickIdentifierDoesNotOpenALiteral(): void
+    {
+        $this->assertSame(['posts'], SchemaReader::tableNames("SELECT p.id AS `user's` FROM posts p WHERE DATE(p.created_at) = '2026-06-07'"));
+        $this->assertSame(['posts'], SchemaReader::tableNames('SELECT `a"b` FROM posts p WHERE p.title = "y"'));
+    }
+
+    public function testABackslashEndsALiteralUnderNoBackslashEscapes(): void
+    {
+        $sql = "SELECT 'C:\\' AS path, p.* FROM posts p WHERE p.title = 'x'";
+
+        $this->assertSame(['posts'], SchemaReader::tableNames($sql, new QuoteRules(backslashEscapes: false)));
+    }
+
+    public function testADoubleQuotedTableIsNotReadAsAnAliasUnderAnsiQuotes(): void
+    {
+        $this->assertSame([], SchemaReader::tableNames('SELECT * FROM "posts" p', new QuoteRules(ansiQuotes: true)));
+        $this->assertSame(['posts'], SchemaReader::tableNames('SELECT MID(p.title FROM 2) FROM posts p'));
+    }
 }
