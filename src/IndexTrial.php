@@ -260,7 +260,7 @@ final class IndexTrial
     private function assertNoInvisibleIndexes(string $sql, IndexDefinition $index): void
     {
         // a qualified table ("reporting.posts") is looked up in its own schema: the session enables its invisible indexes too
-        $keys = array_values(array_unique(array_merge([$index->table], SchemaReader::tableNames($sql))));
+        $keys = array_values(array_unique(array_merge([$index->table], SchemaReader::tableNames($sql, $this->analyzer->quoteRules() ?? new QuoteRules()))));
         $conditions = [];
         $values = [];
         foreach ($keys as $key) {

@@ -180,6 +180,25 @@ final class IndexTrialTest extends MySqlTestCase
         }
     }
 
+    public function testTheInvisibleIndexCheckReadsTheStatementWithTheSessionQuoteRules(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec('ALTER TABLE comments ADD INDEX sqlq_test_hidden (post_id) INVISIBLE');
+        $mode = $pdo->query('SELECT @@session.sql_mode')->fetchColumn();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+
+        try {
+            // without the session's rules, 'C:\' would run on and hide the FROM clause
+            (new IndexTrial($pdo))->run("SELECT 'C:\\' AS path, p.id FROM posts p JOIN comments c ON c.post_id = p.id WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('InvisibleIndexesPresent expected');
+        } catch (InvisibleIndexesPresent $e) {
+            $this->assertSame('comments.sqlq_test_hidden', $e->getMessage());
+        } finally {
+            $pdo->exec('DROP INDEX sqlq_test_hidden ON comments');
+            $pdo->prepare('SET SESSION sql_mode = ?')->execute([$mode]);
+        }
+    }
+
     public function testTheNoticeNamesTheDropStatementBeforeTheIndexIsAdded(): void
     {
         $pdo = $this->connect();
