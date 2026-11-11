@@ -7,13 +7,8 @@ namespace Koriym\SqlQuality;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 
-use function array_unique;
-use function array_values;
-use function explode;
 use function preg_match;
-use function preg_match_all;
-use function preg_replace;
-use function trim;
+use function sprintf;
 
 /**
  * Reads the information_schema rows of the tables a statement references.
@@ -25,8 +20,6 @@ use function trim;
  */
 final class SchemaReader
 {
-    private const TABLE_LIST = '/\b(?:FROM|JOIN|UPDATE)\s+(`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?(?:\s*,\s*`?\w+`?(?:\s+(?:AS\s+)?(?!(?:WHERE|ON|SET|JOIN|LEFT|RIGHT|INNER|OUTER|CROSS|NATURAL|STRAIGHT_JOIN|USING|GROUP|ORDER|LIMIT|HAVING|UNION|WINDOW|FOR|LOCK|INTO|PARTITION|USE|IGNORE|FORCE)\b)`?\w+`?)?)*)/i';
-
     public function __construct(private readonly PDO $pdo)
     {
     }
@@ -46,40 +39,38 @@ final class SchemaReader
         return $schema;
     }
 
-    /** @return list<string> */
+    /** @return list<string> table keys: "posts", or "reporting.posts" when the statement qualifies the table */
     public static function tableNames(string $sql, QuoteRules $rules = new QuoteRules()): array
     {
         // quote-aware: a "--" inside a string literal is not a comment
-        $sql = SqlSafetyClassifier::stripComments($sql, $rules);
-        preg_match_all(self::TABLE_LIST, $sql, $matches);
-
-        $tables = [];
-        foreach ($matches[1] as $list) {
-            foreach (explode(',', $list) as $reference) {
-                $tables[] = trim((string) preg_replace('/\s.*/s', '', trim($reference)), '`');
-            }
-        }
-
-        return array_values(array_unique($tables));
+        return TableReferences::keys(SqlSafetyClassifier::stripComments($sql, $rules), $rules);
     }
 
     /**
+     * @param string $tableName a table key: "posts" for a table of the connection's database, or
+     *                          "reporting.posts" for one of another schema
+     *
      * @return SchemaInfo
      *
      * @throws RuntimeException
      */
     public function forTable(string $tableName): array
     {
-        if (! preg_match('/^[a-zA-Z0-9_]+$/', $tableName)) {
+        if (! preg_match('/^(?:[a-zA-Z0-9_]+\.)?[a-zA-Z0-9_]+$/', $tableName)) {
             throw new RuntimeException('Invalid table name');
         }
 
-        $quotedTable = $this->pdo->quote($tableName);
+        [$schemaName, $table] = TableReferences::split($tableName);
+        $where = sprintf(
+            'table_schema = %s AND table_name = %s',
+            $schemaName === null ? 'DATABASE()' : $this->pdo->quote($schemaName),
+            $this->pdo->quote($table),
+        );
 
         return [
-            'columns' => $this->columns($quotedTable),
-            'indexes' => $this->indexes($quotedTable),
-            'status' => $this->status($quotedTable),
+            'columns' => $this->columns($where),
+            'indexes' => $this->indexes($where),
+            'status' => $this->status($where),
         ];
     }
 
@@ -88,7 +79,7 @@ final class SchemaReader
      *
      * @throws RuntimeException
      */
-    private function columns(string $quotedTable): array
+    private function columns(string $where): array
     {
         // With derived_merge=off (the no-optimizer pass) information_schema returns these headers lower-cased; the aliases pin the SchemaColumn case.
         $sql = <<<SQL
@@ -101,8 +92,7 @@ final class SchemaReader
                 column_default AS COLUMN_DEFAULT,
                 extra AS EXTRA
             FROM information_schema.columns
-            WHERE table_schema = DATABASE()
-            AND table_name = {$quotedTable}
+            WHERE {$where}
             ORDER BY ordinal_position
 SQL;
 
@@ -120,7 +110,7 @@ SQL;
      *
      * @throws RuntimeException
      */
-    private function indexes(string $quotedTable): array
+    private function indexes(string $where): array
     {
         // Aliases pin the header case; see columns().
         $sql = <<<SQL
@@ -131,8 +121,7 @@ SQL;
                 seq_in_index AS SEQ_IN_INDEX,
                 cardinality AS CARDINALITY
             FROM information_schema.statistics
-            WHERE table_schema = DATABASE()
-            AND table_name = {$quotedTable}
+            WHERE {$where}
             ORDER BY index_name, seq_in_index
 SQL;
 
@@ -150,7 +139,7 @@ SQL;
      *
      * @throws RuntimeException
      */
-    private function status(string $quotedTable): array
+    private function status(string $where): array
     {
         $sql = <<<SQL
         SELECT
@@ -161,8 +150,7 @@ SQL;
             CREATE_TIME as create_time,
             UPDATE_TIME as update_time
         FROM information_schema.tables
-        WHERE table_schema = DATABASE()
-        AND table_name = {$quotedTable}
+        WHERE {$where}
 SQL;
 
         $stmt = $this->pdo->query($sql);

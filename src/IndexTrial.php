@@ -9,16 +9,15 @@ use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\IndexAlreadyExists;
 use Koriym\SqlQuality\Exception\IndexCleanupFailed;
 use Koriym\SqlQuality\Exception\IndexTrialUnsupported;
+use Koriym\SqlQuality\Exception\InvalidIndexDefinition;
 use Koriym\SqlQuality\Exception\InvisibleIndexesPresent;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
 use Throwable;
 
-use function array_fill;
 use function array_merge;
 use function array_unique;
 use function array_values;
-use function count;
 use function function_exists;
 use function implode;
 use function in_array;
@@ -86,6 +85,7 @@ final class IndexTrial
         }
 
         $this->assertSupported();
+        $this->assertOwnSchema($index);
         $this->assertAbsent($index);
         $this->assertNoInvisibleIndexes($sql, $index);
         // bind first: an unbound parameter fails here, before any DDL
@@ -108,7 +108,7 @@ final class IndexTrial
             $this->addIndex($index, $added);
             $this->exec("SET SESSION optimizer_switch = 'use_invisible_indexes=on'");
             ['result' => $after, 'context' => $context] = $this->analyzer->explainSql($sql, $params);
-            $used = self::usesIndex($after['explain_result'], $index->name, self::namesOf($index->table, $context->aliases()));
+            $used = self::usesIndex($after['explain_result'], $index->name, self::namesOf($index->table, $context->aliases(), $this->database()));
             $effective = self::isEffective($before, $after, $used, $minImprovement);
         } catch (Throwable $e) {
             $original = $e;
@@ -144,17 +144,19 @@ final class IndexTrial
     }
 
     /**
-     * The names a plan can give the table: itself and every alias of it.
+     * The names a plan can give the table: itself and every alias of it, also one qualified with the
+     * connection's own database ("app.posts p"). An alias of the same name in another schema does not count.
      *
-     * @param array<string, string> $aliases alias => table
+     * @param array<string, string> $aliases alias => table key
      *
      * @return list<string>
      */
-    private static function namesOf(string $table, array $aliases): array
+    private static function namesOf(string $table, array $aliases, string|null $database): array
     {
-        $names = [$table];
+        // the bare name counts by itself only when no reference claims it: "FROM other.posts" is reported as "posts" too
+        $names = isset($aliases[$table]) ? [] : [$table];
         foreach ($aliases as $alias => $aliasedTable) {
-            if ($aliasedTable !== $table) {
+            if ($aliasedTable !== $table && ($database === null || $aliasedTable !== $database . '.' . $table)) {
                 continue;
             }
 
@@ -226,6 +228,21 @@ final class IndexTrial
         return $stmt->fetchColumn() !== false;
     }
 
+    /**
+     * The trial checks and creates indexes in the connection's own database; a table qualified with it
+     * (as a suggestion's ddl names it for "FROM app.posts") is that table.
+     *
+     * @throws InvalidIndexDefinition
+     */
+    private function assertOwnSchema(IndexDefinition $index): void
+    {
+        if ($index->schema === null || $index->schema === $this->database()) {
+            return;
+        }
+
+        throw new InvalidIndexDefinition("{$index->schema}.{$index->table} (a table of another schema is not supported: connect to that schema with --dsn and name the table alone)");
+    }
+
     /** @throws IndexAlreadyExists */
     private function assertAbsent(IndexDefinition $index): void
     {
@@ -242,10 +259,19 @@ final class IndexTrial
      */
     private function assertNoInvisibleIndexes(string $sql, IndexDefinition $index): void
     {
-        $tables = array_values(array_unique(array_merge([$index->table], SchemaReader::tableNames($sql))));
-        $placeholders = implode(', ', array_fill(0, count($tables), '?'));
-        $stmt = $this->pdo->prepare("SELECT DISTINCT CONCAT(table_name, '.', index_name) FROM information_schema.statistics WHERE table_schema = DATABASE() AND is_visible = 'NO' AND table_name IN ({$placeholders}) ORDER BY 1");
-        if ($stmt === false || ! $stmt->execute($tables)) {
+        // a qualified table ("reporting.posts") is looked up in its own schema: the session enables its invisible indexes too
+        $keys = array_values(array_unique(array_merge([$index->table], SchemaReader::tableNames($sql, $this->analyzer->quoteRules() ?? new QuoteRules()))));
+        $conditions = [];
+        $values = [];
+        foreach ($keys as $key) {
+            [$schema, $table] = TableReferences::split($key);
+            $conditions[] = '(table_schema = COALESCE(?, DATABASE()) AND table_name = ?)';
+            $values[] = $schema;
+            $values[] = $table;
+        }
+
+        $stmt = $this->pdo->prepare("SELECT DISTINCT CONCAT(IF(table_schema = DATABASE(), '', CONCAT(table_schema, '.')), table_name, '.', index_name) FROM information_schema.statistics WHERE is_visible = 'NO' AND (" . implode(' OR ', $conditions) . ') ORDER BY 1');
+        if ($stmt === false || ! $stmt->execute($values)) {
             throw new RuntimeException('Failed to look up invisible indexes');
         }
 
@@ -254,6 +280,15 @@ final class IndexTrial
         if ($invisible !== []) {
             throw new InvisibleIndexesPresent(implode(', ', $invisible));
         }
+    }
+
+    /** The connection's default database, null when none is selected */
+    private function database(): string|null
+    {
+        $stmt = $this->pdo->query('SELECT DATABASE()');
+        $database = $stmt === false ? false : $stmt->fetchColumn();
+
+        return is_string($database) ? $database : null;
     }
 
     private function sessionVariable(string $name): string
