@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use PDO;
-
 final class ResultFingerprintTest extends MySqlTestCase
 {
     public function testRowOrderChangesOnlyTheOrderedChecksum(): void
@@ -68,7 +66,7 @@ final class ResultFingerprintTest extends MySqlTestCase
         $pdo = $this->connect();
         ResultFingerprint::of($pdo, 'SELECT id FROM users');
 
-        $this->assertTrue((bool) $pdo->getAttribute(PDO::MYSQL_ATTR_USE_BUFFERED_QUERY));
+        $this->assertTrue((bool) $pdo->getAttribute(MysqlAttribute::useBufferedQuery()));
     }
 
     public function testMultiplicitiesThatDifferBy65536AreStillTold(): void

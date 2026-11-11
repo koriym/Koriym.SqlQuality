@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- The `PDO::MYSQL_ATTR_*` constants PHP 8.5 deprecates are no longer used: `MysqlAttribute` reads `Pdo\Mysql::ATTR_*` where that class exists (PHP 8.4+), and the old constants before PHP 8.4
+
 ## [0.5.0] - 2026-11-05
 
 Rebuilt for coding agents and CI: the tool measures and verifies, the caller writes the prose.
