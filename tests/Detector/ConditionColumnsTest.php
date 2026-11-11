@@ -52,6 +52,14 @@ final class ConditionColumnsTest extends TestCase
         $this->assertSame([], $groups['equality']);
     }
 
+    public function testNamesMayContainADollarSign(): void
+    {
+        $groups = ConditionColumns::forAlias('((year(`db$1`.`p$1`.`created$at`) = 2024) and (`db$1`.`p$1`.`user$id` = 5))', 'p$1');
+
+        $this->assertSame(['created$at'], array_column($groups['functionWrapped'], 'column'));
+        $this->assertSame(['user$id'], array_column($groups['equality'], 'column'));
+    }
+
     public function testComparedToNumberKeepsOnlyPredicatesWithNumericLiterals(): void
     {
         $matches = ConditionColumns::comparedToNumber(

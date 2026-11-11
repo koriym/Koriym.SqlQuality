@@ -56,7 +56,7 @@ final class SchemaReader
      */
     public function forTable(string $tableName): array
     {
-        if (! preg_match('/^(?:[a-zA-Z0-9_]+\.)?[a-zA-Z0-9_]+$/', $tableName)) {
+        if (! preg_match('/^(?:[a-zA-Z0-9_$]+\.)?[a-zA-Z0-9_$]+$/', $tableName)) {
             throw new RuntimeException('Invalid table name');
         }
 

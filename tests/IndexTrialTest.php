@@ -15,7 +15,15 @@ use RuntimeException;
 
 use function array_filter;
 use function array_values;
+use function assert;
+use function function_exists;
+use function is_array;
+use function pcntl_sigprocmask;
 use function preg_match;
+
+use const SIG_BLOCK;
+use const SIG_SETMASK;
+use const SIGTERM;
 
 final class IndexTrialTest extends MySqlTestCase
 {
@@ -326,5 +334,28 @@ final class IndexTrialTest extends MySqlTestCase
 
         $this->assertSame(600, (int) $pdo->query('SELECT @@session.lock_wait_timeout')->fetchColumn());
         $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'sqlq_trial_posts_view_count'")->fetchColumn());
+    }
+
+    public function testTheCallersSignalMaskIsRestored(): void
+    {
+        if (! function_exists('pcntl_sigprocmask')) {
+            $this->markTestSkipped('pcntl is required');
+        }
+
+        $previousMask = [];
+        pcntl_sigprocmask(SIG_BLOCK, [SIGTERM], $previousMask);
+
+        try {
+            $pdo = $this->connect();
+            (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > 9900', [], IndexDefinition::parse('posts(view_count)'));
+
+            $currentMask = [];
+            pcntl_sigprocmask(SIG_BLOCK, [SIGTERM], $currentMask);
+            assert(is_array($currentMask));
+            $this->assertContains(SIGTERM, $currentMask);
+        } finally {
+            assert(is_array($previousMask));
+            pcntl_sigprocmask(SIG_SETMASK, $previousMask);
+        }
     }
 }

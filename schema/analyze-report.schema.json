@@ -228,7 +228,7 @@
       "properties": {
         "id": {
           "type": "string",
-          "description": "Type and location, e.g. FullTableScan@posts or FunctionInvalidatesIndex@posts.created_at; a repeat at the same place gets #2, #3. Stable across runs while the problem persists."
+          "description": "Type and location, e.g. FullTableScan@posts or FunctionInvalidatesIndex@posts.created_at; a repeat at the same place gets #2, #3. Stable across runs while the problem persists. @, ., # and \\ inside a name are backslash-escaped."
         },
         "type": {
           "enum": [

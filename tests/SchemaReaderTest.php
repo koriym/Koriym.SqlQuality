@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
-use PHPUnit\Framework\TestCase;
+use function array_keys;
 
-final class SchemaReaderTest extends TestCase
+final class SchemaReaderTest extends MySqlTestCase
 {
     /** @return iterable<string, array{string, list<string>}> */
     public static function sqlProvider(): iterable
@@ -33,6 +33,27 @@ final class SchemaReaderTest extends TestCase
     public function testADoubleDashInsideALiteralIsNotAComment(): void
     {
         $this->assertSame(['posts', 'comments'], SchemaReader::tableNames("SELECT * FROM posts p WHERE p.title = 'a -- b' AND EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id)"));
+    }
+
+    public function testATableNameContainingADollarSign(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec('DROP TABLE IF EXISTS `sqlq_schema_u$1`');
+        $pdo->exec('CREATE TABLE `sqlq_schema_u$1` (id INT NOT NULL)');
+
+        try {
+            $schema = (new SchemaReader($pdo))->forSql('SELECT * FROM `sqlq_schema_u$1`');
+
+            $this->assertSame(['sqlq_schema_u$1'], array_keys($schema));
+            $this->assertSame('id', $schema['sqlq_schema_u$1']['columns'][0]['COLUMN_NAME']);
+        } finally {
+            $pdo->exec('DROP TABLE `sqlq_schema_u$1`');
+        }
+    }
+
+    public function testAColumnEndingInDollarFromDoesNotStartATableList(): void
+    {
+        $this->assertSame(['posts'], SchemaReader::tableNames('SELECT d.price$from p FROM posts JOIN (SELECT 1 AS price$from) d ON d.price$from = posts.id'));
     }
 
     public function testASchemaQualifiedTableKeepsItsQualifier(): void

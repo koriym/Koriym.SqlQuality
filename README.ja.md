@@ -63,7 +63,7 @@ echo "SELECT * FROM posts" | vendor/bin/sql-quality explain --sql-file=-
 
 文を1つ、ファイル・直書き・標準入力のいずれかで受け取ります。出力はissueとオプティマイザの影響だけの要約です。`--detail=full`でEXPLAIN JSON、`EXPLAIN ANALYZE`、`SHOW WARNINGS`、スキーマ、オプティマイザトレースが加わります。
 
-issueの`id`は種類と場所です（`FullTableScan@posts`、`FunctionInvalidatesIndex@posts.created_at`）。行数やコストを含まないので、問題が残っている間は実行のたびに同じ値になります。
+issueの`id`は種類と場所です（`FullTableScan@posts`、`FunctionInvalidatesIndex@posts.created_at`）。行数やコストを含まないので、問題が残っている間は実行のたびに同じ値になります。同じ場所の2件目以降には`#2`、`#3`を付け、名前に含まれる`@`、`.`、`#`、`\`はバックスラッシュでエスケープします。
 
 ### compare
 

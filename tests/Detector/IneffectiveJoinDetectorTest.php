@@ -72,6 +72,15 @@ final class IneffectiveJoinDetectorTest extends TestCase
         $this->assertSame('review', $findings[0]->suggestion['kind'] ?? null);
     }
 
+    public function testSuggestsAnIndexForNamesContainingADollarSign(): void
+    {
+        $findings = (new IneffectiveJoinDetector())->detect(self::join(
+            ['table_name' => 'c$1', 'access_type' => 'ALL', 'attached_condition' => '(`db$1`.`c$1`.`post$id` = `db$1`.`posts`.`id`)'],
+        ));
+
+        $this->assertSame('CREATE INDEX idx_c$1_post$id ON c$1 (post$id)', $findings[0]->suggestion['ddl'] ?? null);
+    }
+
     public function testDoesNotCombineSeparateSingleTableNestedLoops(): void
     {
         $findings = (new IneffectiveJoinDetector())->detect(self::context([
