@@ -59,4 +59,12 @@ final class IndexDefinitionTest extends TestCase
 
         IndexDefinition::parse($definition);
     }
+
+    public function testASchemaQualifiedTableIsRefusedWithTheReason(): void
+    {
+        $this->expectException(InvalidIndexDefinition::class);
+        $this->expectExceptionMessage('schema-qualified table is not supported');
+
+        IndexDefinition::parse('CREATE INDEX idx_posts_view_count ON reporting.posts (view_count)');
+    }
 }

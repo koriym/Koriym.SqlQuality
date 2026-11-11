@@ -148,6 +148,8 @@ database.
 - Before the index is added, stderr names the `DROP INDEX` statement that removes it. A run killed
   mid-trial can leave the `INVISIBLE` index behind; run that statement, or look for
   `sqlq_trial_%` / your index name in `information_schema.statistics`.
+- A schema-qualified table (`reporting.posts(view_count)`) is refused: connect to that schema with
+  `--dsn` and name the table alone.
 - A table the statement reads that already has an invisible index is refused
   (`InvisibleIndexesPresent`): `use_invisible_indexes=on` would enable it too and the result could
   not be attributed to the trial index.
@@ -219,7 +221,7 @@ final class FullTableScanDetector implements DetectorInterface
 }
 ```
 
-`QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`), `schema` (information_schema per table) and `optimizerTrace` (an excerpt of `information_schema.OPTIMIZER_TRACE` for the default-optimizer `EXPLAIN`, `null` when the trace is unavailable: not captured, unreadable or truncated). `tables()`, `tableAccesses()`, `nestedLoops()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()`, `primaryKeyColumns()` and `optimizerTraceFor()` read them.
+`QueryContext` holds the interpolated `sql`, `explain` (`EXPLAIN FORMAT=JSON`), `explainAnalyze`, `warnings` (`SHOW WARNINGS`), `schema` (information_schema per table, keyed by `posts`, or `reporting.posts` when the statement qualifies the table) and `optimizerTrace` (an excerpt of `information_schema.OPTIMIZER_TRACE` for the default-optimizer `EXPLAIN`, `null` when the trace is unavailable: not captured, unreadable or truncated). `tables()`, `tableAccesses()`, `nestedLoops()`, `warningsWithCode()`, `indexColumns()`, `aliases()`, `schemaFor()`, `columnType()`, `primaryKeyColumns()` and `optimizerTraceFor()` read them.
 
 `Finding::$evidence` holds the values the detector based its decision on: use the EXPLAIN key names for values taken from the plan, and include `table_name` when the finding is about one table, and `column` when it is about one column; the issue id is built from them. It is reported as `evidence` on the issue. `severity`, `confidence` and `suggestion` are optional; when set they replace the defaults for the warning type.
 

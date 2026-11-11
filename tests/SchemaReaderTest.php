@@ -34,4 +34,10 @@ final class SchemaReaderTest extends TestCase
     {
         $this->assertSame(['posts', 'comments'], SchemaReader::tableNames("SELECT * FROM posts p WHERE p.title = 'a -- b' AND EXISTS (SELECT 1 FROM comments c WHERE c.post_id = p.id)"));
     }
+
+    public function testASchemaQualifiedTableKeepsItsQualifier(): void
+    {
+        $this->assertSame(['reporting.posts', 'users'], SchemaReader::tableNames('SELECT * FROM reporting.posts p JOIN users u ON u.id = p.user_id'));
+        $this->assertSame(['reporting.posts'], SchemaReader::tableNames('SELECT * FROM `reporting`.`posts` WHERE id = 1'));
+    }
 }

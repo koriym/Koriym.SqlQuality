@@ -49,6 +49,11 @@ final class IndexDefinition
             return new self($matches[1], substr($name, 0, self::MAX_NAME_LENGTH), $columns);
         }
 
+        // a schema-qualified table: the trial checks and creates indexes in the connection's own database
+        if (preg_match('/\bON\s+`?\w+`?\s*\.\s*`?\w+`?\s*\(|^`?\w+`?\s*\.\s*`?\w+`?\s*\(/i', $definition) === 1) {
+            throw new InvalidIndexDefinition($definition . ' (a schema-qualified table is not supported: connect to that schema with --dsn and name the table alone)');
+        }
+
         throw new InvalidIndexDefinition($definition);
     }
 

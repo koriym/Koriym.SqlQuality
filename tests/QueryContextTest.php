@@ -158,4 +158,12 @@ final class QueryContextTest extends TestCase
         $this->assertNull($context->optimizerTraceFor('p', 3));
         $this->assertNull($context->optimizerTraceFor('comments'));
     }
+
+    public function testAnUnaliasedQualifiedTableMapsFromItsBareName(): void
+    {
+        $context = new QueryContext('SELECT * FROM reporting.posts, reporting.users AS ru', ['query_block' => []], null, [], []);
+
+        // EXPLAIN reports an unaliased table by its bare name
+        $this->assertSame(['posts' => 'reporting.posts', 'ru' => 'reporting.users'], $context->aliases());
+    }
 }

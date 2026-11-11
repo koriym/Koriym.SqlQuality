@@ -15,6 +15,7 @@ use function is_dir;
 use function mkdir;
 use function rmdir;
 use function scandir;
+use function sprintf;
 use function sys_get_temp_dir;
 use function uniqid;
 use function unlink;
@@ -270,5 +271,30 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
         file_put_contents($this->outputDir . '/a.sql', 'SELECT 1');
 
         $this->assertSame(['a.sql'], (new SqlFileAnalyzer($this->connect(), new ExplainAnalyzer(), $this->outputDir))->sqlFiles());
+    }
+
+    public function testATableOfAnotherSchemaGetsItsOwnSchemaAndTheSameFindings(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec('CREATE DATABASE IF NOT EXISTS sqlquality_reporting');
+        $pdo->exec('CREATE TABLE IF NOT EXISTS sqlquality_reporting.posts LIKE posts');
+        $pdo->exec('TRUNCATE sqlquality_reporting.posts');
+        $pdo->exec('INSERT INTO sqlquality_reporting.posts SELECT * FROM posts');
+        $pdo->query('ANALYZE TABLE sqlquality_reporting.posts')->fetchAll();
+
+        try {
+            $analyzer = new SqlFileAnalyzer($pdo);
+            $sql = "SELECT * FROM %s p WHERE DATE(p.created_at) = '2026-06-07'";
+            ['result' => $qualified, 'context' => $context] = $analyzer->explainSql(sprintf($sql, 'sqlquality_reporting.posts'), []);
+            $local = $analyzer->analyzeSql(sprintf($sql, 'posts'), []);
+
+            $this->assertSame(['sqlquality_reporting.posts'], array_keys($context->schema));
+            $this->assertSame(['p' => 'sqlquality_reporting.posts'], $context->aliases());
+            $this->assertNotSame([], $context->indexColumns('p'));
+            $this->assertSame(array_column($local['issues'], 'id'), array_column($qualified['issues'], 'id'));
+            $this->assertContains('FunctionInvalidatesIndex@p.created_at', array_column($qualified['issues'], 'id'));
+        } finally {
+            $pdo->exec('DROP DATABASE sqlquality_reporting');
+        }
     }
 }
