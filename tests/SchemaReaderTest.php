@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Koriym\SqlQuality;
 
+use function array_keys;
 
 final class SchemaReaderTest extends MySqlTestCase
 {
