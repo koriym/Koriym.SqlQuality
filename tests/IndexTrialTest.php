@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\IndexAlreadyExists;
+use Koriym\SqlQuality\Exception\InvalidIndexDefinition;
 use Koriym\SqlQuality\Exception\InvisibleIndexesPresent;
 use Koriym\SqlQuality\Exception\UnboundParameter;
 use PDOException;
@@ -110,6 +111,97 @@ final class IndexTrialTest extends MySqlTestCase
             $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'sqlq_trial_posts_view_count_status'")->fetchColumn());
         } finally {
             $pdo->exec('DROP INDEX sqlq_test_hidden ON posts');
+        }
+    }
+
+    public function testAnInvisibleIndexOnAQualifiedTableOfAnotherSchemaIsRefused(): void
+    {
+        $pdo = $this->connect();
+        $schema = $this->createScratchDatabase($pdo, 'sqlquality_other');
+
+        try {
+            $pdo->exec("CREATE TABLE {$schema}.comments (id INT PRIMARY KEY, post_id INT, INDEX sqlq_test_hidden (post_id) INVISIBLE)");
+            (new IndexTrial($pdo))->run("SELECT * FROM posts p JOIN {$schema}.comments c ON c.post_id = p.id WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('InvisibleIndexesPresent expected');
+        } catch (InvisibleIndexesPresent $e) {
+            $this->assertSame("{$schema}.comments.sqlq_test_hidden", $e->getMessage());
+        } finally {
+            $pdo->exec("DROP DATABASE {$schema}");
+        }
+    }
+
+    public function testAnAliasQualifiedWithTheConnectionDatabaseCountsAsTheTable(): void
+    {
+        $pdo = $this->connect();
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $this->assertIsString($database);
+
+        $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$database}.posts p WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+
+        $this->assertTrue($trial['used']);
+    }
+
+    public function testTheDdlOfASuggestionQualifiedWithTheConnectionDatabaseIsTried(): void
+    {
+        $pdo = $this->connect();
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $this->assertIsString($database);
+
+        $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$database}.posts p WHERE p.view_count > 9900", [], IndexDefinition::parse("CREATE INDEX idx_posts_view_count ON {$database}.posts (view_count)"));
+
+        $this->assertTrue($trial['used']);
+        $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'idx_posts_view_count'")->fetchColumn());
+    }
+
+    public function testAnIndexOnATableOfAnotherSchemaIsRefusedBeforeAnyDdl(): void
+    {
+        $pdo = $this->connect();
+
+        try {
+            (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > 9900', [], IndexDefinition::parse('CREATE INDEX idx_posts_view_count ON reporting.posts (view_count)'));
+            $this->fail('InvalidIndexDefinition expected');
+        } catch (InvalidIndexDefinition $e) {
+            $this->assertStringContainsString('connect to that schema with --dsn', $e->getMessage());
+            $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE index_name = 'idx_posts_view_count'")->fetchColumn());
+        }
+    }
+
+    public function testAnUnaliasedTableOfAnotherSchemaDoesNotCountAsTheTable(): void
+    {
+        $pdo = $this->connect();
+        $schema = $this->createScratchDatabase($pdo, 'sqlquality_other');
+
+        try {
+            // the other schema's posts has an index of the trial's name; EXPLAIN reports it as "posts" too
+            $pdo->exec("CREATE TABLE {$schema}.posts LIKE posts");
+            $pdo->exec("INSERT INTO {$schema}.posts SELECT * FROM posts");
+            $pdo->exec("ALTER TABLE {$schema}.posts ADD INDEX sqlq_trial_posts_view_count (view_count)");
+            $pdo->query("ANALYZE TABLE {$schema}.posts")->fetchAll();
+
+            $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$schema}.posts WHERE view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+
+            $this->assertFalse($trial['used']);
+        } finally {
+            $pdo->exec("DROP DATABASE {$schema}");
+        }
+    }
+
+    public function testTheInvisibleIndexCheckReadsTheStatementWithTheSessionQuoteRules(): void
+    {
+        $pdo = $this->connect();
+        $pdo->exec('ALTER TABLE comments ADD INDEX sqlq_test_hidden (post_id) INVISIBLE');
+        $mode = $pdo->query('SELECT @@session.sql_mode')->fetchColumn();
+        $pdo->exec("SET SESSION sql_mode = CONCAT(@@session.sql_mode, ',NO_BACKSLASH_ESCAPES')");
+
+        try {
+            // without the session's rules, 'C:\' would run on and hide the FROM clause
+            (new IndexTrial($pdo))->run("SELECT 'C:\\' AS path, p.id FROM posts p JOIN comments c ON c.post_id = p.id WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+            $this->fail('InvisibleIndexesPresent expected');
+        } catch (InvisibleIndexesPresent $e) {
+            $this->assertSame('comments.sqlq_test_hidden', $e->getMessage());
+        } finally {
+            $pdo->exec('DROP INDEX sqlq_test_hidden ON comments');
+            $pdo->prepare('SET SESSION sql_mode = ?')->execute([$mode]);
         }
     }
 

@@ -158,4 +158,29 @@ final class QueryContextTest extends TestCase
         $this->assertNull($context->optimizerTraceFor('p', 3));
         $this->assertNull($context->optimizerTraceFor('comments'));
     }
+
+    public function testAnUnaliasedQualifiedTableMapsFromItsBareName(): void
+    {
+        $context = new QueryContext('SELECT * FROM reporting.posts, reporting.users AS ru', ['query_block' => []], null, [], []);
+
+        // EXPLAIN reports an unaliased table by its bare name
+        $this->assertSame(['posts' => 'reporting.posts', 'ru' => 'reporting.users'], $context->aliases());
+    }
+
+    public function testAnUnqualifiedTableKeepsItsNameOverAQualifiedOneOfTheSameName(): void
+    {
+        $before = new QueryContext('SELECT * FROM posts WHERE id IN (SELECT id FROM other.posts)', ['query_block' => []], null, [], []);
+        $after = new QueryContext('SELECT * FROM other.posts WHERE id IN (SELECT id FROM posts)', ['query_block' => []], null, [], []);
+
+        $this->assertSame(['posts' => 'posts'], $before->aliases());
+        $this->assertSame(['posts' => 'posts'], $after->aliases());
+    }
+
+    public function testAColumnAfterTheFromOfAFunctionIsNotATable(): void
+    {
+        $context = new QueryContext("SELECT DISTINCT * FROM posts WHERE EXTRACT(YEAR FROM posts.created_at) = 2024 AND TRIM(' ' FROM posts.title) <> '' AND id IN (SELECT id FROM other.posts)", ['query_block' => []], null, [], []);
+
+        $this->assertSame(['posts' => 'posts'], $context->aliases());
+        $this->assertSame(['posts', 'other.posts'], SchemaReader::tableNames($context->sql));
+    }
 }

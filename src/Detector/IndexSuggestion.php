@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Koriym\SqlQuality\Detector;
 
 use Koriym\SqlQuality\QueryContext;
+use Koriym\SqlQuality\TableReferences;
 use Koriym\SqlQuality\Types;
 
 use function array_slice;
@@ -29,13 +30,15 @@ final class IndexSuggestion
             return null;
         }
 
+        // the table key is "reporting.posts" for a schema-qualified table: the DDL names it so, the index name does not
         $table = $context->aliases()[$aliasOrTable] ?? $aliasOrTable;
+        $bareTable = TableReferences::split($table)[1];
         $columnList = implode(', ', $columns);
 
         return [
             'kind' => 'index',
             'description' => 'Add a composite index covering ' . $columnList,
-            'ddl' => 'CREATE INDEX idx_' . $table . '_' . implode('_', $columns) . ' ON ' . $table . ' (' . $columnList . ')',
+            'ddl' => 'CREATE INDEX idx_' . $bareTable . '_' . implode('_', $columns) . ' ON ' . $table . ' (' . $columnList . ')',
         ];
     }
 
