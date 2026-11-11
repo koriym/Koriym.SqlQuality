@@ -8,8 +8,10 @@ use function array_values;
 use function explode;
 use function preg_match;
 use function preg_match_all;
+use function substr;
 use function trim;
 
+use const PREG_OFFSET_CAPTURE;
 use const PREG_SET_ORDER;
 
 /**
@@ -39,7 +41,14 @@ final class TableReferences
     public static function aliases(string $sqlWithoutComments): array
     {
         $aliases = [];
-        foreach (self::references($sqlWithoutComments) as [$alias, $key]) {
+        foreach (self::references($sqlWithoutComments) as [$alias, $key, $explicit]) {
+            // "FROM posts ... FROM other.posts": both are reported as "posts"; the unqualified table keeps the name
+            if (! $explicit && $key !== $alias) {
+                $aliases[$alias] ??= $key;
+
+                continue;
+            }
+
             $aliases[$alias] = $key;
         }
 
@@ -66,29 +75,57 @@ final class TableReferences
     }
 
     /**
-     * @return list<array{0: string, 1: string}> [alias or bare table name, table key] per reference
+     * @return list<array{0: string, 1: string, 2: bool}> [alias or bare table name, table key, alias given] per reference
      *
      * @psalm-pure
      */
     private static function references(string $sqlWithoutComments): array
     {
-        preg_match_all(self::LIST, $sqlWithoutComments, $matches, PREG_SET_ORDER);
+        preg_match_all(self::LIST, $sqlWithoutComments, $matches, PREG_SET_ORDER | PREG_OFFSET_CAPTURE);
 
         $references = [];
         foreach ($matches as $match) {
-            foreach (explode(',', $match[1]) as $reference) {
+            if (self::isFunctionArgument($sqlWithoutComments, $match[0][1])) {
+                continue;
+            }
+
+            foreach (explode(',', $match[1][0]) as $reference) {
                 if (preg_match(self::ITEM, trim($reference), $item) !== 1) {
                     continue;
                 }
 
                 $schema = $item[1];
                 $table = $item[2];
-                $alias = ($item[3] ?? '') === '' ? $table : $item[3];
-                $references[] = [$alias, $schema === '' ? $table : $schema . '.' . $table];
+                $explicit = ($item[3] ?? '') !== '';
+                $references[] = [$explicit ? $item[3] : $table, $schema === '' ? $table : $schema . '.' . $table, $explicit];
             }
         }
 
         return $references;
+    }
+
+    /**
+     * Whether the keyword at $offset is the FROM of EXTRACT(YEAR FROM t.c), TRIM(x FROM t.c) or SUBSTRING(t.c FROM 2):
+     * inside parentheses that are not a subquery. "t.c" there is a column, not a schema-qualified table.
+     *
+     * @psalm-pure
+     */
+    private static function isFunctionArgument(string $sql, int $offset): bool
+    {
+        $depth = 0;
+        for ($i = $offset - 1; $i >= 0; $i--) {
+            if ($sql[$i] === ')') {
+                $depth++;
+            } elseif ($sql[$i] === '(') {
+                if ($depth === 0) {
+                    return preg_match('/\bSELECT\b/i', substr($sql, $i + 1, $offset - $i - 1)) !== 1;
+                }
+
+                $depth--;
+            }
+        }
+
+        return false;
     }
 
     /** @return array{0: string|null, 1: string} the schema (null when unqualified) and the table of a key */

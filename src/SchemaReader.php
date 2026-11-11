@@ -47,14 +47,12 @@ final class SchemaReader
     }
 
     /**
+     * @param string $tableName a table key: "posts" for a table of the connection's database, or
+     *                          "reporting.posts" for one of another schema
+     *
      * @return SchemaInfo
      *
      * @throws RuntimeException
-     */
-
-    /**
-     * @param string $tableName a table key: "posts" for a table of the connection's database, or
-     *                          "reporting.posts" for one of another schema
      */
     public function forTable(string $tableName): array
     {

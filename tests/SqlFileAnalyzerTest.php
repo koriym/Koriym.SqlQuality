@@ -10,11 +10,9 @@ use RuntimeException;
 
 use function array_column;
 use function array_keys;
-use function bin2hex;
 use function file_put_contents;
 use function is_dir;
 use function mkdir;
-use function random_bytes;
 use function rmdir;
 use function scandir;
 use function sprintf;
@@ -278,9 +276,7 @@ final class SqlFileAnalyzerTest extends MySqlTestCase
     public function testATableOfAnotherSchemaGetsItsOwnSchemaAndTheSameFindings(): void
     {
         $pdo = $this->connect();
-        // a database of this test's own: created without IF NOT EXISTS, so the finally drops nothing else
-        $schema = 'sqlquality_reporting_' . bin2hex(random_bytes(4));
-        $pdo->exec("CREATE DATABASE {$schema}");
+        $schema = $this->createScratchDatabase($pdo, 'sqlquality_reporting');
 
         try {
             $pdo->exec("CREATE TABLE {$schema}.posts LIKE posts");

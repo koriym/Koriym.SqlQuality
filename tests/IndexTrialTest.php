@@ -6,6 +6,7 @@ namespace Koriym\SqlQuality;
 
 use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\IndexAlreadyExists;
+use Koriym\SqlQuality\Exception\InvalidIndexDefinition;
 use Koriym\SqlQuality\Exception\InvisibleIndexesPresent;
 use Koriym\SqlQuality\Exception\UnboundParameter;
 use PDOException;
@@ -14,9 +15,7 @@ use RuntimeException;
 
 use function array_filter;
 use function array_values;
-use function bin2hex;
 use function preg_match;
-use function random_bytes;
 
 final class IndexTrialTest extends MySqlTestCase
 {
@@ -112,8 +111,7 @@ final class IndexTrialTest extends MySqlTestCase
     public function testAnInvisibleIndexOnAQualifiedTableOfAnotherSchemaIsRefused(): void
     {
         $pdo = $this->connect();
-        $schema = 'sqlquality_other_' . bin2hex(random_bytes(4));
-        $pdo->exec("CREATE DATABASE {$schema}");
+        $schema = $this->createScratchDatabase($pdo, 'sqlquality_other');
 
         try {
             $pdo->exec("CREATE TABLE {$schema}.comments (id INT PRIMARY KEY, post_id INT, INDEX sqlq_test_hidden (post_id) INVISIBLE)");
@@ -135,6 +133,51 @@ final class IndexTrialTest extends MySqlTestCase
         $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$database}.posts p WHERE p.view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
 
         $this->assertTrue($trial['used']);
+    }
+
+    public function testTheDdlOfASuggestionQualifiedWithTheConnectionDatabaseIsTried(): void
+    {
+        $pdo = $this->connect();
+        $database = $pdo->query('SELECT DATABASE()')->fetchColumn();
+        $this->assertIsString($database);
+
+        $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$database}.posts p WHERE p.view_count > 9900", [], IndexDefinition::parse("CREATE INDEX idx_posts_view_count ON {$database}.posts (view_count)"));
+
+        $this->assertTrue($trial['used']);
+        $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE table_schema = DATABASE() AND index_name = 'idx_posts_view_count'")->fetchColumn());
+    }
+
+    public function testAnIndexOnATableOfAnotherSchemaIsRefusedBeforeAnyDdl(): void
+    {
+        $pdo = $this->connect();
+
+        try {
+            (new IndexTrial($pdo))->run('SELECT * FROM posts WHERE view_count > 9900', [], IndexDefinition::parse('CREATE INDEX idx_posts_view_count ON reporting.posts (view_count)'));
+            $this->fail('InvalidIndexDefinition expected');
+        } catch (InvalidIndexDefinition $e) {
+            $this->assertStringContainsString('connect to that schema with --dsn', $e->getMessage());
+            $this->assertFalse($pdo->query("SELECT 1 FROM information_schema.statistics WHERE index_name = 'idx_posts_view_count'")->fetchColumn());
+        }
+    }
+
+    public function testAnUnaliasedTableOfAnotherSchemaDoesNotCountAsTheTable(): void
+    {
+        $pdo = $this->connect();
+        $schema = $this->createScratchDatabase($pdo, 'sqlquality_other');
+
+        try {
+            // the other schema's posts has an index of the trial's name; EXPLAIN reports it as "posts" too
+            $pdo->exec("CREATE TABLE {$schema}.posts LIKE posts");
+            $pdo->exec("INSERT INTO {$schema}.posts SELECT * FROM posts");
+            $pdo->exec("ALTER TABLE {$schema}.posts ADD INDEX sqlq_trial_posts_view_count (view_count)");
+            $pdo->query("ANALYZE TABLE {$schema}.posts")->fetchAll();
+
+            $trial = (new IndexTrial($pdo))->run("SELECT * FROM {$schema}.posts WHERE view_count > 9900", [], IndexDefinition::parse('posts(view_count)'));
+
+            $this->assertFalse($trial['used']);
+        } finally {
+            $pdo->exec("DROP DATABASE {$schema}");
+        }
     }
 
     public function testTheNoticeNamesTheDropStatementBeforeTheIndexIsAdded(): void

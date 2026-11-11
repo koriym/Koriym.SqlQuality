@@ -89,7 +89,7 @@ vendor/bin/sql-quality try-index --sql-file=sql/1_full_table_scan.sql --params=s
 
 - ALTERとDROPは、テーブルに開いているトランザクションがあるとメタデータロックを待ち、その間ほかの文もその後ろに並びます。そのためセッションの`lock_wait_timeout`を10秒に下げており、混んでいるテーブルではテーブルを止めずに試行が失敗します（終了コード2）。
 - インデックスを追加する前に、それを消す`DROP INDEX`文を標準エラー出力に出します。試行の途中でプロセスが強制終了されると`INVISIBLE`のインデックスが残ることがあります。その文を実行するか、`information_schema.statistics`で`sqlq_trial_%`や指定した名前を探してください。
-- スキーマ名で修飾したテーブル（`reporting.posts(view_count)`）は拒否します。`--dsn`でそのスキーマに接続し、テーブル名だけを指定してください。
+- 別のスキーマのテーブル（`reporting.posts(view_count)`）は拒否します。`--dsn`でそのスキーマに接続し、テーブル名だけを指定してください。接続先データベース名で修飾したテーブル（`FROM app.posts`に対する提案の`ddl`）は受け付けます。
 - 文が読むテーブルに不可視インデックスがすでにあると拒否します（`InvisibleIndexesPresent`）。`use_invisible_indexes=on`でそれも有効になり、効果を試行したインデックスに帰せないためです。
 
 ### 終了コード

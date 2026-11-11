@@ -60,11 +60,15 @@ final class IndexDefinitionTest extends TestCase
         IndexDefinition::parse($definition);
     }
 
-    public function testASchemaQualifiedTableIsRefusedWithTheReason(): void
+    public function testASchemaQualifiedTableKeepsItsSchema(): void
     {
-        $this->expectException(InvalidIndexDefinition::class);
-        $this->expectExceptionMessage('schema-qualified table is not supported');
+        $index = IndexDefinition::parse('CREATE INDEX idx_posts_view_count ON `reporting`.`posts` (view_count)');
+        $short = IndexDefinition::parse('reporting.posts(view_count)');
 
-        IndexDefinition::parse('CREATE INDEX idx_posts_view_count ON reporting.posts (view_count)');
+        // IndexTrial accepts the schema only when it is the connection's database; the statements name the table alone
+        $this->assertSame(['reporting', 'posts'], [$index->schema, $index->table]);
+        $this->assertSame(['reporting', 'posts', 'sqlq_trial_posts_view_count'], [$short->schema, $short->table, $short->name]);
+        $this->assertSame('DROP INDEX `idx_posts_view_count` ON `posts`', $index->dropStatement());
+        $this->assertNull(IndexDefinition::parse('posts(view_count)')->schema);
     }
 }

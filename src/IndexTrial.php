@@ -9,6 +9,7 @@ use Koriym\SqlQuality\Exception\ActiveTransactionRejected;
 use Koriym\SqlQuality\Exception\IndexAlreadyExists;
 use Koriym\SqlQuality\Exception\IndexCleanupFailed;
 use Koriym\SqlQuality\Exception\IndexTrialUnsupported;
+use Koriym\SqlQuality\Exception\InvalidIndexDefinition;
 use Koriym\SqlQuality\Exception\InvisibleIndexesPresent;
 use Koriym\SqlQuality\Exception\RuntimeException;
 use PDO;
@@ -84,6 +85,7 @@ final class IndexTrial
         }
 
         $this->assertSupported();
+        $this->assertOwnSchema($index);
         $this->assertAbsent($index);
         $this->assertNoInvisibleIndexes($sql, $index);
         // bind first: an unbound parameter fails here, before any DDL
@@ -151,7 +153,8 @@ final class IndexTrial
      */
     private static function namesOf(string $table, array $aliases, string|null $database): array
     {
-        $names = [$table];
+        // the bare name counts by itself only when no reference claims it: "FROM other.posts" is reported as "posts" too
+        $names = isset($aliases[$table]) ? [] : [$table];
         foreach ($aliases as $alias => $aliasedTable) {
             if ($aliasedTable !== $table && ($database === null || $aliasedTable !== $database . '.' . $table)) {
                 continue;
@@ -223,6 +226,21 @@ final class IndexTrial
         }
 
         return $stmt->fetchColumn() !== false;
+    }
+
+    /**
+     * The trial checks and creates indexes in the connection's own database; a table qualified with it
+     * (as a suggestion's ddl names it for "FROM app.posts") is that table.
+     *
+     * @throws InvalidIndexDefinition
+     */
+    private function assertOwnSchema(IndexDefinition $index): void
+    {
+        if ($index->schema === null || $index->schema === $this->database()) {
+            return;
+        }
+
+        throw new InvalidIndexDefinition("{$index->schema}.{$index->table} (a table of another schema is not supported: connect to that schema with --dsn and name the table alone)");
     }
 
     /** @throws IndexAlreadyExists */

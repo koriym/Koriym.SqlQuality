@@ -20,10 +20,14 @@ use function trim;
  * A secondary index to try, parsed from `CREATE INDEX name ON table (col, col(10) DESC)` (the form of a
  * suggestion's ddl) or the short `table(col, col)`. Only plain identifiers are accepted, so the DDL built
  * from it cannot carry anything but an index definition.
+ *
+ * The table may be qualified (`app.posts`, as a suggestion names a qualified table); IndexTrial accepts it
+ * only when the schema is the connection's own database.
  */
 final class IndexDefinition
 {
     private const IDENTIFIER = '`?([A-Za-z0-9_$]+)`?';
+    private const SCHEMA = '(?:`?([A-Za-z0-9_$]+)`?\s*\.\s*)?';
     private const MAX_NAME_LENGTH = 64;
 
     /** @param list<array{name: string, length: int|null, order: 'ASC'|'DESC'|null}> $columns */
@@ -31,6 +35,7 @@ final class IndexDefinition
         public readonly string $table,
         public readonly string $name,
         public readonly array $columns,
+        public readonly string|null $schema = null,
     ) {
     }
 
@@ -38,20 +43,15 @@ final class IndexDefinition
     public static function parse(string $definition): self
     {
         $definition = trim($definition, " \t\n\r;");
-        if (preg_match('/^CREATE\s+INDEX\s+' . self::IDENTIFIER . '\s+ON\s+' . self::IDENTIFIER . '\s*\((.+)\)$/is', $definition, $matches)) {
-            return new self($matches[2], self::checkedName($matches[1], $definition), self::columns($matches[3], $definition));
+        if (preg_match('/^CREATE\s+INDEX\s+' . self::IDENTIFIER . '\s+ON\s+' . self::SCHEMA . self::IDENTIFIER . '\s*\((.+)\)$/is', $definition, $matches)) {
+            return new self($matches[3], self::checkedName($matches[1], $definition), self::columns($matches[4], $definition), $matches[2] === '' ? null : $matches[2]);
         }
 
-        if (preg_match('/^' . self::IDENTIFIER . '\s*\((.+)\)$/s', $definition, $matches)) {
-            $columns = self::columns($matches[2], $definition);
-            $name = 'sqlq_trial_' . $matches[1] . '_' . implode('_', array_map(static fn (array $column): string => $column['name'], $columns));
+        if (preg_match('/^' . self::SCHEMA . self::IDENTIFIER . '\s*\((.+)\)$/s', $definition, $matches)) {
+            $columns = self::columns($matches[3], $definition);
+            $name = 'sqlq_trial_' . $matches[2] . '_' . implode('_', array_map(static fn (array $column): string => $column['name'], $columns));
 
-            return new self($matches[1], substr($name, 0, self::MAX_NAME_LENGTH), $columns);
-        }
-
-        // a schema-qualified table: the trial checks and creates indexes in the connection's own database
-        if (preg_match('/\bON\s+`?\w+`?\s*\.\s*`?\w+`?\s*\(|^`?\w+`?\s*\.\s*`?\w+`?\s*\(/i', $definition) === 1) {
-            throw new InvalidIndexDefinition($definition . ' (a schema-qualified table is not supported: connect to that schema with --dsn and name the table alone)');
+            return new self($matches[2], substr($name, 0, self::MAX_NAME_LENGTH), $columns, $matches[1] === '' ? null : $matches[1]);
         }
 
         throw new InvalidIndexDefinition($definition);

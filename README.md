@@ -148,8 +148,9 @@ database.
 - Before the index is added, stderr names the `DROP INDEX` statement that removes it. A run killed
   mid-trial can leave the `INVISIBLE` index behind; run that statement, or look for
   `sqlq_trial_%` / your index name in `information_schema.statistics`.
-- A schema-qualified table (`reporting.posts(view_count)`) is refused: connect to that schema with
-  `--dsn` and name the table alone.
+- A table of another schema (`reporting.posts(view_count)`) is refused: connect to that schema with
+  `--dsn` and name the table alone. A table qualified with the connection's own database, as a
+  suggestion's `ddl` names it for `FROM app.posts`, is accepted.
 - A table the statement reads that already has an invisible index is refused
   (`InvisibleIndexesPresent`): `use_invisible_indexes=on` would enable it too and the result could
   not be attributed to the trial index.

@@ -8,7 +8,9 @@ use PDO;
 use PDOException;
 use PHPUnit\Framework\TestCase;
 
+use function bin2hex;
 use function getenv;
+use function random_bytes;
 
 abstract class MySqlTestCase extends TestCase
 {
@@ -35,5 +37,25 @@ abstract class MySqlTestCase extends TestCase
 
             $this->markTestSkipped($dsn . ': ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Creates a database of the test's own, named "<prefix>_<random hex>" and without IF NOT EXISTS, so dropping
+     * it drops nothing else. Skipped without the CREATE privilege, unless SQL_QUALITY_REQUIRE_DB is set.
+     */
+    protected function createScratchDatabase(PDO $pdo, string $prefix): string
+    {
+        $name = $prefix . '_' . bin2hex(random_bytes(4));
+        try {
+            $pdo->exec("CREATE DATABASE {$name}");
+        } catch (PDOException $e) {
+            if ((string) getenv('SQL_QUALITY_REQUIRE_DB') !== '') {
+                $this->fail("CREATE DATABASE {$name}: " . $e->getMessage());
+            }
+
+            $this->markTestSkipped("CREATE DATABASE {$name}: " . $e->getMessage());
+        }
+
+        return $name;
     }
 }
